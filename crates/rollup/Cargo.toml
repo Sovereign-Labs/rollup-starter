@@ -15,7 +15,6 @@ sov-modules-api = { workspace = true, features = ["native"] }
 sov-state = { workspace = true }
 sov-kernels = { workspace = true, features = ["native"] }
 sov-mock-zkvm = { workspace = true, features = ["native"] }
-tracing-appender = { workspace = true }
 sov-accounts = { workspace = true, features = ["native"] }
 sov-bank = { workspace = true, features = ["native"] }
 sov-ledger-apis = { workspace = true }

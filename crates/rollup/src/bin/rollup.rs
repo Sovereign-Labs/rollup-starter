@@ -16,14 +16,11 @@ use sov_stf_runner::{from_toml_path, RollupConfig};
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use sov_address::EthereumAddress;
 use sov_modules_api::capabilities::RollupHeight;
-
-const LOG_FILE_PREFIX: &str = "rollup.log";
 
 #[cfg(all(feature = "mock_da", feature = "celestia_da"))]
 compile_error!("Both mock_da and celestia_da are enabled, but only one should be.");
@@ -70,11 +67,7 @@ struct Args {
     #[arg(long, default_value = default_genesis_path().into_os_string())]
     genesis_path: PathBuf,
 
-    /// The optional path to the log file.
-    #[arg(long, default_value = None)]
-    log_dir: Option<String>,
-
-    /// The optional path to the log file.
+    // UDP port on 127.0.0.1 where Telegraf service suppose to listen.
     #[arg(long, default_value_t = 9845)]
     metrics: u64,
 
@@ -87,7 +80,7 @@ struct Args {
     stop_at_rollup_height: Option<u64>,
 }
 
-fn init_logging(log_dir: Option<String>) -> (Option<WorkerGuard>, Option<OtelGuard>) {
+fn init_logging() -> Option<OtelGuard> {
     // Configuring filter
     let rust_log_value =
         env::var("RUST_LOG").unwrap_or_else(|_| default_rust_log_value().to_string());
@@ -111,31 +104,19 @@ fn init_logging(log_dir: Option<String>) -> (Option<WorkerGuard>, Option<OtelGua
         (None, None)
     };
 
-    // Option 2: File appender
-    let (file_guard, file_layer) = if let Some(path) = &log_dir {
-        let file_appender = tracing_appender::rolling::daily(path, LOG_FILE_PREFIX);
-        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-        let file_layer = fmt::layer().with_ansi(false).with_writer(non_blocking);
-
-        (Some(guard), Some(file_layer.boxed()))
-    } else {
-        (None, None)
-    };
-
     // Initializing.
     tracing_subscriber::registry()
         .with(env_filter)
         .with(stdout_layer)
         .with(otel_layer)
-        .with(file_layer)
         .init();
 
-    print_information_about_logging(&rust_log_value, &log_dir);
+    print_information_about_logging(&rust_log_value);
 
-    (file_guard, otel_guard)
+    otel_guard
 }
 
-fn print_information_about_logging(current_env_filter: &str, log_dir: &Option<String>) {
+fn print_information_about_logging(current_env_filter: &str) {
     tracing::info!(
         RUST_LOG = %current_env_filter,
         "Logging initialized; you can restart the node with a custom `RUST_LOG` environment variable to customize log filtering"
@@ -143,19 +124,14 @@ fn print_information_about_logging(current_env_filter: &str, log_dir: &Option<St
     if !should_init_open_telemetry_exporter() {
         tracing::info!("Open Telemetry exporter was not enabled");
     }
-    if let Some(log_dir) = log_dir {
-        tracing::info!(dir = ?log_dir, prefix = LOG_FILE_PREFIX, "Logging to file has been enabled, besides stdout.")
-    } else {
-        tracing::info!("Logging to a file wasn't enabled, logging only to stdout.");
-    }
 }
 
 #[tokio::main]
-// Not returning result here, so error could be logged properly.
+// Not returning a result here, so the error could be logged properly.
 async fn main() {
     let args = Args::parse();
 
-    let guard = init_logging(args.log_dir);
+    let _guard = init_logging();
     let prev_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
         tracing_panic::panic_hook(panic_info);
@@ -185,7 +161,6 @@ async fn main() {
     .await
     .expect("Couldn't start rollup");
     rollup.run().await.expect("Couldn't run rollup");
-    drop(guard);
 }
 
 fn parse_prover_config() -> anyhow::Result<Option<RollupProverConfigDiscriminants>> {
@@ -218,6 +193,7 @@ async fn new_rollup(
 ) -> Result<Rollup<StarterRollup<Native>, Native>, anyhow::Error> {
     tracing::info!(
         ?rollup_config_path,
+        ?genesis_path,
         ?start_at_rollup_height,
         ?stop_at_rollup_height,
         "Starting rollup with config"
