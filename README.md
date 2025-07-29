@@ -4,6 +4,8 @@ This repository provides a starting point for building rollups with the Sovereig
 
 It includes everything you need to create a rollup with customizable modules, REST API for state queries, TypeScript SDK for submitting transactions, WebSocket endpoints to subscribe to transactions and events, built-in token management, and much more.
 
+**Note:** The Sovereign SDK is provided under a revenue share agreement for commercial applications. See the [LICENSE](/LICENSE.md) file for more details.
+
 ## Repository Structure
 
 - `crates/stf`: Contains the State Transition Function (STF) derived from the Runtime, used by both the rollup and prover crates
