@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # be strict
-set -euo pipefail
+set -euxo pipefail
 
 # Amount of bridge nodes to setup, taken from the first argument
 # or 1 if not provided
@@ -37,8 +37,9 @@ wait_for_block() {
 
   # Wait for the block to be created
   while [[ -z "$block_hash" ]]; do
+    # `celestia-appd` skips the block_id field so we use rest
     # `|| echo` fallbacks to an empty string in case it's not ready
-    block_hash="$(celestia-appd query block "$block_num" 2>/dev/null | jq '.block_id.hash' || echo)"
+    block_hash="$(curl -sS "http://localhost:26657/block?height=$block_num" 2>/dev/null | jq -r '.result.block_id.hash // ""' || echo)"
     sleep 0.1
   done
 
@@ -68,7 +69,7 @@ provision_bridge_nodes() {
       echo "Creating a new keys for the $bridge_name"
       celestia-appd keys add "$bridge_name" --keyring-backend "test"
       # export it
-      echo "password" | celestia-appd keys export "$bridge_name" 2> "$key_file"
+      echo "password" | celestia-appd keys export "$bridge_name" --keyring-backend "test" 2> "$key_file"
       # export associated address
       node_address "$bridge_name" > "$addr_file"
     else
@@ -120,15 +121,38 @@ setup_private_validator() {
   celestia-appd keys add "$NODE_NAME" --keyring-backend="test"
   validator_addr=$(node_address "$NODE_NAME")
   # Create a validator's genesis account for the genesis.json with an initial bag of coins
-  celestia-appd add-genesis-account "$validator_addr" "$VALIDATOR_COINS"
+  celestia-appd genesis add-genesis-account "$validator_addr" "$VALIDATOR_COINS"
   # Generate a genesis transaction that creates a validator with a self-delegation
-  celestia-appd gentx "$NODE_NAME" 5000000000utia \
+  celestia-appd genesis gentx "$NODE_NAME" 5000000000utia \
     --keyring-backend="test" \
     --chain-id "$P2P_NETWORK" \
     --gas-prices "1utia"
   # Collect the genesis transactions and form a genesis.json
-  celestia-appd collect-gentxs
+  celestia-appd genesis collect-gentxs
 
+  # Set proper defaults and change ports
+  dasel put -f "$CONFIG_DIR/config/config.toml" -t string -v 'tcp://0.0.0.0:26657' rpc.laddr
+  # enable transaction indexing
+  dasel put -f "$CONFIG_DIR/config/config.toml" -t string -v 'kv' tx_index.indexer
+
+  # enable REST API
+  dasel put -f "$CONFIG_DIR/config/app.toml" -t bool -v true api.enable
+  dasel put -f "$CONFIG_DIR/config/app.toml" -t string -v 'tcp://0.0.0.0:1317' api.address
+  # enable gRPC
+  dasel put -f "$CONFIG_DIR/config/app.toml" -t bool -v true grpc.enable
+  dasel put -f "$CONFIG_DIR/config/app.toml" -t string -v '0.0.0.0:9090' grpc.address
+
+  # enable grpc-web
+  dasel put -f "$CONFIG_DIR/config/app.toml" -t bool -v true grpc-web.enable
+  # enable unsafe CORS since we don't do security properly in CI
+  dasel put -f "$CONFIG_DIR/config/app.toml" -t bool -v true grpc-web.enable-unsafe-cors
+
+  echo "~~~~~~~~~~~~~~~~"
+  echo "APP CONFIG:"
+  cat "$CONFIG_DIR/config/app.toml"
+
+
+  # TODO: convert this to dasel
   # Set proper defaults and change ports
   # If you encounter: `sed: -I or -i may not be used with stdin` on MacOS you can mitigate by installing gnu-sed
   # https://gist.github.com/andre3k1/e3a1a7133fded5de5a9ee99c87c6fa0d?permalink_comment_id=3082272#gistcomment-3082272
@@ -155,6 +179,7 @@ setup_private_validator() {
   sed -i'.bak' 's/^timeout_precommit\s*=.*/timeout_precommit = "20ms"/g' "$CONFIG_DIR/config/config.toml"
   # timeout_precommit_delta = "500ms"
   sed -i'.bak' 's/^timeout_precommit_delta\s*=.*/timeout_precomm_delta = "10ms"/g' "$CONFIG_DIR/config/config.toml"
+  cat "$CONFIG_DIR/config/config.toml"
 }
 
 main() {

@@ -43,16 +43,18 @@ import_shared_key() {
     --node.type bridge
 }
 
-add_trusted_genesis() {
+add_trusted_genesis_and_set_network() {
   local genesis_hash
 
-  # Read the hash of the genesis block
   genesis_hash="$(cat "$GENESIS_HASH_FILE")"
   # and make it trusted in the node's config
   echo "Trusting a genesis: $genesis_hash"
-  sed -i'.bak' "s/TrustedHash = .*/TrustedHash = $genesis_hash/" "$CONFIG_DIR/config.toml"
+  sed -i'.bak' "s/TrustedHash = .*/TrustedHash = \"$genesis_hash\"/" "$CONFIG_DIR/config.toml"
   sed -i'.bak' "s/Address = \"localhost\"/Address = \"0.0.0.0\"/" "$CONFIG_DIR/config.toml"
   sed -i'.bak' "s/SkipAuth = false/SkipAuth = true/" "$CONFIG_DIR/config.toml"
+  # celestia-node requires setting custom network params through env
+  cat
+  export CELESTIA_CUSTOM="$P2P_NETWORK:$genesis_hash"
 }
 
 write_jwt_token() {
@@ -70,7 +72,7 @@ main() {
   # Initialize the bridge node
   celestia bridge init --p2p.network "$P2P_NETWORK"
   # Trust the private blockchain
-  add_trusted_genesis
+  add_trusted_genesis_and_set_network
   # Update the JWT token
   write_jwt_token
   # Start the bridge node
@@ -80,7 +82,7 @@ main() {
     --core.ip validator \
     --keyring.keyname "$NODE_NAME" \
     --p2p.network "$P2P_NETWORK" \
-    --archival \
+    --rpc.addr "0.0.0.0" \
     --gateway.addr "0.0.0.0"
 }
 

@@ -11,10 +11,12 @@ fi
 TOKEN=$(cat "$1")
 
 # Check header.NetworkHead
-HEIGHT=$(curl -s --fail -X POST http://127.0.0.1:26658 \
+CURL_OUTPUT=$(curl -s --fail -X POST http://127.0.0.1:26658 \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer $TOKEN" \
-     -d '{"id": 1, "jsonrpc": "2.0", "method": "header.NetworkHead", "params": []}' | jq ".result.header.height" | bc)
+     -d '{"id": 1, "jsonrpc": "2.0", "method": "header.NetworkHead", "params": []}')
+
+echo "Raw curl output: '$CURL_OUTPUT'"
+HEIGHT=$(echo "$CURL_OUTPUT" | jq -r ".result.header.height" | bc)
 
 echo "Network head height is: '$HEIGHT'"
 
@@ -28,7 +30,6 @@ echo "header.NetworkHead is above or equal to $TARGET_HEIGHT, checking header.."
 # Check header.GetByHeight to be more confident in readiness
 HEADER=$(curl -s --fail -X POST http://127.0.0.1:26658 \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer $TOKEN" \
      -d "{\"id\": 1, \"jsonrpc\": \"2.0\", \"method\": \"header.GetByHeight\", \"params\": [$TARGET_HEIGHT]}")
 
 if echo "$HEADER" | jq -e '.result.header' >/dev/null; then
