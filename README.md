@@ -9,7 +9,7 @@ It includes everything you need to create a rollup with customizable modules, RE
 - `crates/stf`: Contains the State Transition Function (STF) derived from the Runtime, used by both the rollup and prover crates
 - `crates/provers`: Generates proofs for the STF
 - `crates/rollup`: Runs the main rollup binary. This includes both the full-node and the soft-confirming sequencer (as well as replica + fail-over logic.)
-- `examples/value-setter`: Example of Sovereign Rollup module.
+- `examples/value-setter`: Example module.
 
 ## Prerequisites
 
