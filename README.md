@@ -265,5 +265,9 @@ $ cargo run --rollup_config_path="configs/mock/genesis_without_paymaster.json"
 - Try cleaning the database with `make clean-db` and restart
 - Verify you're using the correct Rust version (1.88.0 or later)
 
+**Rollup crashed with `buckets exhausted` error**
+- Increase parameter `storage.user_hashtable_buckets`
+- Clean the rollup database and resync from DA layer
+
 ## Additional Resources
 For more details, visit the [Sovereign SDK documentation](https://docs.sovereign.xyz).
