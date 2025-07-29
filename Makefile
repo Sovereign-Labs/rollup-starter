@@ -65,7 +65,7 @@ build-docker-mock-da: ## Build docker container for the rollup with MockDa
 	DOCKER_BUILDKIT=1 \
 	docker build \
 	--ssh default \
-	-f ./docker/rollup/Dockerfile.mock \
+	-f ./integrations/rollup/Dockerfile.mock \
 	-t rollup-starter:debug \
 	.
 
