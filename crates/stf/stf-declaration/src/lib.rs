@@ -72,6 +72,8 @@ where
     pub blob_storage: sov_blob_storage::BlobStorage<S>,
     /// The Paymaster module.
     pub paymaster: sov_paymaster::Paymaster<S>,
+    /// The Revenue Share module.
+    pub revenue_share: sov_revenue_share::RevenueShare<S>,
     /// The hyperlane mailbox
     pub mailbox: Mailbox<S>,
     /// The hyperlane interchain gas paymaster

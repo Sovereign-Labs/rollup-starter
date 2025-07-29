@@ -10066,6 +10066,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sov-revenue-share"
+version = "0.3.0"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=349bdcd8b76067b6f120db06a66d518fd8f80f8a#349bdcd8b76067b6f120db06a66d518fd8f80f8a"
+dependencies = [
+ "anyhow",
+ "borsh",
+ "schemars",
+ "serde",
+ "sov-bank",
+ "sov-modules-api",
+ "sov-sequencer-registry",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "sov-risc0-adapter"
 version = "0.3.0"
 source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=349bdcd8b76067b6f120db06a66d518fd8f80f8a#349bdcd8b76067b6f120db06a66d518fd8f80f8a"
@@ -11294,6 +11309,7 @@ dependencies = [
  "sov-operator-incentives",
  "sov-paymaster",
  "sov-prover-incentives",
+ "sov-revenue-share",
  "sov-rollup-apis",
  "sov-rollup-interface",
  "sov-sequencer-registry",
