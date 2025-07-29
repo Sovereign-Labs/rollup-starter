@@ -169,7 +169,7 @@ subscription.unsubscribe();
 ### Interacting with different modules
 
 To interact with different modules, simply change the call message. 
-The top-level key corresponds to the [module's variable name in the runtime](/crates/stf/stf-declaration/src/lib.rs#L84), 
+The top-level key corresponds to the [module's variable name in the runtime](/crates/stf/stf-declaration/src/lib.rs#L86), 
 and the nested key is the [CallMessage](examples/value-setter/src/lib.rs#L61) enum variant in snake_case:
 
 ```js
