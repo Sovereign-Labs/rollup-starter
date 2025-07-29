@@ -29,9 +29,6 @@ on:
         required: false
         type: string
         default: ""
-    secrets:
-      SDK_WIP_ACCESS_TOKEN:
-        required: true
 
 jobs:
   run:
@@ -48,9 +45,6 @@ jobs:
           node-version: '20'
 
       - uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: |
-            ${{ secrets.SDK_WIP_ACCESS_TOKEN }}
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
