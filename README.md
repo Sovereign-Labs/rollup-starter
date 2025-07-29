@@ -209,6 +209,8 @@ Waiting for all services to become healthy...
    - InfluxDB:    http://localhost:8086 (admin/admin123)
 ```
 
+To stop it run `make stop-obs` and it will shut down all containers.
+
 Learn more in our [Observability Tutorial](https://sovlabs.notion.site/Tutorial-Getting-started-with-Grafana-Cloud-17e47ef6566b80839fe5c563f5869017?pvs=74).
 
 
