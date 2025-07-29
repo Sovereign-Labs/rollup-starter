@@ -71,15 +71,15 @@ $ curl http://127.0.0.1:12346/modules/value-setter/state/value
 {"value":null}
 ```
 
-## Programmatic Interaction with Typescript
+## Programmatic Interaction with TypeScript
 
-### Set up the Typescript client:
+### Set up the TypeScript client:
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ cd examples/starter-js && npm install
 ```
 
-### The Typescript script demonstrates the complete transaction flow:
+### The TypeScript script demonstrates the complete transaction flow:
 
 ```js
 // 1. Initialize rollup client
@@ -153,7 +153,7 @@ Tx sent successfully. Response:
 
 ### Subscribe to events from the sequencer:
 
-You can also subscribe to events from the sequencer (you need to uncomment the subscription code blocks [in the script](/examples/starter-js/src/index.ts#L35)):
+You can also subscribe to events from the sequencer (you need to uncomment the subscription code blocks [in the script](/examples/starter-js/src/index.ts#L42)):
 
 ```js
 // Subscribe to events
@@ -168,7 +168,9 @@ subscription.unsubscribe();
 
 ### Interacting with different modules
 
-To interact with different modules, simply change the call message. The top-level key corresponds to the [module's variable name in the runtime](/crates/stf/stf-declaration/src/runtime.rs#L84), and the nested key is the [CallMessage](examples/value-setter/src/lib.rs#L90) enum variant in snake_case:
+To interact with different modules, simply change the call message. 
+The top-level key corresponds to the [module's variable name in the runtime](/crates/stf/stf-declaration/src/lib.rs#L84), 
+and the nested key is the [CallMessage](examples/value-setter/src/lib.rs#L62) enum variant in snake_case:
 
 ```js
 // Example: Call the ValueSetter's SetValue method
@@ -179,7 +181,7 @@ let callMessage: RuntimeCall = {
 };
 ```
 
-This transaction would set the ValueSetter's state value to 10. Try setting the [example file's call message](examples/starter-js/src/index.ts#L39) to the expression above and re-running the script. Then verify that the ValueSetter's value changed using [the curl command](#example-query-the-value-setters-state-value) we showed earlier. 
+This transaction would set the ValueSetter's state value to 10. Try setting the [example file's call message](examples/starter-js/src/index.ts#L39) to the expression above and re-running the script. Then verify that the ValueSetter's value changed using [the curl command](#example-query-the-valuesetter-modules-state-value) we showed earlier. 
 
 This time, the curl command should return:
 ```json
@@ -228,7 +230,7 @@ $ cargo run --rollup_config_path="configs/mock/genesis_without_paymaster.json"
 - Another process is using port 12346. Either kill that process or modify the `bind_port` in your [rollup configuration file](configs/mock/rollup.toml#L28)
 
 **Transaction fails with "insufficient funds"**
-- If using the default configuration with paymaster, ensure the [paymaster address](configs/mock/genesis.json#L68) is correctly configured
+- If using the default configuration with paymaster, ensure the [paymaster address](configs/mock/genesis.json#L62) is correctly configured
 - If running without paymaster, ensure your account has sufficient balance for gas fees
 
 **"Module not found" errors in TypeScript**
