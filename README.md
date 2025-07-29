@@ -192,6 +192,25 @@ This time, the curl command should return:
 
 To learn more about building with Sovereign SDK, experiment with the [ValueSetter](/examples/value-setter/src/lib.rs). For a deeper understanding of the abstractions, see the [Quickstart: Your First Module](https://docs.sovereign.xyz/3-quickstart.html) section of the SDK book.
 
+## Observability stack
+
+Starter repo has a helper command to spin up the local observability stack for your rollup. Just run `make start-obs`, 
+and it will spin up all necessary Docker containers and provision Grafana dashboards for the Sovereign rollup
+
+```bash
+$ make start-obs
+...
+Waiting for all services to become healthy...
+⏳ Waiting for services... (45 seconds remaining)
+✅ All observability services are healthy!
+
+🚀 Observability stack is ready:
+   - Grafana:     http://localhost:3000 (admin/admin123)
+   - InfluxDB:    http://localhost:8086 (admin/admin123)
+```
+
+Learn more in our [Observability Tutorial](https://sovlabs.notion.site/Tutorial-Getting-started-with-Grafana-Cloud-17e47ef6566b80839fe5c563f5869017?pvs=74).
+
 
 ## Alternative Configurations
 
