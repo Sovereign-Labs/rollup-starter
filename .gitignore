@@ -19,4 +19,4 @@ docker/observability
 test-data/rollup-starter-data-celestia
 test-data/rollup-starter-data
 test-data/mock_da.sqlite*
-scripts/sov-rollup-starter.sh
+scripts/rollup-starter.sh

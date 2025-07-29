@@ -62,4 +62,4 @@ Steps to do testing described in main [README.md](./README.md)
 - [ ] Genesis params in folder [`test-data/genesis/celestia`](./test-data/genesis/celestia)
 
 Steps to take testing are described in the
-main [README.md](./README.md#how-to-run-the-sov-rollup-starter-using-celestia-da) in the Celestia section.
+main [README.md](./README.md#how-to-run-the-rollup-starter-using-celestia-da) in the Celestia section.

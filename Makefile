@@ -67,7 +67,7 @@ build-docker-mock-da:
 	docker build \
 	--ssh default \
 	-f ./docker/rollup/Dockerfile.mock \
-	-t sov-rollup-starter:debug \
+	-t rollup-starter:debug \
 	.
 
 run-docker-mock-da:
@@ -79,7 +79,7 @@ run-docker-mock-da:
 			-v $(CURDIR)/docker/rollup/data/state:/mnt/state \
 			-v $(CURDIR)/configs/mock/rollup-dockerized.toml:/app/config/rollup.toml \
 			-p 12346:12346 \
-			sov-rollup-starter:debug
+			rollup-starter:debug
 
 start-obs:
 	./scripts/start_observability.sh

@@ -38,8 +38,8 @@ The following tools are optional and only needed for specific features:
 ### 1. Clone the repository and navigate to the rollup directory:
 
 ```bash
-git clone https://github.com/Sovereign-Labs/sov-rollup-starter.git
-cd sov-rollup-starter
+git clone https://github.com/Sovereign-Labs/rollup-starter.git
+cd rollup-starter
 ```
 
 ### 2. (Optional) Clean the database for a fresh start:
