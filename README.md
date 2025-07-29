@@ -38,7 +38,7 @@ The following tools are optional and only needed for specific features:
 ### 1. Clone the repository and navigate to the rollup directory:
 
 ```bash
-git clone https://github.com/Sovereign-Labs/sov-rollup-starter.git
+git clone https://github.com/Sovereign-Labs/rollup-starter.git
 cd sov-rollup-starter
 ```
 
@@ -59,7 +59,7 @@ $ cargo run
 The rollup includes several built-in modules: Bank (for token management), Paymaster, Hyperlane, and more. You can query any state item in these modules:
 
 ```bash
-open http://localhost:12346/swagger-ui/#/ 
+open http://127.0.0.1:12346/swagger-ui/#/ 
 ```
 
 ### Example: Query the `ValueSetter` Module's state value
@@ -170,7 +170,7 @@ subscription.unsubscribe();
 
 To interact with different modules, simply change the call message. 
 The top-level key corresponds to the [module's variable name in the runtime](/crates/stf/stf-declaration/src/lib.rs#L84), 
-and the nested key is the [CallMessage](examples/value-setter/src/lib.rs#L62) enum variant in snake_case:
+and the nested key is the [CallMessage](examples/value-setter/src/lib.rs#L61) enum variant in snake_case:
 
 ```js
 // Example: Call the ValueSetter's SetValue method
@@ -181,7 +181,7 @@ let callMessage: RuntimeCall = {
 };
 ```
 
-This transaction would set the ValueSetter's state value to 10. Try setting the [example file's call message](examples/starter-js/src/index.ts#L39) to the expression above and re-running the script. Then verify that the ValueSetter's value changed using [the curl command](#example-query-the-valuesetter-modules-state-value) we showed earlier. 
+This transaction would set the ValueSetter's state value to 10. Try setting the [example file's call message](examples/starter-js/src/index.ts#L29) to the expression above and re-running the script. Then verify that the ValueSetter's value changed using [the curl command](#example-query-the-valuesetter-modules-state-value) we showed earlier. 
 
 This time, the curl command should return:
 ```json
@@ -205,7 +205,7 @@ $ cargo run --no-default-features --features celestia_da,risc0
 
 ### Enabling the Prover
 
-Proving is disabled by default. Enable it with these environment variables:
+Proving is disabled by default. Enable it with these environment variables before recompiling the rollup:
 
 - `export SOV_PROVER_MODE=skip` - Skip verification logic
 - `export SOV_PROVER_MODE=simulate` - Run verification logic in the current process
