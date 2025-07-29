@@ -168,7 +168,7 @@ subscription.unsubscribe();
 
 ### Interacting with different modules
 
-To interact with different modules, simply change the call message. The top-level key corresponds to the [module's variable name in the runtime](/crates/stf/src/runtime.rs#L85), and the nested key is the [CallMessage](crates/value-setter/src/lib.rs#L90) enum variant in snake_case:
+To interact with different modules, simply change the call message. The top-level key corresponds to the [module's variable name in the runtime](/crates/stf/stf-declaration/src/runtime.rs#L84), and the nested key is the [CallMessage](examples/value-setter/src/lib.rs#L90) enum variant in snake_case:
 
 ```js
 // Example: Call the ValueSetter's SetValue method
@@ -179,7 +179,7 @@ let callMessage: RuntimeCall = {
 };
 ```
 
-This transaction would set the ValueSetter's state value to 10. Try setting the [example file's call message](js/src/index.ts#L39) to the expression above and re-running the script. Then verify that the ValueSetter's value changed using [the curl command](#example-query-the-value-setters-state-value) we showed earlier. 
+This transaction would set the ValueSetter's state value to 10. Try setting the [example file's call message](examples/starter-js/src/index.ts#L39) to the expression above and re-running the script. Then verify that the ValueSetter's value changed using [the curl command](#example-query-the-value-setters-state-value) we showed earlier. 
 
 This time, the curl command should return:
 ```json
@@ -188,7 +188,7 @@ This time, the curl command should return:
 
 ### Learn more
 
-To learn more about building with Sovereign SDK, experiment with the [ValueSetter](/crates/value-setter/src/lib.rs). For a deeper understanding of the abstractions, see the [Building a module](https://docs.sovereign.xyz/rollup-devs/build-a-module.html) section of the SDK book.
+To learn more about building with Sovereign SDK, experiment with the [ValueSetter](/examples/value-setter/src/lib.rs). For a deeper understanding of the abstractions, see the [Quickstart: Your First Module](https://docs.sovereign.xyz/3-quickstart.html) section of the SDK book.
 
 
 ## Alternative Configurations
