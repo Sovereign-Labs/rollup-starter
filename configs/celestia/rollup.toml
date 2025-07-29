@@ -42,11 +42,13 @@ telegraf_address = "127.0.0.1:8094"
 # The total number of bytes to be held in memory might vary per metric + `max_datagram_size`
 # max_pending_metrics = 100
 
+
 [proof_manager]
-aggregated_proof_block_jump = 10
+aggregated_proof_block_jump = 1
 prover_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
 max_number_of_transitions_in_db = 100
-max_number_of_transitions_in_memory = 30
+max_number_of_transitions_in_memory = 20
+
 
 [sequencer]
 max_batch_size_bytes = 1048576
@@ -56,4 +58,9 @@ rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
 blob_processing_timeout_secs = 60
 
 [sequencer.preferred]
+disable_state_root_consistency_checks = true
+# Strategy for handling recovery scenarios when the sequencer is too far behind.
+# "None" - Shutdown the sequencer instead of attempting recovery (default)
+# "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
 recovery_strategy = "TryToSave"
+batch_execution_time_limit_millis = 18000

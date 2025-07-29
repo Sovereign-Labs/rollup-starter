@@ -21,7 +21,7 @@
       "address_and_balances": [
         [
           "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
-          "10000000000000"
+          "10000000000000000"
         ],
         [
           "0x23B6445f524daDee9fb576627740AaD23Afbe8b7",
@@ -60,7 +60,22 @@
     "genesis_da_height": 3
   },
   "paymaster": {
-    "payers": []
+    "payers": [
+      {
+        "payer_address": "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
+        "policy": {
+          "default_payee_policy": {
+            "allow": {}
+          },
+          "payees": [],
+          "authorized_updaters": [],
+          "authorized_sequencers": "all"
+        },
+        "sequencers_to_register": [
+          "celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s"
+        ]
+      }
+    ]
   },
   "prover_incentives": {
     "proving_penalty": [10, 10],
@@ -80,9 +95,10 @@
   },
   "uniqueness": null,
   "blob_storage": null,
+  "revenue_share": null,
   "mailbox": null,
   "interchain_gas_paymaster": null,
   "merkle_tree_hook": null,
   "warp": null,
-  "value_setter": {}
+  "value_setter": null
 }

@@ -76,7 +76,6 @@
         ]
       }
     ]
-
   },
   "prover_incentives": {
     "proving_penalty": [10, 10],
