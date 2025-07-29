@@ -6,7 +6,8 @@ This module is intentionally simple and serves two key purposes:
 
 ## 1. An Educational Tool
 
-This crate is the official hands-on example for the [Sovereign SDK Book](fix-link-to-book). In the [Quickstart](fix-link-to-quickstart) chapter, you will take this module in its initial, insecure state and add access control logic. It is the foundation for learning the core concepts of module development.
+This crate is the official hands-on example for the [Sovereign SDK Book](https://docs.sovereign.xyz/). 
+In the [Quickstart](https://docs.sovereign.xyz/3-quickstart.html) chapter, you will take this module in its initial, insecure state and add access control logic. It is the foundation for learning the core concepts of module development.
 
 If you are following the book, you don't need to do anything else here—just follow the instructions in the guide!
 

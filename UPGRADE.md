@@ -37,7 +37,7 @@ and run some requests against it.
   `git diff EXISTING_COMMIT_IN_CARGO_TOML COMMIT_UPDATE_TO -- CHANGELOG.md`
 - [ ] [`Cargo.toml`](./Cargo.toml)
     - [ ] [`risc0/guest-celestia/Cargo.toml`](crates/provers/risc0/guest-celestia/Cargo.toml)
-    - [ ] [`risc0/guest-mock/Cargo.toml`](crates/provers/risc0/Cargo.toml)
+    - [ ] [`risc0/guest-mock/Cargo.toml`](crates/provers/risc0/guest-mock/Cargo.toml)
 - [ ] Adjust sample requests in [`test-data/requests`](./test-data/requests)
 - [ ] Adjust [`constants.toml`](./constants.toml). This file is used for all configurations: local and remote
 - [ ] Make sure `make lint` and `cargo test` are passing.
@@ -51,10 +51,10 @@ If a Rust native or zkVM toolchain version has changed:
 
 ## Local MockDa
 
-- [ ] Rollup config [`rollup_config.toml`](./rollup_config.toml)
-- [ ] Genesis params in folder [`test-data/genesis/mock`](./test-data/genesis/mock)
+- [ ] Rollup config [`rollup.toml`](./configs/mock/rollup.toml) for Mock DA and [`rollup.toml`](./configs/celestia/rollup.toml)
+- [ ] Genesis params for Mock DA in [`configs/mock/genesis.json)`](./configs/mock/genesis.json) and for Celestia DA in [`configs/celestia/genesis.json)`](./configs/celestia/genesis.json)
 
-Steps to do testing described in main [README.md](./README.md)
+Steps to take testing are described in the main [README.md](./README.md)
 
 ## Local Celestia
 
@@ -62,4 +62,4 @@ Steps to do testing described in main [README.md](./README.md)
 - [ ] Genesis params in folder [`test-data/genesis/celestia`](./test-data/genesis/celestia)
 
 Steps to take testing are described in the
-main [README.md](./README.md#how-to-run-the-rollup-starter-using-celestia-da) in the Celestia section.
+main [README.md](./README.md#alternative-configurationsa) in the Celestia section.
