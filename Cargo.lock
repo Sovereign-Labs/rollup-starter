@@ -8381,7 +8381,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
- "tracing-appender",
  "tracing-panic",
  "tracing-subscriber 0.3.19",
 ]
