@@ -195,7 +195,7 @@ To learn more about building with Sovereign SDK, experiment with the [ValueSette
 ## Observability stack
 
 Starter repo has a helper command to spin up the local observability stack for your rollup. Just run `make start-obs`, 
-and it will spin up all necessary Docker containers and provision Grafana dashboards for the Sovereign rollup
+and it will spin up all necessary Docker containers and provision Grafana dashboards for the rollup:
 
 ```bash
 $ make start-obs
