@@ -41,22 +41,22 @@ $ echo $MY_PERSONAL_GITHUB_TOKEN | docker login ghcr.io -u $MY_GITHUB_USERNAME -
 
 ## Multiple sequencers
 
-To have multiple sequencers, a few conditions needs to be met:
-- validator must know the number of sequencers to provision them with accounts and coins
-- each sequencer must have a unique id and each id has to be a consecutive natural number
+To have multiple rollup sequencers, multiple celestia nodes must be run and a few conditions needs to be met:
+- validator must know the number of celestia nodes to provision them with accounts and coins
+- each celestia node must have a unique id and each id has to be a consecutive natural number
   starting from 0. (eg. 0, 1, 2)
-- each sequencer other than the first one has to have the ports remapped so they don't conflict
-  with other sequencers
+- each celestia node other than the first one has to have the ports remapped so they don't conflict
+  with other celestia nodes
 
-The `docker-compose.yml` has a commented out example setup for the second sequencer. It can
-be copy-pasted and adjusted for an arbitrary number of sequencers. The amount of sequencers
-needs to be provided by uncommenting and aligning the `services.validator.command` field.
+The `docker-compose.yml` has a commented out example setup for the second celestia node. 
+It can be copy-pasted and adjusted for an arbitrary number of celestia nodes. 
+The amount of celestia nodes needs to be provided by uncommenting and aligning the `services.validator.command` field.
 
 ## Credentials
 
-Credentials for each new sequencer are created by validator on the first startup. The validator writes
-the keys and address of each sequencer to the `docker/credentials` volume. Each consecutive
+Credentials for each new celestia node are created by validator on the first startup. The validator writes
+the keys and address of each celestia node to the `docker/credentials` volume. Each consecutive
 run will use the same credentials until the directory is manually cleaned up.
 
-In addition, each sequencer on startup will write it's `JWT` token to the same directory. The token is
+In addition, each celestia node on startup will write it's `JWT` token to the same directory. The token is
 updated during consecutive runs.

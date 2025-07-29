@@ -1,5 +1,5 @@
 services:
-  validator:
+  celestia-validator:
     image: validator
     hostname: validator
     build:
@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 10s
-    # uncomment to provide amount of sequencers to provision (default: 1)
+    # uncomment to provide amount of celestia nodes to provision (default: 1)
     # command: [ "/opt/entrypoint.sh", "2" ]
     volumes:
       - type: bind
@@ -21,23 +21,22 @@ services:
         target: /credentials
       - genesis:/genesis
 
-  sequencer-0:
+  celestia-node-0:
     image: bridge
-    hostname: sequencer-0
     build:
       context: ./celestia
       dockerfile: Dockerfile.bridge
     depends_on:
-      - validator
+      - celestia-validator
     healthcheck:
       # To see health check output:
-      # docker inspect --format "{{json .State.Health }}" docker-sequencer-0-1 | jq
+      # docker inspect --format "{{json .State.Health }}"  integrations-celestia-node-0-1 | jq
       test: ["CMD", "/opt/bridge-healthcheck.sh", "/credentials/bridge-0.jwt"]
       interval: 5s
       timeout: 5s
       retries: 60
       start_period: 10s
-    # uncomment to provide the id of the sequencer (default: 0)
+    # uncomment to provide the id of the celestia node (default: 0)
     # command: ["/opt/entrypoint.sh", "0"]
     ports:
       - "127.0.0.1:${CELESTIA_PORT:-26658}:26658"
@@ -47,9 +46,9 @@ services:
         target: /credentials
         consistency: consistent
       - genesis:/genesis
-  #  #   Uncomment for another sequencer
+  #  #   Uncomment for another celestia node
   #  #   remember to adjust services.validator.command
-  #  sequencer-1:
+  #  celestia-node-1:
   #    image: bridge
   #    build:
   #      context: .
@@ -62,7 +61,7 @@ services:
   #      timeout: 5s
   #      retries: 30
   #      start_period: 10s
-  #    # The first argument is the id of the sequencer (default: 0)
+  #    # The first argument is the id of the celestia node (default: 0)
   #    command: [ "/opt/entrypoint.sh", "1" ]
   #    ports:
   #      # remap the default port as it's already used

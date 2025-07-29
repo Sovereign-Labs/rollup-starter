@@ -22,19 +22,19 @@ check-docker:
 start-celestia:
 	@echo "Starting celestia docker compose..."
 	$(docker_compose) up --build --force-recreate -d --quiet-pull
-	@echo "waiting for container 'sequencer-0' to become operational..."
+	@echo "waiting for container 'celestia-node-0' to become operational..."
 	@while true; do \
 		timestamp=$$(date '+%Y-%m-%d %H:%M:%S'); \
-		health=$$(docker inspect --format='{{.State.Health.Status}}' $$($(docker_compose) ps -q sequencer-0)); \
+		health=$$(docker inspect --format='{{.State.Health.Status}}' $$($(docker_compose) ps -q celestia-node-0)); \
 		if [ "$$health" = "healthy" ]; then \
-			@echo "sequencer-0 is healthy"; \
+			echo "[$$timestamp] celestia-node-0 is healthy"; \
 			break; \
 		else \
-			echo "health == '$$health': Waiting for sequencer-0 to be up and running..."; \
+			echo "[$$timestamp] health == '$$health': Waiting for celestia-node-0 to be up and running..."; \
 		fi; \
 		sleep 3; \
 	done
-	@echo "Services are ready, preparing configuration"
+	@echo " ✔ Celestia devnet containers are ready."
 
 stop-celestia:
 	$(compose_down)
