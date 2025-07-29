@@ -35,7 +35,7 @@ jobs:
     name: ${{ inputs.job-name }}
     runs-on:
       - nscloud-ubuntu-22.04-amd64-8x32-with-cache
-      - nscloud-cache-tag-sov-rollup-starter-build
+      - nscloud-cache-tag-rollup-starter-build
       - nscloud-cache-size-100gb
     steps:
       - uses: actions/checkout@v3

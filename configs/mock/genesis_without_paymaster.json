@@ -84,6 +84,7 @@
   },
   "uniqueness": null,
   "blob_storage": null,
+  "revenue_share": null,
   "mailbox": null,
   "interchain_gas_paymaster": null,
   "merkle_tree_hook": null,

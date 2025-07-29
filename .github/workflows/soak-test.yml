@@ -23,6 +23,6 @@ jobs:
       env-vars: "SKIP_GUEST_BUILD=1"
       command: |
         cargo build --release
-        cargo build --release --bin sov-rollup-starter-soak-test -p sov-rollup-starter-soak-test
+        cargo build --release --bin rollup-starter-soak-test -p rollup-starter-soak-test
         chmod +x scripts/run-soak-test.sh && ./scripts/run-soak-test.sh
     secrets: inherit

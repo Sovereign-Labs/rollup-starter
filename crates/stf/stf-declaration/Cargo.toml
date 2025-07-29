@@ -21,6 +21,7 @@ sov-prover-incentives = { workspace = true }
 sov-attester-incentives = { workspace = true }
 sov-sequencer-registry = { workspace = true }
 sov-paymaster = { workspace = true }
+sov-revenue-share = { workspace = true }
 sov-modules-stf-blueprint = { workspace = true }
 sov-rollup-interface = { workspace = true }
 sov-capabilities = { workspace = true }

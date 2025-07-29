@@ -39,7 +39,7 @@ The following tools are optional and only needed for specific features:
 
 ```bash
 git clone https://github.com/Sovereign-Labs/rollup-starter.git
-cd sov-rollup-starter
+cd rollup-starter
 ```
 
 ### 2. (Optional) Clean the database for a fresh start:

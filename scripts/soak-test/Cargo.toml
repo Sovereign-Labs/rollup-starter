@@ -1,5 +1,5 @@
 [package]
-name = "sov-rollup-starter-soak-test"
+name = "rollup-starter-soak-test"
 version = "0.1.0"
 publish = false
 authors = { workspace = true }
@@ -21,12 +21,12 @@ sov-test-utils = { workspace = true, features = ["arbitrary"] }
 sov-risc0-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] } 
 sov-sp1-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] }
 
-sov-rollup-starter = { path = "../../crates/rollup/", default-features = false }
+rollup-starter = { path = "../../crates/rollup/", default-features = false }
 
 [features]
 default = ["mock_da", "mock_zkvm"]
-mock_da = ["sov-rollup-starter/mock_da"]
-celestia_da = ["sov-rollup-starter/celestia_da"]
-sp1 = ["sov-sp1-adapter", "sov-rollup-starter/sp1"]
-risc0 = ["sov-risc0-adapter", "sov-rollup-starter/risc0"]
-mock_zkvm = ["sov-rollup-starter/mock_zkvm"]
+mock_da = ["rollup-starter/mock_da"]
+celestia_da = ["rollup-starter/celestia_da"]
+sp1 = ["sov-sp1-adapter", "rollup-starter/sp1"]
+risc0 = ["sov-risc0-adapter", "rollup-starter/risc0"]
+mock_zkvm = ["rollup-starter/mock_zkvm"]

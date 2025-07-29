@@ -12,7 +12,7 @@ NO_COLOR=1
 ROLLUP_STARTUP_DELAY=10
 
 NODE_RELATIVE_PATH="target/release/rollup"
-SOAK_TEST_RUNNER_RELATIVE_PATH="target/release/sov-rollup-starter-soak-test"
+SOAK_TEST_RUNNER_RELATIVE_PATH="target/release/rollup-starter-soak-test"
 
 NODE_OUTPUT_LOG="node_output.log"
 SOAK_TEST_OUTPUT_LOG="soak_test_output.log"
