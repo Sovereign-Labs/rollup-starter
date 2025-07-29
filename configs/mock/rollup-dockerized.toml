@@ -23,11 +23,10 @@ telegraf_address = "127.0.0.1:8094"
 
 
 [proof_manager]
-max_batch_size_bytes = 1048576
-max_concurrent_blobs = 128
-max_allowed_node_distance_behind = 10
-rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
-blob_processing_timeout_secs = 60
+aggregated_proof_block_jump = 1
+prover_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
+max_number_of_transitions_in_db = 100
+max_number_of_transitions_in_memory = 20
 
 [sequencer]
 max_allowed_node_distance_behind = 10
