@@ -38,3 +38,10 @@ start-celestia:
 
 stop-celestia:
 	$(compose_down)
+
+clean: ## Clean up all docker compose resources
+	@echo "Cleaning up all docker compose resources..."
+	$(compose_down) --volumes --remove-orphans
+	@echo "Removing any dangling images..."
+	-docker image prune -f
+	@echo "Docker compose cleanup complete"
