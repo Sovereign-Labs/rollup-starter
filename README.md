@@ -221,6 +221,7 @@ Learn more in our [Observability Tutorial](https://sovlabs.notion.site/Tutorial-
 The examples above use mock DA and zkVM for simplicity. To use Celestia DA with Risc0 zkVM:
 
 ```bash
+$ make start-celestia # this will spin up celestia devnet container
 $ cargo run --no-default-features --features celestia_da,risc0
 ```
 
