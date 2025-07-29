@@ -44,8 +44,6 @@ jobs:
         with:
           node-version: '20'
 
-      - uses: webfactory/ssh-agent@v0.9.0
-
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
         with:
