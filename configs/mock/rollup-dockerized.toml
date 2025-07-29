@@ -28,7 +28,10 @@ prover_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
 max_number_of_transitions_in_db = 100
 max_number_of_transitions_in_memory = 20
 
+
 [sequencer]
+max_batch_size_bytes = 1048576
+max_concurrent_blobs = 128
 max_allowed_node_distance_behind = 10
 rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
 blob_processing_timeout_secs = 60
@@ -40,4 +43,3 @@ disable_state_root_consistency_checks = true
 # "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
 recovery_strategy = "TryToSave"
 batch_execution_time_limit_millis = 6000 # This should be adjusted depending on the DA layer's block times
-

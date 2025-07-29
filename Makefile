@@ -59,6 +59,7 @@ clean-db: ## Clean all databases
 	rm -rf test-data/rollup-starter-data
 	rm -rf test-data/rollup-starter-data-celestia
 	rm -rf test-data/mock_da.sqlite
+	rm -rf test-data/docker
 
 # Add `--build-arg BUILD_MODE=release` for release builds
 build-docker-mock-da: ## Build docker container for the rollup with MockDa
@@ -70,12 +71,12 @@ build-docker-mock-da: ## Build docker container for the rollup with MockDa
 	.
 
 run-docker-mock-da: ## Start docker container with MockDa
-	mkdir -p docker/rollup/data
-	mkdir -p docker/rollup/data/da
-	mkdir -p docker/rollup/data/state
+	mkdir -p test-data/docker
+	mkdir -p test-data/docker/da
+	mkdir -p test-data/docker/state
 	docker run --rm -it \
-			-v $(CURDIR)/docker/rollup/data/da:/mnt/da \
-			-v $(CURDIR)/docker/rollup/data/state:/mnt/state \
+			-v $(CURDIR)/test-data/docker/da:/mnt/da \
+			-v $(CURDIR)/test-data/docker/state:/mnt/state \
 			-v $(CURDIR)/configs/mock/rollup-dockerized.toml:/app/config/rollup.toml \
 			-p 12346:12346 \
 			rollup-starter:debug

@@ -12,11 +12,11 @@ docker/credentials/*
 .artifacts
 **/node_modules
 **/dist
-docker/rollup/data
 /crates/rollup/rollup-starter-data-celestia
 /crates/rollup/rollup-starter-data
 docker/observability
 test-data/rollup-starter-data-celestia
 test-data/rollup-starter-data
 test-data/mock_da.sqlite*
+test-data/docker
 scripts/rollup-starter.sh
