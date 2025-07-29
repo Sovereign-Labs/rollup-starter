@@ -2,15 +2,15 @@
 
 use anyhow::Context;
 use clap::Parser;
+use rollup_starter::da::DaService;
+use rollup_starter::rollup::StarterRollup;
+use rollup_starter::zkvm::{rollup_host_args, InnerZkvm};
 use sov_modules_rollup_blueprint::logging::{
     default_rust_log_value, should_init_open_telemetry_exporter, OtelGuard,
 };
 use sov_modules_rollup_blueprint::FullNodeBlueprint;
 use sov_modules_rollup_blueprint::Rollup;
 use sov_rollup_interface::execution_mode::Native;
-use sov_rollup_starter::da::DaService;
-use sov_rollup_starter::rollup::StarterRollup;
-use sov_rollup_starter::zkvm::{rollup_host_args, InnerZkvm};
 use sov_stf_runner::processes::{RollupProverConfig, RollupProverConfigDiscriminants};
 use sov_stf_runner::{from_toml_path, RollupConfig};
 use std::env;

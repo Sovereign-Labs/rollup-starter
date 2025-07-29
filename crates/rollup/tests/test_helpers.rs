@@ -3,13 +3,13 @@ use std::net::SocketAddr;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::Path;
 
+use rollup_starter::rollup::StarterRollup;
+use rollup_starter::zkvm::InnerZkvm;
 use sov_address::EthereumAddress;
 use sov_db::config::RollupDbConfig;
 use sov_mock_da::MockDaConfig;
 use sov_modules_api::Spec;
 use sov_modules_rollup_blueprint::FullNodeBlueprint;
-use sov_rollup_starter::rollup::StarterRollup;
-use sov_rollup_starter::zkvm::InnerZkvm;
 use sov_sequencer::preferred::PreferredSequencerConfig;
 use sov_sequencer::preferred::RecoveryStrategy;
 use sov_sequencer::{SequencerConfig, SequencerKindConfig};

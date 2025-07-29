@@ -1,5 +1,5 @@
 [package]
-name = "sov-rollup-starter"
+name = "rollup-starter"
 version = { workspace = true }
 edition = { workspace = true }
 authors = { workspace = true }
