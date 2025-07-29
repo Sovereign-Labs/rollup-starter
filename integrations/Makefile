@@ -1,4 +1,4 @@
-.PHONY: up down wait-compose-ready restart logs postgres
+.PHONY: up down wait-compose-ready restart logs postgres start-celestia stop-celestia clean check-docker
 
 PROJECT_ROOT := $(shell git rev-parse --show-toplevel)
 DOCKER_COMPOSE_DIR := $(PROJECT_ROOT)/integrations
@@ -22,12 +22,12 @@ check-docker:
 start-celestia:
 	@echo "Starting celestia docker compose..."
 	$(docker_compose) up --build --force-recreate -d --quiet-pull
-	echo "waiting for container 'sequencer-0' to become operational..."
+	@echo "waiting for container 'sequencer-0' to become operational..."
 	@while true; do \
-		timestamp=$$(date $(DATE_FORMAT)); \
+		timestamp=$$(date '+%Y-%m-%d %H:%M:%S'); \
 		health=$$(docker inspect --format='{{.State.Health.Status}}' $$($(docker_compose) ps -q sequencer-0)); \
 		if [ "$$health" = "healthy" ]; then \
-			echo "sequencer-0 is healthy"; \
+			@echo "sequencer-0 is healthy"; \
 			break; \
 		else \
 			echo "health == '$$health': Waiting for sequencer-0 to be up and running..."; \
