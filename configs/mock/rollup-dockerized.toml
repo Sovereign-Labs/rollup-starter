@@ -10,7 +10,7 @@ path = "/mnt/state"
 user_commit_concurrency = 6
 # The number of 4kb buckets to allocate for the state DB
 # The state DB will not exceed this size, and you'll get a warning when it fills up to 90% capacity.
-user_hashtable_buckets = 1_000_000 # 4 GB. You may need more for production deployments
+user_hashtable_buckets = 1_000_000 # 4 GB. You will need much more for production deployments
 kernel_commit_concurrency = 2
 # Run pruning once every 100_000 blocks. Prune any keys more than 100 versions old
 pruner_block_interval = 100_000
