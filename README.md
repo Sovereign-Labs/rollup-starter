@@ -240,5 +240,4 @@ $ cargo run --rollup_config_path="configs/mock/genesis_without_paymaster.json"
 - Verify you're using the correct Rust version (1.88.0 or later)
 
 ## Additional Resources
-
 For more details, visit the [Sovereign SDK documentation](https://docs.sovereign.xyz).
