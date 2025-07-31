@@ -1,30 +1,36 @@
-# Celestia
+# Getting Started with Celestia
 
-Sovereign Rollups support Celestia as the Data Availability (DA) layer. 
-Celestia has been designed with rollups in mind and offers instance finality and significant data throughput.
+Sovereign Rollups support Celestia as a Data Availability (DA) layer. Celestia has been designed for accommodating rollups, offering instant finality and significant data throughput.
 
-This tutorial describes how to run the rollup starter on Celestia.
+This tutorial will guide you through running the rollup starter on Celestia, from local development to testnet deployment.
 
 ## Prerequisites
 
-Your rollup works with MockDa and you want to switch to Celestia.
+Before starting this tutorial, ensure that:
+- You have Rust and Cargo installed
+- You have Docker installed (for local devnet)
+- Your rollup is working with MockDa
+- You have basic familiarity with Celestia concepts
 
-Here are steps 
+## Overview
 
-1. Local devnet: first use local devnet to basic check that it works with celestia
-2. Testnet: moving to public testnet and adjusting configuration
-3. Mainnet: configuration-wise it is very similar but requires production like keys security of celestia node
+It is recommented to proceed through three stages:
 
-This tutorial only describes steps 1 and 2.
+1. **Local Devnet**: Test your rollup with a local Celestia instance to verify basic functionality
+2. **Testnet**: Deploy to a public testnet with proper configuration
+3. **Mainnet**: Production deployment with secure key management (not covered in this tutorial)
 
-## Celestia devnet
+This tutorial covers stages 1 and 2.
 
-Starter repo provides docker compose configuration for running celestia locally. 
-It also has necessary configuration
+## Stage 1: Celestia Local Devnet
 
-First, start the celestia docker containers:
+The starter repository includes a [Docker Compose](./integrations/docker-compose.celestia.yml) configuration for running Celestia locally, along with all necessary configurations.
 
-```bash,test-ci
+### Starting Celestia Devnet
+
+First, start the Celestia Docker containers by running `make start-celestia` command:
+
+```bash
 $ make start-celestia
 [+] Running 4/4
  ✔ celestia-validator                           Built                                                                                                                                                                                    0.0s
@@ -38,69 +44,80 @@ waiting for container 'celestia-node-0' to become operational...
  ✔ Celestia devnet containers are ready.
 ```
 
-Then run rollup with `celestia_da` feature and arguments for celestia
+### Running the Rollup
 
-```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=rest_address
+Now run your rollup with the `celestia_da` feature enabled:
+
+```bash
 $ cargo run --no-default-features --features=celestia_da,mock_zkvm -- --rollup-config-path=configs/celestia/rollup.toml --genesis-path=configs/celestia/genesis.json
 ```
 
-Log output should indicate healthy running rollup, check that REST API is responding.
+The log output should indicate a healthy running rollup. Verify that the REST API is responding:
 
-```bash,test-ci,bashtestmd:compare-output
+```bash
 $ curl http://127.0.0.1:12346/modules/value-setter/state/value
 {"value":null}
 ```
 
-## Celestia testnet
+## Stage 2: Celestia Testnet
 
-Stop devnet:
+### Stopping the Devnet
+
+First, stop the local devnet and clean the database if you previously ran on devnet:
 
 ```bash
-make stop-celestia
+$ make stop-celestia
+$ make clean-db
 ```
 
-We use `mocha` testnet in this tutorial.
+### Setting Up a Celestia Light Node
 
-You will need a celestia light node. 
+For this tutorial, we'll use the [Mocha testnet](https://docs.celestia.org/how-to-guides/mocha-testnet). 
+You'll need to run a Celestia light node to connect your rollup to the network.
 
-For robust production setup it is recommended to connect the light node to a reliable RPC provider or use a bridge node
+**Note**: For production deployments, it's recommended to connect your light node to a reliable RPC provider or use a bridge node for enhanced reliability and performance.
 
-Check celestia documentation: 
+#### Installation and Setup
 
-* [Install celestia-node](https://docs.celestia.org/how-to-guides/celestia-node)
-* [Setting up Celestia light node](https://docs.celestia.org/how-to-guides/light-node)
+Follow the Celestia documentation for detailed instructions:
+- [Install celestia-node](https://docs.celestia.org/how-to-guides/celestia-node)
+- [Setting up a Celestia light node](https://docs.celestia.org/how-to-guides/light-node)
 
-Before starting the light node, you might want to adjust these values in its config, as for getting started on testnet you will need a few of the past blocks.
+#### Optimizing Initial Sync
 
-Go to the block explorer, for example, https://mocha.celenium.io/, choose a recent block and use it for those values in config: 
+To speed up the initial synchronization, you can configure your light node to start from a recent block:
 
-* `Header.TrustedHash` - use block hash of selected block
-* `DASer.SampleFrom` - use height of this block
+1. Visit the block explorer: https://mocha.celenium.io/
+2. Select a recent block and note its hash and height
+3. Update your light node configuration:
+   - `Header.TrustedHash`: Use the block hash from step 2
+   - `DASer.SampleFrom`: Use the block height from step 2
 
-This will significantly reduce the time the node needs to become synced.
-But it won't be possible to start rollup from the block prior to selected.
+**Important**: This optimization means you won't be able to start your rollup from blocks prior to the selected height.
 
-To get address use `cel-key` utility:
+### Preparing Your Node
+
+#### Getting Your Node Address
+
+Use the `cel-key` utility to list your node's address:
 
 ```bash
 $ ./cel-key list --keyring-backend test \
-$    --node.type light --p2p.network mocha
+    --node.type light --p2p.network mocha
 using directory:  /Users/developer/.celestia-light-mocha-4/keys
 - address: celestia1qd73x7lzh97uxm9lxe49qdfmuup25kp4khaxdd
   name: my_celes_key
   pubkey: '{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"A2hgY3ckADmUQRO01L4J54tZhhZrfE2oGGjGV+63DJcB"}'
   type: local
 ```
-You will need an `address` from its output
 
-Address that celestia node is running with needs some TIA. 
-For mocha testnet it can be requested via [faucet](https://docs.celestia.org/how-to-guides/mocha-testnet#mocha-testnet-faucet)
+#### Funding Your Node
 
-**Checking light node**
+Your Celestia node address needs `TIA` tokens to submit data. For the Mocha testnet, request tokens from the [faucet](https://docs.celestia.org/how-to-guides/mocha-testnet#mocha-testnet-faucet).
 
-Make sure the light node is running and it's synced. 
+### Verifying Your Light Node
 
-Values `catch_up_done` and `network_head_height` and `head_of_sampled_chain` tell all necessary information
+Ensure your light node is running and fully synced by checking the sampling statistics:
 
 ```bash
 $ celestia das sampling-stats
@@ -136,7 +153,12 @@ $ celestia das sampling-stats
 }
 ```
 
-As described in [CLI tutorial](https://docs.celestia.org/tutorials/node-tutorial], submitting a sample blob should succeed.
+Key indicators to check:
+- `catch_up_done`: Should be `true` when fully synced
+- `network_head_height`: Current height of the network
+- `head_of_sampled_chain`: Should be close to network height when synced
+
+Test blob submission to verify your node is working correctly:
 
 ```bash
 $ export AUTH_TOKEN=$(celestia light auth admin --p2p.network mocha)
@@ -151,26 +173,40 @@ $ celestia blob submit 0x42690c204d39600fddd3 0x676d auth $AUTH_TOKEN
 }
 ```
 
-**Preparing configuration**
+### Configuring Your Rollup
 
-* Namespace. You will need 2: 1 for batches and 1 for proofs. After you chose namespaces for you rollup they need to be updated in [`crates/rollup/src/da.rs`](crates/rollup/src/da.rs#L15). 
-  They need to be committed in binary as it is a part of cryptographic commitment for the prover.
-* Genesis. Address of the celestia node needs to be in updated in 2 places: [`configs/celestia/genesis.json`](configs/celestia/genesis.json):
-  * `sequencer_registry.sequencer_config.seq_da_address`
-  * If paymaster is used: `paymaster.payers[].sequencers_to_register`
-  For simplicity you can use this command `sed -i "s/celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s/YOUR_ADDRESS/g" configs/celestia/genesis.json`
-* In rollup.toml:
-  * `da.celestia_rpc_auth_token` which can be fetched via `celestia light auth admin --p2p.network mocha`, as it was shown before.
-  * `da.celestia_rpc_address`. Existing value should match default behaviour
-  * `da.signer_address`. Rollup will pull the address for the connected node, this parameter is only needed for checking that rollup is connected to the expected node.
-  * `runner.genesis_height`. For a new rollup it is better to set it closer to the current tip of the chain
+You'll need to update several configuration files:
 
-If previously run on devnet, clean a database before starting
-```
-$ make clean-db
-```
+#### 1. Namespaces
 
-Run rollup again
+Your rollup requires two namespaces: one for batches and one for proofs. 
+
+Update these in [`crates/rollup/src/da.rs`](crates/rollup/src/da.rs#L15). 
+They are specified in rust source files as they're part of the cryptographic commitment for the prover, and need to be compiled into a binary.
+
+#### 2. Genesis Configuration
+
+Update your Celestia node address in [`configs/celestia/genesis.json`](configs/celestia/genesis.json):
+
+- `sequencer_registry.sequencer_config.seq_da_address`
+- `paymaster.payers[].sequencers_to_register` (if using paymaster)
+
+#### 3. Rollup Configuration
+
+Update `configs/celestia/rollup.toml`:
+
+- **`da.celestia_rpc_auth_token`**: Get this using:
+  ```bash
+  $ celestia light auth admin --p2p.network mocha
+  ```
+- **`da.celestia_rpc_address`**: Default value should work for standard setups, ensure that this value matches the port light node is listening on.
+- **`da.signer_address`**: Your node address (for verification purposes)
+- **`runner.genesis_height`**: Set to a recent block height for new rollups
+
+### Running on Testnet
+
+Start your rollup:
+
 ```bash
 $ cargo run --no-default-features \
   --features=celestia_da,mock_zkvm \
@@ -178,9 +214,12 @@ $ cargo run --no-default-features \
   --genesis-path=configs/celestia/genesis.json
 ```
 
-Node will start posting some empty batches to maintain the liveness of the rollup.
+Your node will begin posting empty batches to maintain rollup liveness.
+You can open block explore, find your namespace and see that blobs are posted from the address of your light node.
 
-Submit transaction and check it out in the 
+### Testing Transactions
+
+Submit a test transaction using the TypeScript example:
 
 ```bash
 $ cd examples/starter-js && npm install
@@ -222,6 +261,26 @@ Tx sent successfully. Response:
 }
 ```
 
-You can follow `tx_hash` in rollup logs and after its posted on DA, you can check out namespace page of your rollup and see that slightly larger batch has been published.
+You can track the `tx_hash` in your rollup logs. Once posted to the DA layer, check your rollup's namespace page to see the published batch (it will be slightly larger than empty batches).
 
-Success!
+## Success!
+
+Congratulations! Your rollup is now running on Celestia testnet. You can monitor your rollup's activity through:
+- Rollup logs
+- Celestia block explorer
+- Your rollup's REST API
+
+## Next Steps
+
+- Explore the [Sovereign SDK documentation](https://docs.sovereign.xyz/) for advanced rollup features
+- Learn about [Celestia's architecture](https://docs.celestia.org/) for deeper integration
+- Plan your mainnet deployment strategy
+
+## Troubleshooting
+
+If you encounter issues:
+1. Ensure your Celestia light node is fully synced
+2. Verify your node has sufficient TIA tokens
+3. Check that all configuration files have been updated correctly
+4. Review logs for specific error messages
+5. Consult the [Sovereign SDK GitHub repository](https://github.com/Sovereign-Labs/sovereign-sdk) for known issues
