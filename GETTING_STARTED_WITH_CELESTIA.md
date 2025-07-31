@@ -14,7 +14,7 @@ Before starting this tutorial, ensure that:
 
 ## Overview
 
-It is recommented to proceed through three stages:
+It is recommended to proceed through three stages:
 
 1. **Local Devnet**: Test your rollup with a local Celestia instance to verify basic functionality
 2. **Testnet**: Deploy to a public testnet with proper configuration
@@ -30,7 +30,7 @@ The starter repository includes a [Docker Compose](./integrations/docker-compose
 
 First, start the Celestia Docker containers by running `make start-celestia` command:
 
-```bash
+```bash,test-ci,bashtestmd:exit-code=0
 $ make start-celestia
 [+] Running 4/4
  ✔ celestia-validator                           Built                                                                                                                                                                                    0.0s
@@ -46,16 +46,22 @@ waiting for container 'celestia-node-0' to become operational...
 
 ### Running the Rollup
 
+Clean the database to avoid any issues with rollup from MockDa, if it has been run previously
+
+```bash,test-ci,bashtestmd:exit-code=0
+$ make clean-db 
+```
+
 Now run your rollup with the `celestia_da` feature enabled:
 
-```bash
+```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=rest_address
 $ cargo run --no-default-features --features=celestia_da,mock_zkvm -- --rollup-config-path=configs/celestia/rollup.toml --genesis-path=configs/celestia/genesis.json
 ```
 
 The log output should indicate a healthy running rollup. Verify that the REST API is responding:
 
-```bash
-$ curl http://127.0.0.1:12346/modules/value-setter/state/value
+```bash,test-ci,bashtestmd:compare-output
+$ curl -s http://127.0.0.1:12346/modules/value-setter/state/value
 {"value":null}
 ```
 
@@ -199,7 +205,7 @@ Update `configs/celestia/rollup.toml`:
   ```bash
   $ celestia light auth admin --p2p.network mocha
   ```
-- **`da.celestia_rpc_address`**: Default value should work for standard setups, ensure that this value matches the port light node is listening on.
+- **`da.celestia_rpc_address`**: Default value should work for standard setups. Ensure this matches the port your light node is listening on.
 - **`da.signer_address`**: Your node address (for verification purposes)
 - **`runner.genesis_height`**: Set to a recent block height for new rollups
 
@@ -215,7 +221,7 @@ $ cargo run --no-default-features \
 ```
 
 Your node will begin posting empty batches to maintain rollup liveness.
-You can open block explore, find your namespace and see that blobs are posted from the address of your light node.
+You can open the block explorer, find your namespace and see that blobs are posted from the address of your light node.
 
 ### Testing Transactions
 

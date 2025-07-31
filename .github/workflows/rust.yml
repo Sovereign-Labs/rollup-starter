@@ -63,3 +63,14 @@ jobs:
         chmod +x scripts/rollup-starter.sh
         ./scripts/rollup-starter.sh
     secrets: inherit
+
+  run-celestia-tutorial:
+    uses: ./.github/workflows/reusable-job.yml
+    with:
+      job-name: "Run Celestia tutorial"
+      env-vars: "SKIP_GUEST_BUILD=1"
+      command: |
+        bashtestmd --input GETTING_STARTED_WITH_CELESTIA.md --output scripts/rollup-starter-celestia.sh --tag=test-ci
+        chmod +x scripts/rollup-starter-celestia.sh
+        ./scripts/rollup-starter-celestia.sh
+    secrets: inherit

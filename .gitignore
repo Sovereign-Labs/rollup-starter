@@ -20,3 +20,4 @@ test-data/rollup-starter-data
 test-data/mock_da.sqlite*
 test-data/docker
 scripts/rollup-starter.sh
+scripts/rollup-starter-celestia.sh
