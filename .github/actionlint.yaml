@@ -1,0 +1,6 @@
+self-hosted-runner:
+  labels:
+    - nscloud-ubuntu-22.04-amd64-8x32-with-cache
+    - nscloud-cache-tag-rollup-starter-build
+    - nscloud-cache-size-100gb
+    - nscloud-exp-features:privileged;host-pid-namespace
