@@ -67,7 +67,7 @@ jobs:
   run-celestia-tutorial:
     uses: ./.github/workflows/reusable-job.yml
     with:
-      job-name: "Run Celestia tutorial"
+      job-name: "Run Celestia Tutorial"
       env-vars: "SKIP_GUEST_BUILD=1"
       command: |
         bashtestmd --input GETTING_STARTED_WITH_CELESTIA.md --output scripts/rollup-starter-celestia.sh --tag=test-ci

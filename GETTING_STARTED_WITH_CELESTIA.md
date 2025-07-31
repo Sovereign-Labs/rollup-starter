@@ -106,6 +106,7 @@ To speed up the initial synchronization, you can configure your light node to st
 #### Getting Your Node Address
 
 Use the `cel-key` utility to list your node's address:
+Assuming you're running it from the repo folder after building.
 
 ```bash
 $ ./cel-key list --keyring-backend test \
