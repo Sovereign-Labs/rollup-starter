@@ -94,8 +94,8 @@ Follow the Celestia documentation for detailed instructions:
 To speed up the initial synchronization, you can configure your light node to start from a recent block:
 
 1. Visit the block explorer: https://mocha.celenium.io/
-2. Select a recent block and note its hash and height
-3. Update your light node configuration:
+2. Select a recent block and note its hash and height. Remember this number, as it is going to be used in SDK rollup configuration.
+3. Update your light node configuration so the celestia node can be operational sooner because it won't need to start from genesis:
    - `Header.TrustedHash`: Use the block hash from step 2
    - `DASer.SampleFrom`: Use the block height from step 2
 
@@ -127,43 +127,22 @@ Your Celestia node address needs `TIA` tokens to submit data. For the Mocha test
 Ensure your light node is running and fully synced by checking the sampling statistics:
 
 ```bash
-$ celestia das sampling-stats
+$ celestia header sync-state
 {
   "result": {
-    "head_of_sampled_chain": 7413765,
-    "head_of_catchup": 7413794,
-    "network_head_height": 7413794,
-    "workers": [
-      {
-        "job_type": "recent",
-        "current": 7413767,
-        "from": 7413767,
-        "to": 7413767
-      },
-      {
-        "job_type": "catchup",
-        "current": 7413766,
-        "from": 7413672,
-        "to": 7413767
-      },
-      {
-        "job_type": "recent",
-        "current": 7413768,
-        "from": 7413768,
-        "to": 7413768
-      }
-    ],
-    "concurrency": 3,
-    "catch_up_done": false,
-    "is_running": true
+    "id": 1,
+    "height": 7439832,
+    "from_height": 7428057,
+    "to_height": 7481444,
+    "from_hash": "6738B417621AD529A42CE31DC2181B69F5C2A482E2D4B0A2728A07C59D21382C",
+    "to_hash": "6316B4692AA1474394BB68E804F151A266792CB6F5B73B444F0D033B0D77BD1D",
+    "start": "2025-08-04T16:33:14.192732+02:00",
+    "end": "0001-01-01T00:00:00Z"
   }
 }
 ```
 
-Key indicators to check:
-- `catch_up_done`: Should be `true` when fully synced
-- `network_head_height`: Current height of the network
-- `head_of_sampled_chain`: Should be close to network height when synced
+Key indicator is `height` which should be close to `to_height`, indicating that light node can pull all necessary data.
 
 Test blob submission to verify your node is working correctly:
 
@@ -179,6 +158,8 @@ $ celestia blob submit 0x42690c204d39600fddd3 0x676d auth $AUTH_TOKEN
   }
 }
 ```
+
+In case of correct submission, the result will indicate height at which blob has been submitted and commitment.
 
 ### Configuring Your Rollup
 
@@ -208,7 +189,7 @@ Update `configs/celestia/rollup.toml`:
   ```
 - **`da.celestia_rpc_address`**: Default value should work for standard setups. Ensure this matches the port your light node is listening on.
 - **`da.signer_address`**: Your node address (for verification purposes)
-- **`runner.genesis_height`**: Set to a recent block height for new rollups
+- **`runner.genesis_height`**: Set to a block that is higher or equal block selected Celestia light node configuration previously.
 
 ### Running on Testnet
 
