@@ -222,7 +222,7 @@ $ cargo run --no-default-features \
 ```
 
 Your node will begin posting empty batches to maintain rollup liveness.
-You can open the block explorer, find your namespace and see that blobs are posted from the address of your light node.
+You can open the Celestia block explorer, find your namespace and see that blobs are posted from the address of your light node.
 
 ### Testing Transactions
 
