@@ -188,7 +188,7 @@ Update `configs/celestia/rollup.toml`:
   ```
 - **`da.celestia_rpc_address`**: Default value should work for standard setups. Ensure this matches the port your light node is listening on.
 - **`da.signer_address`**: Your node address (for verification purposes)
-- **`runner.genesis_height`**: Set to a block that is higher than or equal to the block selected in the Celestia light node configuration previously.
+- **`runner.genesis_height`**: Set to a block that is higher than or equal to the block selected in the Celestia light node configuration.
 
 ### Running on Testnet
 
