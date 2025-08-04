@@ -238,13 +238,20 @@ Proving is disabled by default. Enable it with these environment variables befor
 
 ### Paymaster Configuration
 
-By default, the gas costs of transactions submitted by the preferred sequencer are covered by the paymaster at address `0xA6edfca3AA985Dd3CC728BFFB700933a986aC085`. You can modify this in the [configuration file](configs/mock/genesis.json#L65).
+By default, the gas costs of transactions submitted by the preferred sequencer are covered by the paymaster at address `0xA6edfca3AA985Dd3CC728BFFB700933a986aC085`. 
+You can modify this in the [configuration file](configs/mock/genesis.json#L65).
 
-To run without a paymaster, use our configuration file that does not have a paymaster setting configured:
+To run without a paymaster, just remove all payers from `paymaster` section:
 
-```bash
-$ cargo run --rollup_config_path="configs/mock/genesis_without_paymaster.json"
+```json
+{
+  "paymaster": {
+    "payers": []
+  }
+}
 ```
+
+With this change, the gas cost of each transaction will be covered by the sender of the transaction.
 
 ## Troubleshooting
 

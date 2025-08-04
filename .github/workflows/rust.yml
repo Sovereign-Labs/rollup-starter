@@ -64,6 +64,44 @@ jobs:
         ./scripts/rollup-starter.sh
     secrets: inherit
 
+  docker-mock-da:
+    name: "Docker Mock DA"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: make build-docker-mock-da
+
+      - name: Run Docker container in background
+        run: make run-docker-mock-da BACKGROUND=true
+
+      - name: Wait for rollup to be ready
+        run: |
+          echo "Waiting for rollup to start..."
+          for i in {1..30}; do
+            if curl -f http://127.0.0.1:12346/healthcheck 2>/dev/null; then
+              echo "Rollup is ready!"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          
+          # Check if the container is still running
+          if ! docker ps | grep -q rollup-mock-da; then
+            echo "Container failed to start. Logs:"
+            docker logs rollup-mock-da
+            exit 1
+          fi
+
+      - name: Stop Docker container
+        if: always()
+        run: make stop-docker-mock-da
+
   run-celestia-tutorial:
     uses: ./.github/workflows/reusable-job.yml
     with:

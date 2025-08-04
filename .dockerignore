@@ -24,3 +24,6 @@ runtime_call.json
 **/node_modules
 js/src/generated/
 integrations/rollup/data
+crates/stf/.artifacts
+test-data/**
+integrations/**
