@@ -95,7 +95,7 @@ To speed up the initial synchronization, you can configure your light node to st
 
 1. Visit the block explorer: https://mocha.celenium.io/
 2. Select a recent block and note its hash and height. Remember this number, as it is going to be used in SDK rollup configuration.
-3. Update your light node configuration so the celestia node can be operational sooner because it won't need to start from genesis
+3. Update your light node configuration in `~/.celestia-light-mocha-4/config.toml` so the celestia node can be operational sooner because it won't need to start from genesis
    - `Header.TrustedHash`: Use the block hash from step 2
    - `DASer.SampleFrom`: Use the block height from step 2
 
