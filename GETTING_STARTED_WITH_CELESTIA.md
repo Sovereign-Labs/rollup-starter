@@ -1,6 +1,6 @@
 # Getting Started with Celestia
 
-Sovereign Rollups support Celestia as a Data Availability (DA) layer. Celestia has been designed for accommodating rollups, offering instant finality and significant data throughput.
+Sovereign SDK rollups support Celestia as a Data Availability (DA) layer. Celestia has been designed for accommodating rollups, offering instant finality and significant data throughput.
 
 This tutorial will guide you through running the rollup starter on Celestia, from local development to testnet deployment.
 
