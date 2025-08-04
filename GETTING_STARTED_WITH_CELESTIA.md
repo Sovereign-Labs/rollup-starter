@@ -46,7 +46,7 @@ waiting for container 'celestia-node-0' to become operational...
 
 ### Running the Rollup
 
-Clean the database to avoid any issues with rollup from MockDa, if it has been run previously
+Clean the database to avoid conflicts if you previously ran the rollup with MockDa
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ make clean-db 
@@ -95,7 +95,7 @@ To speed up the initial synchronization, you can configure your light node to st
 
 1. Visit the block explorer: https://mocha.celenium.io/
 2. Select a recent block and note its hash and height. Remember this number, as it is going to be used in SDK rollup configuration.
-3. Update your light node configuration so the celestia node can be operational sooner because it won't need to start from genesis:
+3. Update your light node configuration so the celestia node can be operational sooner because it won't need to start from genesis
    - `Header.TrustedHash`: Use the block hash from step 2
    - `DASer.SampleFrom`: Use the block height from step 2
 
@@ -105,8 +105,7 @@ To speed up the initial synchronization, you can configure your light node to st
 
 #### Getting Your Node Address
 
-Use the `cel-key` utility to list your node's address:
-Assuming you're running it from the repo folder after building.
+Use the `cel-key` utility to list your node's address (assuming you're running it from the repo folder after building):
 
 ```bash
 $ ./cel-key list --keyring-backend test \
@@ -142,7 +141,7 @@ $ celestia header sync-state
 }
 ```
 
-Key indicator is `height` which should be close to `to_height`, indicating that light node can pull all necessary data.
+The key indicator is `height` which should be close to `to_height`, indicating that light node can pull all necessary data.
 
 Test blob submission to verify your node is working correctly:
 
@@ -159,7 +158,7 @@ $ celestia blob submit 0x42690c204d39600fddd3 0x676d auth $AUTH_TOKEN
 }
 ```
 
-In case of correct submission, the result will indicate height at which blob has been submitted and commitment.
+In the case of a correct submission, the result will indicate the height at which the blob has been submitted and the commitment.
 
 ### Configuring Your Rollup
 
@@ -189,7 +188,7 @@ Update `configs/celestia/rollup.toml`:
   ```
 - **`da.celestia_rpc_address`**: Default value should work for standard setups. Ensure this matches the port your light node is listening on.
 - **`da.signer_address`**: Your node address (for verification purposes)
-- **`runner.genesis_height`**: Set to a block that is higher or equal block selected Celestia light node configuration previously.
+- **`runner.genesis_height`**: Set to a block that is higher than or equal to the block selected in the Celestia light node configuration previously.
 
 ### Running on Testnet
 
