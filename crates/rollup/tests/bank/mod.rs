@@ -5,6 +5,7 @@ use sov_address::{EthereumAddress, EvmCryptoSpec};
 use sov_cli::NodeClient;
 use sov_mock_da::{BlockProducingConfig, MockAddress, MockDaConfig, MockDaSpec};
 use sov_mock_zkvm::MockZkvm;
+use sov_modules_api::capabilities::UniquenessData;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::macros::config_value;
@@ -107,7 +108,7 @@ async fn send_test_create_token_tx(client: &NodeClient) -> Result<(), anyhow::Er
             chain_id,
             max_priority_fee,
             MAX_TX_FEE,
-            generation,
+            UniquenessData::Generation(generation),
             gas_limit,
         ),
     );
