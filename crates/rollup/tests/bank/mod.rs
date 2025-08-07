@@ -18,6 +18,7 @@ use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
 use std::env;
 use std::str::FromStr;
+use sov_modules_api::capabilities::UniquenessData;
 use stf_starter::Runtime;
 use stf_starter::RuntimeCall;
 use tracing_subscriber::layer::SubscriberExt;
@@ -107,7 +108,7 @@ async fn send_test_create_token_tx(client: &NodeClient) -> Result<(), anyhow::Er
             chain_id,
             max_priority_fee,
             MAX_TX_FEE,
-            generation,
+            UniquenessData::Generation(generation),
             gas_limit,
         ),
     );
