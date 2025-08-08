@@ -23,7 +23,9 @@ type ExecMode = sov_modules_api::execution_mode::Native;
 #[cfg(not(feature = "native"))]
 type ExecMode = sov_modules_api::execution_mode::Zk;
 
-type S = ConfigurableSpec<DaSpec, MockZkvm, MockZkvm, EthereumAddress, ExecMode, EvmCryptoSpec>;
+use sov_address::MultiAddressEvm;
+
+type S = ConfigurableSpec<DaSpec, MockZkvm, MockZkvm, MultiAddressEvm, ExecMode, EvmCryptoSpec>;
 
 fn main() -> anyhow::Result<()> {
     sov_build::Options::apply_defaults::<S, Runtime<S>>()

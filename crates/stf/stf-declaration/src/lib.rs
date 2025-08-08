@@ -8,6 +8,7 @@
 use sov_hyperlane_integration::{
     warp::Warp, HyperlaneAddress, InterchainGasPaymaster, Mailbox as RawMailbox, MerkleTreeHook,
 };
+use sov_address::{EthereumAddress, FromVmAddress};
 #[cfg(feature = "native")]
 use sov_modules_api::macros::{expose_rpc, CliWallet};
 use sov_modules_api::prelude::*;
@@ -50,7 +51,7 @@ pub type Mailbox<S> = RawMailbox<S, Warp<S>>;
 #[genesis(serde(bound = "S::Address: serde::de::DeserializeOwned"))]
 pub struct Runtime<S: Spec>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     /// The `accounts` module is responsible for managing user accounts.
     pub accounts: sov_accounts::Accounts<S>,
@@ -84,4 +85,7 @@ where
     pub warp: Warp<S>,
     /// The ValueSetter module (recommended as a starting point for building new modules)
     pub value_setter: value_setter::ValueSetter<S>,
+    #[cfg_attr(feature = "native", cli_skip)]
+    /// The EVM module.
+    pub evm: sov_evm::Evm<S>,
 }

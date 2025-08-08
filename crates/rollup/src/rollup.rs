@@ -2,13 +2,16 @@
 //! StarterRollup provides a minimal self-contained rollup implementation
 
 use async_trait::async_trait;
+use sov_address::{FromVmAddress, MultiAddress};
 use sov_address::{EthereumAddress, EvmCryptoSpec};
 use sov_db::ledger_db::LedgerDb;
 use sov_db::storage_manager::NomtStorageManager;
 use sov_hyperlane_integration::HyperlaneAddress;
 use sov_mock_zkvm::MockCodeCommitment;
+use sov_ethereum::{EthRpcConfig, GasPriceOracleConfig};
 use sov_modules_api::configurable_spec::ConfigurableSpec;
 use sov_modules_api::rest::StateUpdateReceiver;
+use sov_modules_api::NodeEndpoints;
 use sov_modules_api::Spec;
 use sov_modules_api::ZkVerifier;
 use sov_modules_rollup_blueprint::pluggable_traits::PluggableSpec;
@@ -19,6 +22,7 @@ use sov_rollup_interface::execution_mode::Native;
 use sov_rollup_interface::node::SyncStatus;
 use sov_rollup_interface::zk::aggregated_proof::CodeCommitment;
 use sov_sequencer::ProofBlobSender;
+use sov_sequencer::Sequencer;
 use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
 use sov_state::Storage;
@@ -40,7 +44,7 @@ pub type EthSpec<Da, InnerZkvm, OuterZkvm> = ConfigurableSpec<
     Da,
     InnerZkvm,
     OuterZkvm,
-    EthereumAddress,
+    MultiAddress<EthereumAddress>,
     Native,
     EvmCryptoSpec,
     NativeStorage,
@@ -57,7 +61,7 @@ pub struct StarterRollup<M> {
 impl RollupBlueprint<Native> for StarterRollup<Native>
 where
     EthSpec<DaSpec, InnerZkvm, OuterZkvm>: PluggableSpec,
-    <EthSpec<DaSpec, InnerZkvm, OuterZkvm> as Spec>::Address: HyperlaneAddress,
+    <EthSpec<DaSpec, InnerZkvm, OuterZkvm> as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Spec = EthSpec<DaSpec, InnerZkvm, OuterZkvm>;
     type Runtime = Runtime<Self::Spec>;
@@ -149,6 +153,25 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         sequence_number_provider: Arc<dyn ProofBlobSender>,
     ) -> anyhow::Result<Self::ProofSender> {
         Ok(Self::ProofSender::new(sequence_number_provider))
+    }
+
+    async fn sequencer_additional_apis<Seq>(
+        &self,
+        sequencer: Arc<Seq>,
+        _rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
+    ) -> anyhow::Result<NodeEndpoints>
+    where
+        Seq: Sequencer<Spec = Self::Spec, Rt = Self::Runtime, Da = Self::DaService>,
+    {
+        let eth_rpc_config = EthRpcConfig {
+            gas_price_oracle_config: GasPriceOracleConfig::default(),
+        };
+
+        Ok(NodeEndpoints {
+            jsonrpsee_module: sov_ethereum::get_ethereum_rpc(eth_rpc_config, sequencer)
+                .remove_context(),
+            ..Default::default()
+        })
     }
 }
 

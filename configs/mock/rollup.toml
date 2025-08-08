@@ -11,7 +11,7 @@ sender_address = "00000000000000000000000000000000000000000000000000000000000000
 finalization = 10
 # Defines how new blocks should be produced.
 [da.block_producing.periodic]
-block_time_ms = 3_000
+block_time_ms = 500
 
 [storage]
 # The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
