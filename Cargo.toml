@@ -64,6 +64,7 @@ sov-evm = { path = "../sovereign-sdk/crates/module-system/module-implementations
 sov-ethereum = { path = "../sovereign-sdk/crates/full-node/sov-ethereum", default-features = false }
 sov-build = { path = "../sovereign-sdk/crates/utils/sov-build", default-features = false }
 stf-starter = { path = "./crates/stf", default-features = false }
+sov-eth-dev-signer = { path = "../sovereign-sdk/crates/full-node/sov-eth-dev-signer" }
 stf-starter-declaration = { path = "./crates/stf/stf-declaration", default-features = false }
 value-setter = { path = "./examples/value-setter" }
 strum = { version = "0.26.3", features = ["derive"] }
