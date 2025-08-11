@@ -6,10 +6,19 @@
     "reward_address": "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
   },
   "attester_incentives": {
-    "minimum_attester_bond": [1000, 1000],
-    "minimum_challenger_bond": [1000, 1000],
+    "minimum_attester_bond": [
+      1000,
+      1000
+    ],
+    "minimum_challenger_bond": [
+      1000,
+      1000
+    ],
     "initial_attesters": [
-      ["0xA6edfca3AA985Dd3CC728BFFB700933a986aC085", "200000"]
+      [
+        "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
+        "200000"
+      ]
     ],
     "rollup_finality_period": 5,
     "maximum_attested_height": 0,
@@ -50,18 +59,125 @@
         [
           "0x9b08ce57a93751aE790698A2C9ebc76A78F23E25",
           "10000000000000000"
+        ],
+        [
+          "0x5cAA360D300fcA6DaFEBce1a693B9daC949738D2",
+          "10000000000000000"
+        ],
+        [
+          "0x503210c9A90d61FC0772bAC00aba9b12b6Fa9EDC",
+          "10000000000000000"
+        ],
+        [
+          "0xf1ceAC618Bc181450a052aA23bCDF3a8b328Edc3",
+          "10000000000000000"
+        ],
+        [
+          "0x503210c9A90d61FC0772bAC00aba9b12b6Fa9EDC",
+          "10000000000000000"
+        ],
+        [
+          "0x0fbd0C30aEEEd9d2f9936B6A0A2c87Df0F8fCDC3",
+          "10000000000000000"
+        ],
+        [
+          "0x147Af6275322304cD0f6C5948d89ef9ae70757d4",
+          "10000000000000000"
+        ],
+        [
+          "0x2780F1FC8064Ae158F414bBB9A0a96584f83f72a",
+          "10000000000000000"
+        ],
+        [
+          "0x0E88357eB4E0aA75F8DbA2cB8141803cd560C757",
+          "10000000000000000"
+        ],
+        [
+          "0xb7E55830E9E7D431A2B31f15c98D9c20Dc477A8d",
+          "10000000000000000"
+        ],
+        [
+          "0x45131F098386322909d4A45132810fB403340BD4",
+          "10000000000000000"
+        ],
+        [
+          "0x22545Cea3C9A4197a4e920b0A471e8f114B05611",
+          "10000000000000000"
+        ],
+        [
+          "0x22545Cea3C9A4197a4e920b0A471e8f114B05611",
+          "1000000000000000"
+        ],
+        [
+          "0xEca46725aBEBe0ba3A6c4D202A5Cd7388B4752A0",
+          "1000000000000000"
+        ],
+        [
+          "0x8de0a26B3167B6e9703297f0c680f607dab04DcE",
+          "1000000000000000"
+        ],
+        [
+          "0x716D2794f6B8a6fAD79a4634c444c875B9C1a9a2",
+          "1000000000000000"
+        ],
+        [
+          "0xAd7096467877382A35A532FAc9886D8378F8F8E8",
+          "1000000000000000"
+        ],
+        [
+          "0x6d85315f4ba6e6f367A252660c8d9702C57922Dc",
+          "1000000000000000"
+        ],
+        [
+          "0x3973CfB35983592d603649D980966E9765346ed9",
+          "1000000000000000"
+        ],
+        [
+          "0xf3c182417d1172835BEc2FaF36C12d45DcD90c01",
+          "1000000000000000"
+        ],
+        [
+          "0xAC40b4EFDc2Bd4BC937505409708aAA8D17172a9",
+          "1000000000000000"
+        ],
+        [
+          "0x63e4b21Dde03dDFf847c31Fc6D00B6bBe38c206b",
+          "1000000000000000"
+        ],
+        [
+          "0xa95a33aD06910489e65aAa5e9B72C1a4bbBE0Ee2",
+          "1000000000000000"
         ]
-
       ],
-      "admins": ["0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"]
+      "admins": [
+        "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
+      ]
     },
     "tokens": []
   },
   "chain_state": {
     "current_time": 0,
     "operating_mode": "operator",
-    "inner_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
-    "outer_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
+    "inner_code_commitment": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "outer_code_commitment": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
     "genesis_da_height": 0
   },
   "paymaster": {
@@ -83,10 +199,19 @@
     ]
   },
   "prover_incentives": {
-    "proving_penalty": [10, 10],
-    "minimum_bond": [1000, 1000],
+    "proving_penalty": [
+      10,
+      10
+    ],
+    "minimum_bond": [
+      1000,
+      1000
+    ],
     "initial_provers": [
-      ["0xA6edfca3AA985Dd3CC728BFFB700933a986aC085", "200000"]
+      [
+        "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
+        "200000"
+      ]
     ]
   },
   "sequencer_registry": {

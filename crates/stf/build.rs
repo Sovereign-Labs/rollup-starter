@@ -1,4 +1,4 @@
-use sov_address::{EthereumAddress, EvmCryptoSpec};
+use sov_address::EvmCryptoSpec;
 use sov_mock_zkvm::MockZkvm;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
 use stf_starter_declaration::Runtime;
