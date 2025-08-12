@@ -11,7 +11,7 @@ sender_address = "00000000000000000000000000000000000000000000000000000000000000
 finalization = 10
 # Defines how new blocks should be produced.
 [da.block_producing.periodic]
-block_time_ms = 3_000
+block_time_ms = 3000
 
 [storage]
 # The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
@@ -33,8 +33,8 @@ da_polling_interval_ms = 1000
 
 [runner.http_config]
 bind_host = "0.0.0.0"
-bind_port = 12346
-public_address = "http://127.0.0.1:12346"
+bind_port = 8546
+public_address = "http://127.0.0.1:8546"
 
 [monitoring]
 telegraf_address = "127.0.0.1:8094"
@@ -59,7 +59,7 @@ max_number_of_transitions_in_memory = 20
 
 
 [sequencer]
-max_batch_size_bytes = 1048576
+max_batch_size_bytes = 2097152
 max_concurrent_blobs = 128
 max_allowed_node_distance_behind = 10
 rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
@@ -71,4 +71,5 @@ disable_state_root_consistency_checks = true
 # "None" - Shutdown the sequencer instead of attempting recovery (default)
 # "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
 recovery_strategy = "TryToSave"
-batch_execution_time_limit_millis = 6000 # This should be adjusted depending on the DA layer's block times
+batch_execution_time_limit_millis = 3000 # This should be adjusted depending on the DA layer's block times
+postgres_connection_string = "postgresql://postgres:yourpassword@localhost:5432/rollup"

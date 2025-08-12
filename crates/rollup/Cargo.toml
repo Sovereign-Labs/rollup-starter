@@ -50,7 +50,7 @@ sp1-starter = { path = "../provers/sp1", optional = true }
 stf-starter = { workspace = true, default-features = false, features = ["native"] }
 sov-risc0-adapter = { workspace = true, features = ["native"], optional = true }
 sov-sp1-adapter = { workspace = true, features = ["native"], optional = true }
-
+sov-ethereum = { workspace = true }
 # binary dependencies
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing-panic = "0.1.2"

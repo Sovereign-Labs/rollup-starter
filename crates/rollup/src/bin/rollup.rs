@@ -19,7 +19,7 @@ use std::str::FromStr;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use sov_address::EthereumAddress;
+use sov_address::{EthereumAddress, MultiAddress};
 use sov_modules_api::capabilities::RollupHeight;
 
 #[cfg(all(feature = "mock_da", feature = "celestia_da"))]
@@ -199,7 +199,7 @@ async fn new_rollup(
         "Starting rollup with config"
     );
 
-    let rollup_config: RollupConfig<EthereumAddress, DaService> =
+    let rollup_config: RollupConfig<MultiAddress<EthereumAddress>, DaService> =
         from_toml_path(&rollup_config_path).with_context(|| {
             format!(
                 "Failed to read rollup configuration from {}",
