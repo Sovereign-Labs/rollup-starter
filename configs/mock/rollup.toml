@@ -72,4 +72,4 @@ disable_state_root_consistency_checks = true
 # "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
 recovery_strategy = "TryToSave"
 batch_execution_time_limit_millis = 3000 # This should be adjusted depending on the DA layer's block times
-postgres_connection_string = "postgresql://postgres:yourpassword@localhost:5432/"
+postgres_connection_string = "postgresql://postgres:yourpassword@localhost:5432/rollup"
