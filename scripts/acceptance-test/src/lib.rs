@@ -3,6 +3,7 @@ use rand::Rng;
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
 use tracing::{debug, info};
+pub mod fetch_and_compare;
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
 

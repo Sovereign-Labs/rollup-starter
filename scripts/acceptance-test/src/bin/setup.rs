@@ -2,20 +2,18 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
+use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{cleanup_postgres_container, generate_postgres_password, interpolate_config, start_and_wait_for_postgres_ready, Directories, POSTGRES_CONTAINER_NAME};
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
-use sov_api_spec::types::{self, AcceptTxBody, GetSlotByIdChildren, Slot};
+use sov_api_spec::types::{self, AcceptTxBody};
 
 use sov_api_spec::ResponseValue;
 use tokio_stream::StreamExt;
-use futures::stream::Stream;
-use serde_json::Value;
-use std::path::PathBuf;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_modules_api::Spec as SpecT;
-use sov_rollup_interface::node::ledger_api::IncludeChildren;
-use sov_soak_testing::{run_generator_task_for_bank, run_generator_task_for_bank_and_synthetic_load, TxType, ValidityProfile};
+use sov_soak_testing::{run_generator_task_for_bank, ValidityProfile};
+use acceptance_test::fetch_and_compare::SlotMonitor;
 use rollup_starter::rollup::StarterRollup;
 use sov_bank::{get_token_id, Amount, CallMessage as BankCallMessage, Coins, TokenId};
 use stf_starter::sov_modules_api::capabilities::UniquenessData;
@@ -26,7 +24,6 @@ use stf_starter::sov_modules_api::{CryptoSpec, RawTx};
 use stf_starter::RuntimeCall;
 use tokio::sync::watch::Receiver;
 
-use tokio::signal::unix::SignalKind;
 use tokio::task::JoinSet;
 use tracing::info;
 
@@ -88,221 +85,22 @@ fn start_workers() ->  Result<(tokio::sync::watch::Sender<bool>, JoinSet<Result<
 
 const API_URL: &str = "http://localhost:12348";
 
-fn assert_slots_match_excluding_batches(slot1: &Slot, slot2: &Slot, description: &str) {
-    assert_eq!(slot1.batch_range, slot2.batch_range, "{}: batch_range should match", description);
-    assert_eq!(slot1.finality_status, slot2.finality_status, "{}: finality_status should match", description);
-    assert_eq!(slot1.hash, slot2.hash, "{}: hash should match", description);
-    assert_eq!(slot1.number, slot2.number, "{}: number should match", description);
-    assert_eq!(slot1.state_root, slot2.state_root, "{}: state_root should match", description);
-    assert_eq!(slot1.timestamp, slot2.timestamp, "{}: timestamp should match", description);
-    assert_eq!(slot1.type_, slot2.type_, "{}: type should match", description);
-}
-
-fn slot_to_json(slot: &Slot, exclude_batches: bool) -> Result<Value, anyhow::Error> {
-    let mut json = serde_json::to_value(slot)?;
-    if let Value::Object(ref mut map) = json {
-        if exclude_batches {
-            map.remove("batches");
-        }
-    }
-    Ok(json)
-}
-
-
-fn assert_slots_match_json_excluding_batches(slot1: &Slot, slot2: &Slot, description: &str) -> Result<(), anyhow::Error> {
-    let json1 = slot_to_json(slot1, true)?;
-    let json2 = slot_to_json(slot2, true)?;
+fn compare_tx_info_and_accepted_tx(
+    tx_info: &types::TxInfoWithConfirmation, 
+    accepted_tx: &types::ApiAcceptedTx,
+    description: &str
+) {
+    // Compare shared fields
+    assert_eq!(tx_info.events, accepted_tx.events, "{}: events should match", description);
+    assert_eq!(tx_info.id, accepted_tx.id, "{}: id should match", description);
+    assert_eq!(tx_info.tx_number, Some(accepted_tx.tx_number), "{}: tx_number should match", description);
     
-    if json1 != json2 {
-        println!("❌ {} JSON mismatch:", description);
-        println!("Slot 1: {}", serde_json::to_string_pretty(&json1)?);
-        println!("Slot 2: {}", serde_json::to_string_pretty(&json2)?);
-        anyhow::bail!("{}: JSON comparison failed", description);
+    // TxInfoWithConfirmation has receipt wrapped in Option, ApiAcceptedTx has it directly
+    if let Some(ref receipt) = tx_info.receipt {
+        assert_eq!(receipt, &accepted_tx.receipt, "{}: receipt should match", description);
     }
-    Ok(())
-}
-
-fn compare_against_snapshot(slot: &Slot, snapshot_json: &str, description: &str, exclude_batches: bool) -> Result<(), anyhow::Error> {
-    let slot_json = slot_to_json(slot, exclude_batches)?;
-    let snapshot: Value = serde_json::from_str(snapshot_json)?;
     
-    if slot_json != snapshot {
-        println!("❌ {} snapshot mismatch:", description);
-        println!("Actual: {}", serde_json::to_string_pretty(&slot_json)?);
-        println!("Expected: {}", serde_json::to_string_pretty(&snapshot)?);
-        anyhow::bail!("{}: Snapshot comparison failed", description);
-    }
-    Ok(())
-}
-
-fn save_slot_snapshot(slot: &Slot, output_dir: &PathBuf) -> Result<(), anyhow::Error> {
-    let json = slot_to_json(slot, false)?;
-    let snapshot_json = serde_json::to_string_pretty(&json)?;
-    let filename = format!("slot_{:04}_with_children.json", slot.number);
-    let filepath = output_dir.join(&filename);
-    
-    std::fs::write(&filepath, snapshot_json)?;
-    
-    Ok(())
-}
-
-fn validate_against_snapshot(slot: &Slot, output_dir: &PathBuf, description: &str) -> Result<(), anyhow::Error> {
-    let filename = format!("slot_{:04}_with_children.json", slot.number);
-    let filepath = output_dir.join(&filename);
-    let snapshot_json = std::fs::read_to_string(&filepath)?;
-    compare_against_snapshot(slot, &snapshot_json, description, false)
-}
-
-pub enum GetItemBehavior {
-    SaveSnapshot,
-    CheckAgainstSnapshot,
-}
-
-pub struct SlotMonitor {
-    slots: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
-    slots_with_children: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
-    finalized_slots: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
-    finalized_slots_with_children: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
-    prev_slot_with_children: Option<Slot>,
-    output_dir: PathBuf,
-    expected_slot_number: Option<u64>,
-}
-
-impl SlotMonitor {
-    pub async fn new(client: &sov_api_spec::Client, output_dir: PathBuf) -> Result<Self, anyhow::Error> {
-        let finalized_slots = client.subscribe_finalized_slots().await?;
-        let finalized_slots_with_children = client.subscribe_finalized_slots_with_children(IncludeChildren::new(true)).await?;
-        let slots = client.subscribe_slots().await?;
-        let slots_with_children = client.subscribe_slots_with_children(IncludeChildren::new(true)).await?;
-
-        // Create snapshots directory if it doesn't exist
-        let snapshots_dir = output_dir.join("snapshots");
-        std::fs::create_dir_all(&snapshots_dir)?;
-
-        Ok(Self {
-            slots: Box::new(slots),
-            slots_with_children: Box::new(slots_with_children),
-            finalized_slots: Box::new(finalized_slots),
-            finalized_slots_with_children: Box::new(finalized_slots_with_children),
-            prev_slot_with_children: None,
-            output_dir: snapshots_dir,
-            expected_slot_number: None,
-        })
-    }
-
-    pub async fn get_next_slot(&mut self, behavior: GetItemBehavior) -> Result<(Slot, Slot, Slot, Slot), anyhow::Error> {
-        let next_slot = self.slots.next().await.unwrap().unwrap();
-        let next_slot_with_children = self.slots_with_children.next().await.unwrap().unwrap();
-        let finalized_next_slot = self.finalized_slots.next().await.unwrap().unwrap();
-        let finalized_next_slot_with_children = self.finalized_slots_with_children.next().await.unwrap().unwrap();
-
-        // Validate slot number sequence
-        if let Some(expected) = self.expected_slot_number {
-            if next_slot_with_children.number != expected {
-                anyhow::bail!("Slot number out of sequence! Expected {}, got {}", expected, next_slot_with_children.number);
-            }
-        } else {
-            // First slot - initialize the expected sequence
-            self.expected_slot_number = Some(next_slot_with_children.number);
-        }
-        // Check that slots match (excluding batches field)
-        assert_slots_match_excluding_batches(&next_slot, &next_slot_with_children, "Next slot");
-        assert_slots_match_json_excluding_batches(&next_slot, &next_slot_with_children, "Next slot JSON")?;
-
-        // Check that finalized_slots_with_children matches finalized_slots (excluding batches field)
-        assert_slots_match_excluding_batches(&finalized_next_slot, &finalized_next_slot_with_children, "Finalized slot");
-        assert_slots_match_json_excluding_batches(&finalized_next_slot, &finalized_next_slot_with_children, "Finalized slot JSON")?;
-
-        // Check if this slot has been finalized and has batches
-        if finalized_next_slot.batch_range.end != finalized_next_slot.batch_range.start {
-            if let Some(ref prev_slot_with_children) = self.prev_slot_with_children {
-                assert_slots_match_excluding_batches(&finalized_next_slot, prev_slot_with_children, "Next slot with children should match previous slot with children");
-                assert_eq!(finalized_next_slot_with_children.batches, prev_slot_with_children.batches, "Previous slot with children should match newly finalized slot with children");
-            }
-        }
-
-        // Save the next_slot_with_children snapshot
-        match behavior {
-            GetItemBehavior::SaveSnapshot => {
-                save_slot_snapshot(&next_slot_with_children, &self.output_dir)?;
-            }
-            GetItemBehavior::CheckAgainstSnapshot => {
-                validate_against_snapshot(&next_slot_with_children, &self.output_dir, "Next slot with children")?;
-            }
-        }
-
-        self.prev_slot_with_children = Some(next_slot_with_children.clone());
-        
-        // Update expected slot number for next iteration
-        self.expected_slot_number = Some(next_slot_with_children.number + 1);
-
-        Ok((next_slot, next_slot_with_children, finalized_next_slot, finalized_next_slot_with_children))
-    }
-
-    pub fn save_slot_as_snapshot(&self, slot: &Slot) -> Result<String, anyhow::Error> {
-        let json = slot_to_json(slot, false)?;
-        Ok(serde_json::to_string_pretty(&json)?)
-    }
-}
-
-pub struct SlotFetcher {
-    client: sov_api_spec::Client,
-    output_dir: PathBuf,
-}
-
-impl SlotFetcher {
-    pub fn new(client: sov_api_spec::Client, output_dir: PathBuf) -> Self {
-        // Create snapshots directory if it doesn't exist
-        let snapshots_dir = output_dir.join("snapshots");
-        std::fs::create_dir_all(&snapshots_dir).ok();
-        
-        Self { 
-            client,
-            output_dir: snapshots_dir,
-        }
-    }
-
-    pub async fn fetch_and_compare_slot(&self, slot_number: u64, behavior: GetItemBehavior) -> Result<Slot, anyhow::Error> {
-        // Fetch slot in all 4 possible ways
-        let slot_with_children = self.client.get_slot_by_id(&types::IntOrHash::Integer(slot_number), Some(GetSlotByIdChildren::_1)).await?;
-        let slot_without_children = self.client.get_slot_by_id(&types::IntOrHash::Integer(slot_number), Some(GetSlotByIdChildren::_0)).await?;
-        let slot_by_hash = self.client.get_slot_by_id(&types::IntOrHash::Hash(slot_with_children.hash.clone()), None).await?;
-        let slot_by_hash_with_children = self.client.get_slot_by_id(&types::IntOrHash::Hash(slot_with_children.hash.clone()), Some(GetSlotByIdChildren::_1)).await?;
-
-        // Compare all variations for consistency
-        self.compare_slot_variations(&slot_with_children, &slot_without_children, &slot_by_hash, &slot_by_hash_with_children, slot_number)?;
-
-        // Handle snapshot behavior
-        match behavior {
-            GetItemBehavior::SaveSnapshot => {
-                save_slot_snapshot(&slot_with_children, &self.output_dir)?;
-            }
-            GetItemBehavior::CheckAgainstSnapshot => {
-                validate_against_snapshot(&slot_with_children, &self.output_dir, &format!("Fetched slot {}", slot_number))?;
-            }
-        }
-
-        // Return the most complete version (with children)
-        Ok(slot_with_children.into_inner())
-    }
-
-    fn compare_slot_variations(&self, slot_with_children: &Slot, slot_without_children: &Slot, slot_by_hash: &Slot, slot_by_hash_with_children: &Slot, slot_number: u64) -> Result<(), anyhow::Error> {
-        let description_prefix = format!("Slot {}", slot_number);
-
-        // Compare slots fetched by number vs by hash (excluding batches)
-        assert_slots_match_excluding_batches(slot_with_children, slot_by_hash_with_children, &format!("{}: by number vs by hash (with children)", description_prefix));
-        assert_eq!(slot_by_hash_with_children.batches, slot_with_children.batches, "{}: batches should match", description_prefix);
-        assert_slots_match_excluding_batches(slot_without_children, slot_by_hash, &format!("{}: by number vs by hash (without children)", description_prefix));
-        assert_slots_match_excluding_batches(slot_with_children, slot_without_children, &format!("{}: by hash vs by hash with children", description_prefix));
-
-
-        // Compare the slots as JSON as well to be extra safe
-        assert_slots_match_json_excluding_batches(slot_with_children, slot_by_hash_with_children, &format!("{}: JSON by number vs by hash (with children)", description_prefix))?;
-        assert_slots_match_json_excluding_batches(slot_without_children, slot_by_hash, &format!("{}: JSON by number vs by hash (without children)", description_prefix))?;
-        assert_slots_match_json_excluding_batches(slot_with_children, slot_without_children, &format!("{}: JSON with vs without children (by number)", description_prefix))?;
-
-        Ok(())
-    }
+    println!("✓ {} shared fields match", description);
 }
 
 
@@ -325,90 +123,13 @@ async fn main() -> Result<(), anyhow::Error> {
 			"--stop-at-rollup-height",
 			"100",
 		])
-        .current_dir(directories.rollup_root)
+        .current_dir(directories.rollup_root.clone())
         .spawn()
         .expect("Failed to start rollup");
-    info!("Rollup started, waiting for sequencer to be ready");
-    // Wait up to two minutes for the sequencer to be ready
-    for _ in 0..1200 {
-        if let Ok(response) = reqwest::get(format!("{}/sequencer/ready", API_URL)).await {
-            if response.status().is_success() {
-                break;
-            }
-        }
-        thread::sleep(Duration::from_millis(100));
-    }
-    // Send the known good txs: Create token, mint token, transfer token
-    let client = get_rollup_client()?;
-
-    let mut slot_monitor = SlotMonitor::new(&client, directories.output_dir.clone()).await?;
-
-    let mut sequencer_events = client.subscribe_to_events().await?;
-    let mut sequencer_txs = client.subscribe_to_txs(None).await?;
-
-    let [create_token, mint, transfer] = set_txs();
-
-    let response = sign_and_send_tx(create_token, &client).await?;
-    println!("Accepted tx: {:?}\n", response);
-    println!("Sequencer tx: {:?}\n", sequencer_txs.next().await);
-    for _ in 0..response.events.len() {
-        println!("Event: {:?}", sequencer_events.next().await);
-    }
-    println!("\n\n");
-
-    let mut first_subscribed_slot_number = 0;
-    // Wait for the first batch to be posted 
-    for i in 0..10 {
-        let (next_slot, _next_slot_with_children, _finalized_next_slot, _finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
-        if i == 0 {
-            first_subscribed_slot_number = next_slot.number;
-        }
-
-        if next_slot.batch_range.end != next_slot.batch_range.start {
-            break;
-        }
-    }
-
-    let response = sign_and_send_tx(mint, &client).await?;
-    println!("Accepted tx: {:?}\n", response);
-    println!("Sequencer tx: {:?}\n", sequencer_txs.next().await);
-    for _ in 0..response.events.len() {
-        println!("Event: {:?}", sequencer_events.next().await);
-    }
-    println!("\n\n");
-
-    let response = sign_and_send_tx(transfer, &client).await?;
-    println!("Accepted tx: {:?}\n", response);
-    println!("Sequencer tx: {:?}\n", sequencer_txs.next().await);
-    for _ in 0..response.events.len() {
-        println!("Event: {:?}", sequencer_events.next().await);
-    }
-    println!("\n\n");
-
-    // Wait for the next txs to post and be finalized. 
-    for _ in 0..10 {
-        let (_next_slot, _next_slot_with_children, _finalized_next_slot, finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
-        
-        if finalized_next_slot_with_children.batches.len() > 0 {
-            let batch = &finalized_next_slot_with_children.batches[0];
-            if batch.txs.len() > 0 {
-                break
-            }
-        }
-    }
-
-    let last_slot = slot_monitor.prev_slot_with_children.as_ref().unwrap();
     
-    let slot_fetcher = SlotFetcher::new(client, directories.output_dir.clone());
     
-    for slotnum in 0..first_subscribed_slot_number {
-        let _slot = slot_fetcher.fetch_and_compare_slot(slotnum, GetItemBehavior::SaveSnapshot).await?;
-    }
-    for slotnum in first_subscribed_slot_number..=last_slot.number {
-        let _slot = slot_fetcher.fetch_and_compare_slot(slotnum, GetItemBehavior::CheckAgainstSnapshot).await?;
-    }
-
-    
+    // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
+    let result = do_manual_setup(directories).await?;
 
 	// let (tx, worker_set) = start_workers()?;
 
@@ -436,8 +157,98 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("Rollup process finished");
     println!("{}", String::from_utf8(output.stdout)?);
 	cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
+    Ok(result)
+}
+
+/// Runs a sequence of two batches, one with a create token, and one with a mint and transfer.
+/// Since we know exactly what state will be generated, we can make fine-grained assertions about the state using this manual setup.
+async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> {
+    info!("Rollup started, waiting for sequencer to be ready");
+    // Wait up to two minutes for the sequencer to be ready
+    for _ in 0..1200 {
+        if let Ok(response) = reqwest::get(format!("{}/sequencer/ready", API_URL)).await {
+            if response.status().is_success() {
+                break;
+            }
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    // Send the known good txs: Create token, mint token, transfer token
+    let client = get_rollup_client()?;
+    let http_client = reqwest::Client::new();
+    
+    let mut slot_monitor = SlotMonitor::new(&client, directories.output_dir.clone()).await?;
+
+    let mut sequencer_events = client.subscribe_to_events().await?;
+    let mut sequencer_txs = client.subscribe_to_txs(None).await?;
+
+    let ([create_token, mint, transfer], token_id) = set_txs();
+    let initial_supply = get_supply(&http_client, token_id).await?;
+    assert_eq!(initial_supply, Amount::ZERO);
+
+    let response = sign_and_send_tx(create_token, &client).await?;
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0], sequencer_events.next().await.unwrap().unwrap());
+    let accepted_tx = sequencer_txs.next().await.unwrap().unwrap();
+    compare_tx_info_and_accepted_tx(&response, &accepted_tx, "Create token transaction");
+    
+    let new_supply = get_supply(&http_client, token_id).await?;
+    assert_eq!(new_supply, Amount::new(1000));
+    
+
+    let mut first_subscribed_slot_number = 0;
+    // Wait for the first batch to be posted 
+    for i in 0..10 {
+        let (next_slot, _next_slot_with_children, _finalized_next_slot, _finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
+        if i == 0 {
+            first_subscribed_slot_number = next_slot.number;
+        }
+
+        if next_slot.batch_range.end != next_slot.batch_range.start {
+            break;
+        }
+    }
+
+    let response = sign_and_send_tx(mint, &client).await?;
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0], sequencer_events.next().await.unwrap().unwrap());
+    let accepted_tx = sequencer_txs.next().await.unwrap().unwrap();
+    compare_tx_info_and_accepted_tx(&response, &accepted_tx, "Mint transaction");
+    let new_supply = get_supply(&http_client, token_id).await?;
+    assert_eq!(new_supply, Amount::new(1800));
+
+    let response = sign_and_send_tx(transfer, &client).await?;
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0], sequencer_events.next().await.unwrap().unwrap());
+    let accepted_tx = sequencer_txs.next().await.unwrap().unwrap();
+    compare_tx_info_and_accepted_tx(&response, &accepted_tx, "Transfer transaction");
+    let new_supply = get_supply(&http_client, token_id).await?;
+    assert_eq!(new_supply, Amount::new(1800));
+
+
+    // Wait for the next txs to post and be finalized. 
+    for _ in 0..10 {
+        let (_next_slot, _next_slot_with_children, _finalized_next_slot, finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
+        
+        if finalized_next_slot_with_children.batches.len() > 0 {
+            let batch = &finalized_next_slot_with_children.batches[0];
+            if batch.txs.len() > 0 && batch.txs[0].number == 1 {
+                break
+            }
+        }
+    }
+
+    let last_slot = slot_monitor.prev_slot_with_children.as_ref().unwrap();
+    let slot_fetcher = SlotFetcher::new(client, directories.output_dir.clone());
+    for slotnum in 0..first_subscribed_slot_number {
+        let _slot = slot_fetcher.fetch_and_compare_slot(slotnum, GetItemBehavior::SaveSnapshot).await?;
+    }
+    for slotnum in first_subscribed_slot_number..=last_slot.number {
+        let _slot = slot_fetcher.fetch_and_compare_slot(slotnum, GetItemBehavior::CheckAgainstSnapshot).await?;
+    }
 
     Ok(())
+
 }
 
 fn encode_and_sign_tx(msg: RuntimeCall<Spec>) -> Result<RawTx, anyhow::Error> {
@@ -458,7 +269,7 @@ async fn sign_and_send_tx(msg: RuntimeCall<Spec>, client: &sov_api_spec::Client)
 }
 
 
-fn set_txs() -> [RuntimeCall<Spec>; 3] {
+fn set_txs() -> ([RuntimeCall<Spec>; 3], TokenId) {
     let msg1: RuntimeCall<Spec> = RuntimeCall::Bank(BankCallMessage::CreateToken { 
         token_name: "acceptance-test-token".try_into().unwrap(), 
         token_decimals: None, 
@@ -493,13 +304,31 @@ fn set_txs() -> [RuntimeCall<Spec>; 3] {
     });
 
 
-    // loop {
-    //     // Query live total supply (1800) and balance of 0x9b08ce57a93751aE790698A2C9ebc76A78F23E25 (1790)
-    //     // Query live balance of 0x0000000000000000000000000000000000000000 (10)
-    //     // Query historical balance of 0x0000000000000000000000000000000000000000 at H-1 (0)
-    //     // Query historical supply at H-1 (1000)
-    // }
+    ([msg1, msg2, msg3], token_id)
+}
 
-    [msg1, msg2, msg3]
-    
+async fn get_supply(client: &reqwest::Client, token_id: TokenId) -> Result<Amount, anyhow::Error> {
+    let Some(supply) = get_from_base_url(client, &format!("modules/bank/tokens/{}/total-supply", token_id)).await? else {
+        return Ok(Amount::ZERO);
+    };
+    let supply = supply["amount"].as_str().expect(&format!("Supply not found in {}", supply.to_string()));
+    let supply = u128::from_str_radix(supply, 10)?;
+    Ok(Amount::new(supply))
+}
+
+async fn get_from_base_url(client: &reqwest::Client, url: &str) -> anyhow::Result<Option<serde_json::Value>> {
+    let url = format!("{}/{}", API_URL, url);
+    get(client, &url).await
+}
+
+
+async fn get(client: &reqwest::Client, url: &str) -> anyhow::Result<Option<serde_json::Value>> {
+    let response = client.get(url).send().await?;
+    if response.status().is_success() {
+        Ok(Some(response.json::<serde_json::Value>().await?))
+    } else if response.status() == reqwest::StatusCode::NOT_FOUND {
+        Ok(None)
+    } else {
+        return Err(anyhow::anyhow!("Failed to get {}", url));
+    }
 }
