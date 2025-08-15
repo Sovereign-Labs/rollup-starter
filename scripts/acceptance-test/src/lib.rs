@@ -85,6 +85,7 @@ pub fn generate_postgres_password() -> Result<String, anyhow::Error> {
     Ok(password)
 }
 
+#[derive(Debug, Clone)]
 pub struct Directories {
     pub rollup_root: PathBuf,
     pub acceptance_test_dir: PathBuf,

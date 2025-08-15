@@ -2,27 +2,32 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
-use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
-use acceptance_test::{cleanup_postgres_container, generate_postgres_password, interpolate_config, start_and_wait_for_postgres_ready, Directories, POSTGRES_CONTAINER_NAME};
+use acceptance_test::fetch_and_compare::{save_slot_snapshot, GetItemBehavior, SlotFetcher};
+use acceptance_test::{
+    cleanup_postgres_container, generate_postgres_password, interpolate_config,
+    start_and_wait_for_postgres_ready, Directories, POSTGRES_CONTAINER_NAME,
+};
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
-use sov_api_spec::types::{self, AcceptTxBody};
+use sov_api_spec::types::{self, AcceptTxBody, GetSlotByIdChildren};
 
-use sov_api_spec::ResponseValue;
-use tokio_stream::StreamExt;
-use sov_modules_rollup_blueprint::RollupBlueprint;
-use sov_modules_api::Spec as SpecT;
-use sov_soak_testing::{run_generator_task_for_bank, ValidityProfile};
 use acceptance_test::fetch_and_compare::SlotMonitor;
 use rollup_starter::rollup::StarterRollup;
+use sov_api_spec::ResponseValue;
 use sov_bank::{get_token_id, Amount, CallMessage as BankCallMessage, Coins, TokenId};
+use sov_modules_api::Spec as SpecT;
+use sov_modules_rollup_blueprint::RollupBlueprint;
+use sov_soak_testing::{run_generator_task_for_bank, ValidityProfile};
 use stf_starter::sov_modules_api::capabilities::UniquenessData;
 use stf_starter::sov_modules_api::execution_mode::Native;
 use stf_starter::sov_modules_api::macros::config_value;
-use stf_starter::sov_modules_api::transaction::{PriorityFeeBips, Transaction, UnsignedTransaction};
+use stf_starter::sov_modules_api::transaction::{
+    PriorityFeeBips, Transaction, UnsignedTransaction,
+};
 use stf_starter::sov_modules_api::{CryptoSpec, RawTx};
 use stf_starter::RuntimeCall;
 use tokio::sync::watch::Receiver;
+use tokio_stream::StreamExt;
 
 use tokio::task::JoinSet;
 use tracing::info;
@@ -30,6 +35,8 @@ use tracing::info;
 type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
 
+// Save a full snapshot of the slot every N slots
+const FULL_SLOT_SAVE_INTERVAL: u64 = 100;
 
 async fn worker_task(
     client: sov_api_spec::Client,
@@ -37,14 +44,14 @@ async fn worker_task(
     worker_id: u128,
     num_workers: u32,
 ) -> anyhow::Result<()> {
-	// TODO: Add synthetic load txs
+    // TODO: Add synthetic load txs
     let result = run_generator_task_for_bank::<Runtime, Spec>(
         client,
         rx,
         worker_id,
         num_workers,
         ValidityProfile::Clean.get_validity(),
-		// TxType::Mixed,
+        // TxType::Mixed,
     )
     .await;
 
@@ -65,9 +72,16 @@ fn get_rollup_client() -> Result<sov_api_spec::Client, anyhow::Error> {
     Ok(client)
 }
 
-fn start_workers() ->  Result<(tokio::sync::watch::Sender<bool>, JoinSet<Result<(), anyhow::Error>>), anyhow::Error> {
-	const NUM_WORKERS: u32 = 20;
-	let mut worker_set = JoinSet::new();
+fn start_workers() -> Result<
+    (
+        tokio::sync::watch::Sender<bool>,
+        JoinSet<Result<(), anyhow::Error>>,
+    ),
+    anyhow::Error,
+> {
+    tracing::info!("Starting {} workers", NUM_WORKERS);
+    const NUM_WORKERS: u32 = 20;
+    let mut worker_set = JoinSet::new();
     let (tx, rx) = tokio::sync::watch::channel(false);
     let client = get_rollup_client()?;
 
@@ -79,82 +93,224 @@ fn start_workers() ->  Result<(tokio::sync::watch::Sender<bool>, JoinSet<Result<
             NUM_WORKERS,
         ));
     }
-	Ok((tx, worker_set))
-
+    Ok((tx, worker_set))
 }
 
 const API_URL: &str = "http://localhost:12348";
 
 fn compare_tx_info_and_accepted_tx(
-    tx_info: &types::TxInfoWithConfirmation, 
+    tx_info: &types::TxInfoWithConfirmation,
     accepted_tx: &types::ApiAcceptedTx,
-    description: &str
+    description: &str,
 ) {
     // Compare shared fields
-    assert_eq!(tx_info.events, accepted_tx.events, "{}: events should match", description);
-    assert_eq!(tx_info.id, accepted_tx.id, "{}: id should match", description);
-    assert_eq!(tx_info.tx_number, Some(accepted_tx.tx_number), "{}: tx_number should match", description);
-    
+    assert_eq!(
+        tx_info.events, accepted_tx.events,
+        "{}: events should match",
+        description
+    );
+    assert_eq!(
+        tx_info.id, accepted_tx.id,
+        "{}: id should match",
+        description
+    );
+    assert_eq!(
+        tx_info.tx_number,
+        Some(accepted_tx.tx_number),
+        "{}: tx_number should match",
+        description
+    );
+
     // TxInfoWithConfirmation has receipt wrapped in Option, ApiAcceptedTx has it directly
     if let Some(ref receipt) = tx_info.receipt {
-        assert_eq!(receipt, &accepted_tx.receipt, "{}: receipt should match", description);
+        assert_eq!(
+            receipt, &accepted_tx.receipt,
+            "{}: receipt should match",
+            description
+        );
     }
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let directories = Directories::new()?;
-	let password = generate_postgres_password()?;
-	start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
-	interpolate_config(&password, &directories)?;
+    // Initialize tracing subscriber with RUST_LOG environment variable, fallback to info
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
 
-	info!("Starting rollup from rollup workspace root: {}", directories.rollup_root.display());
-    let rollup: std::process::Child = Command::new("cargo")
-        .args(["run", 
-			"--release", 
-			"--", 
-			"--rollup-config-path", 
-			&directories.output_dir.join("config.toml").display().to_string(),
-			"--genesis-path",
-			&directories.acceptance_test_dir.join("genesis.json").display().to_string(),
-			"--stop-at-rollup-height",
-			"100",
-		])
+    let directories = Directories::new()?;
+    let password = generate_postgres_password()?;
+    start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
+    interpolate_config(&password, &directories)?;
+
+    info!(
+        "Starting rollup from rollup workspace root: {}",
+        directories.rollup_root.display()
+    );
+    let mut rollup: std::process::Child = Command::new("cargo")
+        .args([
+            "run",
+            "--release",
+            "--",
+            "--rollup-config-path",
+            &directories
+                .output_dir
+                .join("config.toml")
+                .display()
+                .to_string(),
+            "--genesis-path",
+            &directories
+                .acceptance_test_dir
+                .join("genesis.json")
+                .display()
+                .to_string(),
+            "--stop-at-rollup-height",
+            "1010",
+        ])
         .current_dir(directories.rollup_root.clone())
+        .env("RUST_LOG", "info")
+        .stdout(std::fs::File::create(
+            directories.output_dir.join("rollup.log"),
+        )?)
         .spawn()
         .expect("Failed to start rollup");
-    
-    
+
+    let rollup_id = rollup.id();
+    let (rollup_tx, mut rollup_rx) = tokio::sync::oneshot::channel();
+
+    // Spawn background task to wait for rollup process
+    tokio::spawn(async move {
+        let result = tokio::task::spawn_blocking(move || rollup.wait()).await;
+        let _ = rollup_tx.send(result);
+    });
+
     // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
-    let result = do_manual_setup(directories).await?;
+    let result = do_manual_setup(directories.clone()).await?;
+    let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, directories.output_dir.clone());
+    slot_fetcher.subscribe_slots(false).await?;
+    let (tx, worker_set) = start_workers()?;
 
-	// let (tx, worker_set) = start_workers()?;
+    use tokio::signal::unix::SignalKind;
+    let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
+        .expect("Failed to set up SIGTERM handler");
+    let mut quit =
+        tokio::signal::unix::signal(SignalKind::quit()).expect("Failed to set up SIGQUIT handler");
+    let client = get_rollup_client()?;
 
+    tracing::info!("Workers started. Listening for slots");
+    let mut num_soak_txs = 0;
+    let mut num_soak_slots = 0;
+    let mut has_started_soak = false;
+    let mut has_encountered_error = false;
 
-    // let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
-    //     .expect("Failed to set up SIGTERM handler");
-    // let mut quit =
-    //     tokio::signal::unix::signal(SignalKind::quit()).expect("Failed to set up SIGQUIT handler");
-    // tokio::select! {
-    //     _ = tokio::signal::ctrl_c() => tracing::info!("Received Ctrl+C"),
-    //     _ = terminate.recv() => tracing::info!("Received SIGTERM"),
-    //     _ = quit.recv() => tracing::info!("Received SIGQUIT"),
-    // }
+    loop {
+        tokio::select! {
+            new_slot = slot_fetcher.next_slot() => {
+                if has_encountered_error {
+                    tracing::error!("Encountered error on previous iteration and this isn't the last slot. Aborting.");
+                    break;
+                }
+                if let Some(slot) = new_slot? {
+                    for batch_num in slot.batch_range.start..slot.batch_range.end {
+                        if let Ok(batch) = slot_fetcher.fetch_batch_without_children(batch_num).await {
+                            num_soak_txs = batch.tx_range.end;
+                            if batch.tx_range.end > 3 {
+                                has_started_soak = true;
+                            }
+                        } else {
+                            tracing::warn!("Failed to fetch batch {} for slot {}", batch_num, slot.number);
+                            has_encountered_error = true;
+                        }
+                    }
+                    if !has_started_soak {
+                        save_slot_snapshot(&slot, &directories.output_dir)?;
+                        continue;
+                    }
+                    num_soak_slots += 1;
+                    info!("Received new slot. Rollup has processed {} txs in {} slots. Average throughput: {} txs/slot", num_soak_txs, num_soak_slots, num_soak_txs as f64 / num_soak_slots as f64);
+                    if num_soak_slots % FULL_SLOT_SAVE_INTERVAL == 0 {
+                       match client.get_slot_by_id(&types::IntOrHash::Integer(slot.number), Some(GetSlotByIdChildren::_1)).await {
+                            Ok(full_slot) => {
+                                save_slot_snapshot(&full_slot, &directories.output_dir)?;
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to fetch full slot {}: {}.", slot.number, e);
+                                save_slot_snapshot(&slot, &directories.output_dir)?;
+                            }
+                        }
+                    } else {
+                        save_slot_snapshot(&slot, &directories.output_dir)?;
+                    }
+                }
+            }
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("Received Ctrl+C, shutting down rollup");
+                // Shutdown the rollup immediately
+                if let Ok(mut interrupt) = Command::new("kill")
+                    .args(["-s", "SIGINT", &rollup_id.to_string()])
+                    .spawn() {
+                    let _ = interrupt.wait();
+                }
+                break;
+            },
+            _ = terminate.recv() => {
+                tracing::info!("Received SIGTERM, shutting down rollup");
+                // Shutdown the rollup immediately
+                if let Ok(mut interrupt) = Command::new("kill")
+                    .args(["-s", "SIGINT", &rollup_id.to_string()])
+                    .spawn() {
+                    let _ = interrupt.wait();
+                }
+                break;
+            },
+            _ = quit.recv() => {
+                tracing::info!("Received SIGQUIT, shutting down rollup");
+                // Shutdown the rollup immediately
+                if let Ok(mut interrupt) = Command::new("kill")
+                    .args(["-s", "SIGINT", &rollup_id.to_string()])
+                    .spawn() {
+                    let _ = interrupt.wait();
+                }
+                break;
+            },
+            rollup_result = &mut rollup_rx => {
+                match rollup_result {
+                    Ok(Ok(exit_status)) => {
+                        tracing::info!("Rollup process finished with status: {:?}", exit_status);
+                    },
+                    Ok(Err(e)) => {
+                        tracing::error!("Rollup process failed: {}", e);
+                    },
+                    Err(_) => {
+                        tracing::error!("Failed to receive rollup process result");
+                    }
+                }
+                break;
+            }
+        }
+    }
 
-    // tx.send(true)?;
-    // _ = worker_set.join_all();
+    tx.send(true)?;
+    _ = worker_set.join_all();
 
-    // Shutdown the rollup )
-    info!("Sending SIGINT to rollup process");
-    let mut interrupt = Command::new("kill")
-        .args(["-s", "SIGINT", &rollup.id().to_string()])
-        .spawn()?;
-    interrupt.wait()?;
-    let output = rollup.wait_with_output()?;
-    info!("Rollup process finished");
-    println!("{}", String::from_utf8(output.stdout)?);
-	cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
+    // Wait for rollup to finish if it hasn't already
+    if let Ok(rollup_result) = rollup_rx.try_recv() {
+        match rollup_result {
+            Ok(Ok(_)) => info!("Rollup process finished successfully"),
+            Ok(Err(e)) => tracing::error!("Rollup process failed: {}", e),
+            Err(_) => tracing::error!("Failed to get rollup process result"),
+        }
+    }
+    info!(
+        "Rollup process finished. Processed {} txs in  {} slots. Average throughput: {} txs/slot",
+        num_soak_txs,
+        num_soak_slots,
+        num_soak_txs as f64 / num_soak_slots as f64
+    );
+    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
     Ok(result)
 }
 
@@ -171,10 +327,11 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
         }
         thread::sleep(Duration::from_millis(100));
     }
+    info!("Sequencer is ready, sending txs");
     // Send the known good txs: Create token, mint token, transfer token
     let client = get_rollup_client()?;
     let http_client = reqwest::Client::new();
-    
+
     let mut slot_monitor = SlotMonitor::new(&client, directories.output_dir.clone()).await?;
 
     let mut sequencer_events = client.subscribe_to_events().await?;
@@ -187,19 +344,29 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
     // Create the token and check consistency between the sequencer and ledger
     let response = sign_and_send_tx(create_token, &client).await?;
     assert_eq!(response.events.len(), 1);
-    assert_eq!(response.events[0], sequencer_events.next().await.unwrap().unwrap());
+    assert_eq!(
+        response.events[0],
+        sequencer_events.next().await.unwrap().unwrap()
+    );
     let accepted_tx = sequencer_txs.next().await.unwrap().unwrap();
     compare_tx_info_and_accepted_tx(&response, &accepted_tx, "Create token transaction");
-    
+
     let new_supply = get_supply(&http_client, token_id).await?;
     assert_eq!(new_supply, Amount::new(1000));
-    
 
+    info!("First tx sent, waiting for first batch to be posted");
     let mut first_subscribed_slot_number = 0;
     let mut first_non_empty_slot_number = 0;
-    // Wait for the first batch to be posted 
+    // Wait for the first batch to be posted
     for i in 0..10 {
-        let (next_slot, next_slot_with_children, _finalized_next_slot, _finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
+        let (
+            next_slot,
+            next_slot_with_children,
+            _finalized_next_slot,
+            _finalized_next_slot_with_children,
+        ) = slot_monitor
+            .get_next_slot(GetItemBehavior::SaveSnapshot)
+            .await?;
         if i == 0 {
             first_subscribed_slot_number = next_slot.number;
         }
@@ -214,10 +381,13 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
             }
         }
     }
-
+    info!("First batch posted, sending mint and transfer txs");
     let response = sign_and_send_tx(mint, &client).await?;
     assert_eq!(response.events.len(), 1);
-    assert_eq!(response.events[0], sequencer_events.next().await.unwrap().unwrap());
+    assert_eq!(
+        response.events[0],
+        sequencer_events.next().await.unwrap().unwrap()
+    );
     let accepted_tx = sequencer_txs.next().await.unwrap().unwrap();
     compare_tx_info_and_accepted_tx(&response, &accepted_tx, "Mint transaction");
     let new_supply = get_supply(&http_client, token_id).await?;
@@ -225,105 +395,170 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
 
     let response = sign_and_send_tx(transfer, &client).await?;
     assert_eq!(response.events.len(), 1);
-    assert_eq!(response.events[0], sequencer_events.next().await.unwrap().unwrap());
+    assert_eq!(
+        response.events[0],
+        sequencer_events.next().await.unwrap().unwrap()
+    );
     let accepted_tx = sequencer_txs.next().await.unwrap().unwrap();
     compare_tx_info_and_accepted_tx(&response, &accepted_tx, "Transfer transaction");
     let new_supply = get_supply(&http_client, token_id).await?;
     assert_eq!(new_supply, Amount::new(1800));
 
-
-    // Wait for the next txs to post and be finalized. 
-    let second_non_empty_slot_number = 0;
+    info!("Mint and transfer txs sent, waiting for next batch to be posted");
+    // Wait for the next txs to post and be finalized.
+    let mut second_non_empty_slot_number = 0;
     for _ in 0..10 {
-        let (_next_slot, _next_slot_with_children, _finalized_next_slot, finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
-        
+        let (
+            _next_slot,
+            _next_slot_with_children,
+            _finalized_next_slot,
+            finalized_next_slot_with_children,
+        ) = slot_monitor
+            .get_next_slot(GetItemBehavior::SaveSnapshot)
+            .await?;
+
         if finalized_next_slot_with_children.batches.len() > 0 {
             let batch = &finalized_next_slot_with_children.batches[0];
             let last_tx = batch.txs.iter().find(|tx| tx.number == 2);
             if let Some(last_tx) = last_tx {
                 assert_eq!(last_tx.events.len(), 1);
                 assert_eq!(last_tx.events[0], response.events[0]);
+                second_non_empty_slot_number = finalized_next_slot_with_children.number;
                 break;
             }
         }
     }
+    info!("Next batch posted, fetching and comparing slots");
 
     let last_slot = slot_monitor.prev_slot_with_children.as_ref().unwrap();
     let slot_fetcher = SlotFetcher::new(client, directories.output_dir.clone());
     for slotnum in 0..first_subscribed_slot_number {
-        let _slot = slot_fetcher.fetch_and_compare_slot(slotnum, GetItemBehavior::SaveSnapshot).await?;
+        let _slot = slot_fetcher
+            .fetch_and_compare_slot(slotnum, GetItemBehavior::SaveSnapshot)
+            .await?;
     }
     for slotnum in first_subscribed_slot_number..=last_slot.number {
-        let _slot = slot_fetcher.fetch_and_compare_slot(slotnum, GetItemBehavior::CheckAgainstSnapshot).await?;
+        let _slot = slot_fetcher
+            .fetch_and_compare_slot(slotnum, GetItemBehavior::CheckAgainstSnapshot)
+            .await?;
     }
 
     for slot_num in 0..=last_slot.number {
         let supply = get_supply_archival(&http_client, token_id, Some(slot_num)).await?;
         if slot_num < first_non_empty_slot_number {
-            assert_eq!(supply, Amount::ZERO, "Supply should be zero for slot {}. First non-empty slot was {}", slot_num, first_non_empty_slot_number);
+            assert_eq!(
+                supply,
+                Amount::ZERO,
+                "Supply should be zero for slot {}. First non-empty slot was {}",
+                slot_num,
+                first_non_empty_slot_number
+            );
         } else if slot_num < second_non_empty_slot_number {
-            assert_eq!(supply, Amount::new(1000), "Supply should be 1000 for slot {}. First non-empty slot was {}. Last slot is {}", slot_num, first_non_empty_slot_number, last_slot.number);
+            assert_eq!(
+                supply,
+                Amount::new(1000),
+                "Supply should be 1000 for slot {}. First non-empty slot was {}. Last slot is {}",
+                slot_num,
+                first_non_empty_slot_number,
+                second_non_empty_slot_number
+            );
         } else {
-            assert_eq!(supply, Amount::new(1800), "Supply should be 1800 for slot {}. Last slot is {}", slot_num, last_slot.number);
+            assert_eq!(
+                supply,
+                Amount::new(1800),
+                "Supply should be 1800 for slot {}. second_non_empty_slot_number is {}",
+                slot_num,
+                second_non_empty_slot_number
+            );
         }
     }
+    info!("Manual setup complete");
 
     Ok(())
-
 }
 
 fn encode_and_sign_tx(msg: RuntimeCall<Spec>) -> Result<RawTx, anyhow::Error> {
-    let utx = UnsignedTransaction::<Runtime, Spec>::new(msg, config_value!("CHAIN_ID"), PriorityFeeBips(0), Amount::new(100_000_000), UniquenessData::Generation(0), None);
-    let priv_key: <<Spec as SpecT>::CryptoSpec as CryptoSpec>::PrivateKey = serde_json::from_str("\"0d87c12ea7c12024b3f70a26d735874608f17c8bce2b48e6fe87389310191264\"").unwrap();
+    let utx = UnsignedTransaction::<Runtime, Spec>::new(
+        msg,
+        config_value!("CHAIN_ID"),
+        PriorityFeeBips(0),
+        Amount::new(100_000_000),
+        UniquenessData::Generation(0),
+        None,
+    );
+    let priv_key: <<Spec as SpecT>::CryptoSpec as CryptoSpec>::PrivateKey = serde_json::from_str(
+        "\"0d87c12ea7c12024b3f70a26d735874608f17c8bce2b48e6fe87389310191264\"",
+    )
+    .unwrap();
 
-    let tx = Transaction::new_signed_tx(&priv_key, &<Runtime as sov_modules_stf_blueprint::Runtime<Spec>>::CHAIN_HASH, utx);
+    let tx = Transaction::new_signed_tx(
+        &priv_key,
+        &<Runtime as sov_modules_stf_blueprint::Runtime<Spec>>::CHAIN_HASH,
+        utx,
+    );
     let tx = RawTx::new(borsh::to_vec(&tx).unwrap());
 
     Ok(tx)
 }
 
-async fn sign_and_send_tx(msg: RuntimeCall<Spec>, client: &sov_api_spec::Client) -> Result<ResponseValue<types::TxInfoWithConfirmation>, anyhow::Error> {
+async fn sign_and_send_tx(
+    msg: RuntimeCall<Spec>,
+    client: &sov_api_spec::Client,
+) -> Result<ResponseValue<types::TxInfoWithConfirmation>, anyhow::Error> {
     let tx = encode_and_sign_tx(msg)?;
-    Ok(client.accept_tx(&AcceptTxBody {
-        body: BASE64_STANDARD.encode(tx)
-    }).await?)
+    Ok(client
+        .accept_tx(&AcceptTxBody {
+            body: BASE64_STANDARD.encode(tx),
+        })
+        .await?)
 }
 
-
 fn set_txs() -> ([RuntimeCall<Spec>; 3], TokenId) {
-    let msg1: RuntimeCall<Spec> = RuntimeCall::Bank(BankCallMessage::CreateToken { 
-        token_name: "acceptance-test-token".try_into().unwrap(), 
-        token_decimals: None, 
-        initial_balance: Amount::new(1000), 
-        mint_to_address: "0x9b08ce57a93751aE790698A2C9ebc76A78F23E25".parse().unwrap(), 
-        admins: vec![
-            "0x9b08ce57a93751aE790698A2C9ebc76A78F23E25".parse().unwrap()
-        ].try_into().unwrap(), 
-        supply_cap: None 
+    let msg1: RuntimeCall<Spec> = RuntimeCall::Bank(BankCallMessage::CreateToken {
+        token_name: "acceptance-test-token".try_into().unwrap(),
+        token_decimals: None,
+        initial_balance: Amount::new(1000),
+        mint_to_address: "0x9b08ce57a93751aE790698A2C9ebc76A78F23E25"
+            .parse()
+            .unwrap(),
+        admins: vec!["0x9b08ce57a93751aE790698A2C9ebc76A78F23E25"
+            .parse()
+            .unwrap()]
+        .try_into()
+        .unwrap(),
+        supply_cap: None,
     });
-
 
     // Check balance and total supply (1000). Record block height as create_height
     // Wait for next block.
 
     // Send txs. Record block height
-    let token_id = get_token_id::<Spec>("acceptance-test-token", None, &"0x9b08ce57a93751aE790698A2C9ebc76A78F23E25".parse::<<Spec as SpecT>::Address>().unwrap());
-    let msg2: RuntimeCall<Spec> = RuntimeCall::Bank(BankCallMessage::Mint { 
+    let token_id = get_token_id::<Spec>(
+        "acceptance-test-token",
+        None,
+        &"0x9b08ce57a93751aE790698A2C9ebc76A78F23E25"
+            .parse::<<Spec as SpecT>::Address>()
+            .unwrap(),
+    );
+    let msg2: RuntimeCall<Spec> = RuntimeCall::Bank(BankCallMessage::Mint {
         coins: Coins {
             amount: Amount::new(800),
             token_id,
         },
-        mint_to_address: "0x9b08ce57a93751aE790698A2C9ebc76A78F23E25".parse().unwrap(), 
+        mint_to_address: "0x9b08ce57a93751aE790698A2C9ebc76A78F23E25"
+            .parse()
+            .unwrap(),
     });
 
-    let msg3: RuntimeCall<Spec> = RuntimeCall::Bank(BankCallMessage::Transfer { 
+    let msg3: RuntimeCall<Spec> = RuntimeCall::Bank(BankCallMessage::Transfer {
         coins: Coins {
             amount: Amount::new(10),
             token_id,
         },
-        to: "0x0000000000000000000000000000000000000000".parse().unwrap(), 
+        to: "0x0000000000000000000000000000000000000000"
+            .parse()
+            .unwrap(),
     });
-
 
     ([msg1, msg2, msg3], token_id)
 }
@@ -332,26 +567,36 @@ async fn get_supply(client: &reqwest::Client, token_id: TokenId) -> Result<Amoun
     get_supply_archival(client, token_id, None).await
 }
 
-
-async fn get_supply_archival(client: &reqwest::Client, token_id: TokenId, slot_number: Option<u64>) -> Result<Amount, anyhow::Error> {
+async fn get_supply_archival(
+    client: &reqwest::Client,
+    token_id: TokenId,
+    slot_number: Option<u64>,
+) -> Result<Amount, anyhow::Error> {
     let url = if let Some(slot_number) = slot_number {
-        format!("modules/bank/tokens/{}/total-supply?slot_number={}", token_id, slot_number)
+        format!(
+            "modules/bank/tokens/{}/total-supply?slot_number={}",
+            token_id, slot_number
+        )
     } else {
         format!("modules/bank/tokens/{}/total-supply", token_id)
     };
     let Some(supply) = get_from_base_url(client, &url).await? else {
         return Ok(Amount::ZERO);
     };
-    let supply = supply["amount"].as_str().expect(&format!("Supply not found in {}", supply.to_string()));
+    let supply = supply["amount"]
+        .as_str()
+        .expect(&format!("Supply not found in {}", supply.to_string()));
     let supply = u128::from_str_radix(supply, 10)?;
     Ok(Amount::new(supply))
 }
 
-async fn get_from_base_url(client: &reqwest::Client, url: &str) -> anyhow::Result<Option<serde_json::Value>> {
+async fn get_from_base_url(
+    client: &reqwest::Client,
+    url: &str,
+) -> anyhow::Result<Option<serde_json::Value>> {
     let url = format!("{}/{}", API_URL, url);
     get(client, &url).await
 }
-
 
 async fn get(client: &reqwest::Client, url: &str) -> anyhow::Result<Option<serde_json::Value>> {
     let response = client.get(url).send().await?;
