@@ -99,8 +99,6 @@ fn compare_tx_info_and_accepted_tx(
     if let Some(ref receipt) = tx_info.receipt {
         assert_eq!(receipt, &accepted_tx.receipt, "{}: receipt should match", description);
     }
-    
-    println!("✓ {} shared fields match", description);
 }
 
 
@@ -186,6 +184,7 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
     let initial_supply = get_supply(&http_client, token_id).await?;
     assert_eq!(initial_supply, Amount::ZERO);
 
+    // Create the token and check consistency between the sequencer and ledger
     let response = sign_and_send_tx(create_token, &client).await?;
     assert_eq!(response.events.len(), 1);
     assert_eq!(response.events[0], sequencer_events.next().await.unwrap().unwrap());
@@ -197,15 +196,22 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
     
 
     let mut first_subscribed_slot_number = 0;
+    let mut first_non_empty_slot_number = 0;
     // Wait for the first batch to be posted 
     for i in 0..10 {
-        let (next_slot, _next_slot_with_children, _finalized_next_slot, _finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
+        let (next_slot, next_slot_with_children, _finalized_next_slot, _finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
         if i == 0 {
             first_subscribed_slot_number = next_slot.number;
         }
 
-        if next_slot.batch_range.end != next_slot.batch_range.start {
-            break;
+        if next_slot_with_children.batches.len() > 0 {
+            let batch = &next_slot_with_children.batches[0];
+            if batch.txs.len() > 0 {
+                first_non_empty_slot_number = next_slot.number;
+                assert_eq!(batch.txs[0].events.len(), 1);
+                assert_eq!(batch.txs[0].events[0], response.events[0]);
+                break;
+            }
         }
     }
 
@@ -227,13 +233,17 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
 
 
     // Wait for the next txs to post and be finalized. 
+    let second_non_empty_slot_number = 0;
     for _ in 0..10 {
         let (_next_slot, _next_slot_with_children, _finalized_next_slot, finalized_next_slot_with_children) = slot_monitor.get_next_slot(GetItemBehavior::SaveSnapshot).await?;
         
         if finalized_next_slot_with_children.batches.len() > 0 {
             let batch = &finalized_next_slot_with_children.batches[0];
-            if batch.txs.len() > 0 && batch.txs[0].number == 1 {
-                break
+            let last_tx = batch.txs.iter().find(|tx| tx.number == 2);
+            if let Some(last_tx) = last_tx {
+                assert_eq!(last_tx.events.len(), 1);
+                assert_eq!(last_tx.events[0], response.events[0]);
+                break;
             }
         }
     }
@@ -245,6 +255,17 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
     }
     for slotnum in first_subscribed_slot_number..=last_slot.number {
         let _slot = slot_fetcher.fetch_and_compare_slot(slotnum, GetItemBehavior::CheckAgainstSnapshot).await?;
+    }
+
+    for slot_num in 0..=last_slot.number {
+        let supply = get_supply_archival(&http_client, token_id, Some(slot_num)).await?;
+        if slot_num < first_non_empty_slot_number {
+            assert_eq!(supply, Amount::ZERO, "Supply should be zero for slot {}. First non-empty slot was {}", slot_num, first_non_empty_slot_number);
+        } else if slot_num < second_non_empty_slot_number {
+            assert_eq!(supply, Amount::new(1000), "Supply should be 1000 for slot {}. First non-empty slot was {}. Last slot is {}", slot_num, first_non_empty_slot_number, last_slot.number);
+        } else {
+            assert_eq!(supply, Amount::new(1800), "Supply should be 1800 for slot {}. Last slot is {}", slot_num, last_slot.number);
+        }
     }
 
     Ok(())
@@ -308,7 +329,17 @@ fn set_txs() -> ([RuntimeCall<Spec>; 3], TokenId) {
 }
 
 async fn get_supply(client: &reqwest::Client, token_id: TokenId) -> Result<Amount, anyhow::Error> {
-    let Some(supply) = get_from_base_url(client, &format!("modules/bank/tokens/{}/total-supply", token_id)).await? else {
+    get_supply_archival(client, token_id, None).await
+}
+
+
+async fn get_supply_archival(client: &reqwest::Client, token_id: TokenId, slot_number: Option<u64>) -> Result<Amount, anyhow::Error> {
+    let url = if let Some(slot_number) = slot_number {
+        format!("modules/bank/tokens/{}/total-supply?slot_number={}", token_id, slot_number)
+    } else {
+        format!("modules/bank/tokens/{}/total-supply", token_id)
+    };
+    let Some(supply) = get_from_base_url(client, &url).await? else {
         return Ok(Amount::ZERO);
     };
     let supply = supply["amount"].as_str().expect(&format!("Supply not found in {}", supply.to_string()));

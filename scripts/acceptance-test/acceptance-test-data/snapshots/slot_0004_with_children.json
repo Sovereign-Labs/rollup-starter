@@ -1,0 +1,41 @@
+{
+  "batch_range": {
+    "end": 2,
+    "start": 1
+  },
+  "batches": [
+    {
+      "hash": "0x849cacf44ed69c96f5f28a1b31f13a8e7b2499539b4471650f5f792bd38a3b68",
+      "number": 1,
+      "receipt": {
+        "da_address": "0000000000000000000000000000000000000000000000000000000000000000",
+        "gas_price": [
+          "9",
+          "9"
+        ],
+        "gas_used": [
+          0,
+          0
+        ],
+        "outcome": {
+          "rewards": {
+            "accumulated_penalty": "0",
+            "accumulated_reward": "0"
+          }
+        }
+      },
+      "slot_number": 4,
+      "tx_range": {
+        "end": 1,
+        "start": 1
+      },
+      "type": "batch"
+    }
+  ],
+  "finality_status": "finalized",
+  "hash": "0xbf334314331d23a22140ea94187ae7f15df606a4e06047e9004717d6f4f66bbd",
+  "number": 4,
+  "state_root": "0x7c23ca861fdb791f777aa0ee81d86ad616c7b1dd9208168336282b30a4be33d161976c2045e69e493c9870d4a6c3f555b72e328d1a8bd006557a0af7d8eb2e5b",
+  "timestamp": 1755213343355.0,
+  "type": "slot"
+}

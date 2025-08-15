@@ -76,5 +76,5 @@ disable_state_root_consistency_checks = true
 # "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
 recovery_strategy = "TryToSave"
 batch_execution_time_limit_millis = 3000 # This should be adjusted depending on the DA layer's block times
-postgres_connection_string = "postgres://postgres:B5YVrPsAnIDa1mfe@localhost:5432/postgres"
+postgres_connection_string = "postgres://postgres:2YpPm3d1GDW8UI0w@localhost:5432/postgres"
 ideal_lag_behind_finalized_slot = 1

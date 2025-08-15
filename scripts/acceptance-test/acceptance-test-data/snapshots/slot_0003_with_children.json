@@ -1,0 +1,89 @@
+{
+  "batch_range": {
+    "end": 1,
+    "start": 0
+  },
+  "batches": [
+    {
+      "hash": "0x6b412ad01fa4b5caaf1ac1b8cb3d5495f1aec905b2c74d52e9f16a4bf467ce66",
+      "number": 0,
+      "receipt": {
+        "da_address": "0000000000000000000000000000000000000000000000000000000000000000",
+        "gas_price": [
+          "10",
+          "10"
+        ],
+        "gas_used": [
+          21794,
+          21794
+        ],
+        "outcome": {
+          "rewards": {
+            "accumulated_penalty": "0",
+            "accumulated_reward": "0"
+          }
+        }
+      },
+      "slot_number": 3,
+      "tx_range": {
+        "end": 1,
+        "start": 0
+      },
+      "txs": [
+        {
+          "batch_number": 0,
+          "body": "",
+          "event_range": {
+            "end": 1,
+            "start": 0
+          },
+          "events": [
+            {
+              "key": "Bank/TokenCreated",
+              "module": {
+                "name": "Bank"
+              },
+              "number": 0,
+              "tx_hash": "0x1a91219d14d464592df750707b1aa974fbd6961f51887c6e4bc4e286e8413850",
+              "type": "event",
+              "value": {
+                "token_created": {
+                  "admins": [
+                    {
+                      "user": "0x9b08ce57a93751ae790698a2c9ebc76a78f23e25"
+                    }
+                  ],
+                  "coins": {
+                    "amount": "1000",
+                    "token_id": "token_13yc5fs7mnh2dfad42d3epkn67nhvxals3pufnges48m4t9lj8qyqhwq26z"
+                  },
+                  "mint_to_address": {
+                    "user": "0x9b08ce57a93751ae790698a2c9ebc76a78f23e25"
+                  },
+                  "minter": {
+                    "user": "0x9b08ce57a93751ae790698a2c9ebc76a78f23e25"
+                  },
+                  "supply_cap": "340282366920938463463374607431768211455",
+                  "token_name": "acceptance-test-token"
+                }
+              }
+            }
+          ],
+          "hash": "0x1a91219d14d464592df750707b1aa974fbd6961f51887c6e4bc4e286e8413850",
+          "number": 0,
+          "receipt": {
+            "result": "successful"
+          },
+          "type": "tx"
+        }
+      ],
+      "type": "batch"
+    }
+  ],
+  "finality_status": "finalized",
+  "hash": "0x72f59d9b98853ae28265bb5111e83e5cea851abd01fa18669b8251debe4018ff",
+  "number": 3,
+  "state_root": "0x0f833c89cc616e099c19c24cf2ace9b167faf46255392aeddcdb0f28a030f97b0c442e350f02dff065ce130bf6f9f362f65440f11778dff7bd865e5063d164f4",
+  "timestamp": 1755213340351.0,
+  "type": "slot"
+}

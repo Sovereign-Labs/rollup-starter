@@ -1,0 +1,12 @@
+{
+  "batch_range": {
+    "end": 0,
+    "start": 0
+  },
+  "finality_status": "finalized",
+  "hash": "0xf03fb92fb76fce8fd8b2d7e4d48c466f3ba15408db67b40992c22d0a74e73927",
+  "number": 0,
+  "state_root": "0x0c8dd4583277d159abd7a9016e77574935e3810bb046afb8c0acac947829748e3277cbee3247a1d1f7a2ae0e0de018d989e711cd4151faf7b7b44c33d7dc6f73",
+  "timestamp": 1755213331339.0,
+  "type": "slot"
+}

@@ -1,0 +1,121 @@
+{
+  "batch_range": {
+    "end": 3,
+    "start": 2
+  },
+  "batches": [
+    {
+      "hash": "0xa684480434d0ed36311044b7eab68e819514fe1ed6fcbc225767a1a31a6ce058",
+      "number": 2,
+      "receipt": {
+        "da_address": "0000000000000000000000000000000000000000000000000000000000000000",
+        "gas_price": [
+          "8",
+          "8"
+        ],
+        "gas_used": [
+          48432,
+          48432
+        ],
+        "outcome": {
+          "rewards": {
+            "accumulated_penalty": "0",
+            "accumulated_reward": "0"
+          }
+        }
+      },
+      "slot_number": 5,
+      "tx_range": {
+        "end": 3,
+        "start": 1
+      },
+      "txs": [
+        {
+          "batch_number": 2,
+          "body": "",
+          "event_range": {
+            "end": 2,
+            "start": 1
+          },
+          "events": [
+            {
+              "key": "Bank/TokenMinted",
+              "module": {
+                "name": "Bank"
+              },
+              "number": 1,
+              "tx_hash": "0x53225a1e1471785f06ecad774d75e955bc7ceca18348b0783f8bd337212f72e7",
+              "type": "event",
+              "value": {
+                "token_minted": {
+                  "authorizer": {
+                    "user": "0x9b08ce57a93751ae790698a2c9ebc76a78f23e25"
+                  },
+                  "coins": {
+                    "amount": "800",
+                    "token_id": "token_13yc5fs7mnh2dfad42d3epkn67nhvxals3pufnges48m4t9lj8qyqhwq26z"
+                  },
+                  "mint_to_identity": {
+                    "user": "0x9b08ce57a93751ae790698a2c9ebc76a78f23e25"
+                  }
+                }
+              }
+            }
+          ],
+          "hash": "0x53225a1e1471785f06ecad774d75e955bc7ceca18348b0783f8bd337212f72e7",
+          "number": 1,
+          "receipt": {
+            "result": "successful"
+          },
+          "type": "tx"
+        },
+        {
+          "batch_number": 2,
+          "body": "",
+          "event_range": {
+            "end": 3,
+            "start": 2
+          },
+          "events": [
+            {
+              "key": "Bank/TokenTransferred",
+              "module": {
+                "name": "Bank"
+              },
+              "number": 2,
+              "tx_hash": "0x08a411078f6b022fd862bcc41b5abc93e7ba96a8659eb674008d0ecacbc6c7e5",
+              "type": "event",
+              "value": {
+                "token_transferred": {
+                  "coins": {
+                    "amount": "10",
+                    "token_id": "token_13yc5fs7mnh2dfad42d3epkn67nhvxals3pufnges48m4t9lj8qyqhwq26z"
+                  },
+                  "from": {
+                    "user": "0x9b08ce57a93751ae790698a2c9ebc76a78f23e25"
+                  },
+                  "to": {
+                    "user": "0x0000000000000000000000000000000000000000"
+                  }
+                }
+              }
+            }
+          ],
+          "hash": "0x08a411078f6b022fd862bcc41b5abc93e7ba96a8659eb674008d0ecacbc6c7e5",
+          "number": 2,
+          "receipt": {
+            "result": "successful"
+          },
+          "type": "tx"
+        }
+      ],
+      "type": "batch"
+    }
+  ],
+  "finality_status": "finalized",
+  "hash": "0xe6405a0efdff55cfc2078cd811e02b3df8935628e665e1da72f9bfc1cdde0069",
+  "number": 5,
+  "state_root": "0x6511914a4a2bf6b6f4e62970372a2141cca691de96dd1526661d777b3f3d55ba02251ab244fc59d35b76e37a2b9bc00837b675aeb3d3582203340318a544b1e8",
+  "timestamp": 1755213346358.0,
+  "type": "slot"
+}
