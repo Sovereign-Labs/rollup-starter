@@ -54,6 +54,7 @@ jobs:
     secrets: inherit
 
   run-readme:
+    if: github.repository == 'Sovereign-Labs/rollup-starter'
     uses: ./.github/workflows/reusable-job.yml
     with:
       job-name: "Run README"
@@ -103,6 +104,7 @@ jobs:
         run: make stop-docker-mock-da
 
   run-celestia-tutorial:
+    if: github.repository == 'Sovereign-Labs/rollup-starter'
     uses: ./.github/workflows/reusable-job.yml
     with:
       job-name: "Run Celestia Tutorial"
