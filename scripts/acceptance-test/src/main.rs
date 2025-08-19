@@ -1,12 +1,19 @@
+use acceptance_test::fetch_and_compare::SlotFetcher;
+use acceptance_test::ThroughputReport;
 use acceptance_test::{
-    cleanup_postgres_container, generate_postgres_password, interpolate_config,
-    start_and_wait_for_postgres_ready, Directories, POSTGRES_CONTAINER_NAME,
+    cleanup_postgres_container,
+    fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
+    generate_postgres_password, get_rollup_client, interpolate_config, run_soak,
+    start_and_wait_for_postgres_ready, Directories, API_URL, NUM_SOAK_BATCHES,
+    POSTGRES_CONTAINER_NAME,
 };
 use clap::Parser;
-use std::{process::Command, thread, time::Duration};
+use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
+use std::{process::Command, time::Duration};
 use tracing::info;
 
-fn main() -> Result<(), anyhow::Error> {
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     // Initialize tracing subscriber with RUST_LOG environment variable, fallback to info
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -18,18 +25,24 @@ fn main() -> Result<(), anyhow::Error> {
     info!("Starting acceptance test");
 
     // Run the test
-    let result = run_test();
+    let result = run_test().await;
+    if let Err(e) = &result {
+        tracing::error!("Acceptance test failed: {}", e);
+    }
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
 
     info!("Acceptance test completed");
     result
 }
 
-fn run_test() -> Result<(), anyhow::Error> {
+async fn run_test() -> Result<(), anyhow::Error> {
     // Generate a config file with our db password and all paths set relative to the workspace root
     let password = generate_postgres_password()?;
     let directories = Directories::new()?;
     interpolate_config(&password, &directories)?;
+
+    tracing::info!("Removing rollup data path: {}", directories.rollup_data_path.display());
+    std::fs::remove_dir_all(&directories.rollup_data_path)?;
 
     // Start the sequencer postgres and wait for it to be ready
     start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
@@ -39,6 +52,7 @@ fn run_test() -> Result<(), anyhow::Error> {
         "Starting rollup from rollup workspace root: {}",
         directories.rollup_root.display()
     );
+
     let rollup = Command::new("cargo")
         .args([
             "run",
@@ -50,22 +64,77 @@ fn run_test() -> Result<(), anyhow::Error> {
                 .join("config.toml")
                 .display()
                 .to_string(),
+            "--stop-at-rollup-height",
+            &((NUM_SOAK_BATCHES * 2).to_string()),
         ])
-        .current_dir(directories.rollup_root)
+        .current_dir(directories.rollup_root.clone())
+        .env("RUST_LOG", "info")
         .spawn()
         .expect("Failed to start rollup");
-    info!("Rollup started, waiting 10 seconds");
-    thread::sleep(Duration::from_secs(45));
 
-    // Shutdown the rollup )
-    info!("Sending SIGINT to rollup process");
-    let mut interrupt = Command::new("kill")
-        .args(["-s", "SIGINT", &rollup.id().to_string()])
-        .spawn()?;
-    interrupt.wait()?;
-    let output = rollup.wait_with_output()?;
-    info!("Rollup process finished");
-    println!("{}", String::from_utf8(output.stdout)?);
+    for _ in 0..120 {
+        if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
+            .await
+            .is_ok_and(|response| response.status().is_success())
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
+    slot_fetcher.subscribe_slots(false).await?;
+
+    let mut checked = 0;
+    let client = get_rollup_client()?;
+    let mut latest_batch_num = 0;
+    'outer: loop {
+        let slot = slot_fetcher.next_slot().await?.unwrap();
+        for slot_number in checked..=slot.number {
+            let Ok(snapshot) = load_snapshot_json(slot_number, &directories.snapshots_dir) else {
+                // We might be missing a few slots at the beginning.
+                // If the slot number is less than 10, just ignore the missing snapshot.
+                if slot_number < 10 {
+                    continue;
+                } else if latest_batch_num < NUM_SOAK_BATCHES {
+                    panic!("Missing snapshot for slot {}", slot_number);
+                } else {
+                    // Once we've passed NUM_SOAK_BATCHES, and we find the first missing snapshot, we're done
+                    tracing::info!("Missing snapshot found at slot {}. Finished resyncing.", slot_number);
+                    break 'outer;
+                }
+            };
+            let slot_snapshot: Slot = serde_json::from_value(snapshot.clone()).unwrap();
+            latest_batch_num = slot_snapshot.batch_range.end.saturating_sub(1);
+            let include_children = if slot_snapshot.batches.is_empty() {
+                None
+            } else {
+                Some(GetSlotByIdChildren::_1)
+            };
+            let slot = client
+                .get_slot_by_id(&types::IntOrHash::Integer(slot_number), include_children)
+                .await?;
+            compare_against_snapshot(
+                &slot.into_inner(),
+                snapshot,
+                &format!("slot_{}", slot_number),
+                false,
+            )?;
+        }
+        checked = slot.number;
+    }
+
+    tracing::info!("Rollup resync complete. All slots match their snapshots.");
+    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
+
+    let new_throughput_report = run_soak(directories.clone(), rollup, latest_batch_num, false).await?;
+    let previous_throughput_report: ThroughputReport = serde_json::from_str::<ThroughputReport>(&std::fs::read_to_string(directories.output_dir.join("throughput_report.json"))?)?;
+    let previous_throughput = previous_throughput_report.num_txs as f64 / previous_throughput_report.num_slots as f64;
+    let new_throughput = new_throughput_report.num_txs as f64 / new_throughput_report.num_slots as f64;
+    if new_throughput < (previous_throughput  * 0.9){
+        anyhow::bail!("Throughput is less than 90% of the previous throughput. This is likely due to a bug in the rollup. Old throughput: {:.2} txs/slot, new throughput: {:.2} txs/slot", previous_throughput, new_throughput);
+    }
+
     Ok(())
 }
 

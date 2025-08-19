@@ -1,102 +1,29 @@
 use std::process::Command;
-use std::thread;
-use std::time::Duration;
 
-use acceptance_test::fetch_and_compare::{save_slot_snapshot, GetItemBehavior, SlotFetcher};
+use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
-    cleanup_postgres_container, generate_postgres_password, interpolate_config,
-    start_and_wait_for_postgres_ready, Directories, POSTGRES_CONTAINER_NAME,
+    cleanup_postgres_container, generate_postgres_password, get_rollup_client, interpolate_config,
+    run_soak, start_and_wait_for_postgres_ready, wait_for_sequencer_ready, Directories, Runtime,
+    Spec, API_URL, NUM_SOAK_BATCHES, POSTGRES_CONTAINER_NAME,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
-use sov_api_spec::types::{self, AcceptTxBody, GetSlotByIdChildren};
+use sov_api_spec::types::{self, AcceptTxBody};
 
 use acceptance_test::fetch_and_compare::SlotMonitor;
-use rollup_starter::rollup::StarterRollup;
 use sov_api_spec::ResponseValue;
 use sov_bank::{get_token_id, Amount, CallMessage as BankCallMessage, Coins, TokenId};
 use sov_modules_api::Spec as SpecT;
-use sov_modules_rollup_blueprint::RollupBlueprint;
-use sov_soak_testing::{run_generator_task_for_bank, ValidityProfile};
 use stf_starter::sov_modules_api::capabilities::UniquenessData;
-use stf_starter::sov_modules_api::execution_mode::Native;
 use stf_starter::sov_modules_api::macros::config_value;
 use stf_starter::sov_modules_api::transaction::{
     PriorityFeeBips, Transaction, UnsignedTransaction,
 };
 use stf_starter::sov_modules_api::{CryptoSpec, RawTx};
 use stf_starter::RuntimeCall;
-use tokio::sync::watch::Receiver;
 use tokio_stream::StreamExt;
 
-use tokio::task::JoinSet;
 use tracing::info;
-
-type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
-type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
-
-// Save a full snapshot of the slot every N slots
-const FULL_SLOT_SAVE_INTERVAL: u64 = 100;
-
-async fn worker_task(
-    client: sov_api_spec::Client,
-    rx: Receiver<bool>,
-    worker_id: u128,
-    num_workers: u32,
-) -> anyhow::Result<()> {
-    // TODO: Add synthetic load txs
-    let result = run_generator_task_for_bank::<Runtime, Spec>(
-        client,
-        rx,
-        worker_id,
-        num_workers,
-        ValidityProfile::Clean.get_validity(),
-        // TxType::Mixed,
-    )
-    .await;
-
-    if let Err(e) = result {
-        tracing::error!("Worker task {worker_id} failed: {}", e);
-        std::process::exit(1);
-    }
-    Ok(())
-}
-
-fn get_rollup_client() -> Result<sov_api_spec::Client, anyhow::Error> {
-    let reqwest_client = reqwest::ClientBuilder::new()
-        .timeout(Duration::from_secs(600))
-        .connect_timeout(Duration::from_secs(60))
-        .read_timeout(Duration::from_secs(120))
-        .build()?;
-    let client = sov_api_spec::Client::new_with_client(API_URL, reqwest_client);
-    Ok(client)
-}
-
-fn start_workers() -> Result<
-    (
-        tokio::sync::watch::Sender<bool>,
-        JoinSet<Result<(), anyhow::Error>>,
-    ),
-    anyhow::Error,
-> {
-    tracing::info!("Starting {} workers", NUM_WORKERS);
-    const NUM_WORKERS: u32 = 20;
-    let mut worker_set = JoinSet::new();
-    let (tx, rx) = tokio::sync::watch::channel(false);
-    let client = get_rollup_client()?;
-
-    for i in 0..NUM_WORKERS {
-        worker_set.spawn(worker_task(
-            client.clone(),
-            rx.clone(),
-            i as u128,
-            NUM_WORKERS,
-        ));
-    }
-    Ok((tx, worker_set))
-}
-
-const API_URL: &str = "http://localhost:12348";
 
 fn compare_tx_info_and_accepted_tx(
     tx_info: &types::TxInfoWithConfirmation,
@@ -150,7 +77,7 @@ async fn main() -> Result<(), anyhow::Error> {
         "Starting rollup from rollup workspace root: {}",
         directories.rollup_root.display()
     );
-    let mut rollup: std::process::Child = Command::new("cargo")
+    let rollup = Command::new("cargo")
         .args([
             "run",
             "--release",
@@ -168,7 +95,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .display()
                 .to_string(),
             "--stop-at-rollup-height",
-            "1010",
+            &(NUM_SOAK_BATCHES + 10).to_string(),
         ])
         .current_dir(directories.rollup_root.clone())
         .env("RUST_LOG", "info")
@@ -178,161 +105,30 @@ async fn main() -> Result<(), anyhow::Error> {
         .spawn()
         .expect("Failed to start rollup");
 
-    let rollup_id = rollup.id();
-    let (rollup_tx, mut rollup_rx) = tokio::sync::oneshot::channel();
-
-    // Spawn background task to wait for rollup process
-    tokio::spawn(async move {
-        let result = tokio::task::spawn_blocking(move || rollup.wait()).await;
-        let _ = rollup_tx.send(result);
-    });
-
     // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
-    let result = do_manual_setup(directories.clone()).await?;
-    let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, directories.output_dir.clone());
-    slot_fetcher.subscribe_slots(false).await?;
-    let (tx, worker_set) = start_workers()?;
+    do_manual_setup(directories.clone()).await?;
+    let throughput_report = run_soak(directories.clone(), rollup, 3, true).await?;
+    std::fs::write(
+        directories.output_dir.join("throughput_report.json"),
+        serde_json::to_string(&throughput_report)?,
+    )?;
 
-    use tokio::signal::unix::SignalKind;
-    let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
-        .expect("Failed to set up SIGTERM handler");
-    let mut quit =
-        tokio::signal::unix::signal(SignalKind::quit()).expect("Failed to set up SIGQUIT handler");
-    let client = get_rollup_client()?;
-
-    tracing::info!("Workers started. Listening for slots");
-    let mut num_soak_txs = 0;
-    let mut num_soak_slots = 0;
-    let mut has_started_soak = false;
-    let mut has_encountered_error = false;
-
-    loop {
-        tokio::select! {
-            new_slot = slot_fetcher.next_slot() => {
-                if has_encountered_error {
-                    tracing::error!("Encountered error on previous iteration and this isn't the last slot. Aborting.");
-                    break;
-                }
-                if let Some(slot) = new_slot? {
-                    for batch_num in slot.batch_range.start..slot.batch_range.end {
-                        if let Ok(batch) = slot_fetcher.fetch_batch_without_children(batch_num).await {
-                            num_soak_txs = batch.tx_range.end;
-                            if batch.tx_range.end > 3 {
-                                has_started_soak = true;
-                            }
-                        } else {
-                            tracing::warn!("Failed to fetch batch {} for slot {}", batch_num, slot.number);
-                            has_encountered_error = true;
-                        }
-                    }
-                    if !has_started_soak {
-                        save_slot_snapshot(&slot, &directories.output_dir)?;
-                        continue;
-                    }
-                    num_soak_slots += 1;
-                    info!("Received new slot. Rollup has processed {} txs in {} slots. Average throughput: {} txs/slot", num_soak_txs, num_soak_slots, num_soak_txs as f64 / num_soak_slots as f64);
-                    if num_soak_slots % FULL_SLOT_SAVE_INTERVAL == 0 {
-                       match client.get_slot_by_id(&types::IntOrHash::Integer(slot.number), Some(GetSlotByIdChildren::_1)).await {
-                            Ok(full_slot) => {
-                                save_slot_snapshot(&full_slot, &directories.output_dir)?;
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to fetch full slot {}: {}.", slot.number, e);
-                                save_slot_snapshot(&slot, &directories.output_dir)?;
-                            }
-                        }
-                    } else {
-                        save_slot_snapshot(&slot, &directories.output_dir)?;
-                    }
-                }
-            }
-            _ = tokio::signal::ctrl_c() => {
-                tracing::info!("Received Ctrl+C, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
-                break;
-            },
-            _ = terminate.recv() => {
-                tracing::info!("Received SIGTERM, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
-                break;
-            },
-            _ = quit.recv() => {
-                tracing::info!("Received SIGQUIT, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
-                break;
-            },
-            rollup_result = &mut rollup_rx => {
-                match rollup_result {
-                    Ok(Ok(exit_status)) => {
-                        tracing::info!("Rollup process finished with status: {:?}", exit_status);
-                    },
-                    Ok(Err(e)) => {
-                        tracing::error!("Rollup process failed: {}", e);
-                    },
-                    Err(_) => {
-                        tracing::error!("Failed to receive rollup process result");
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    tx.send(true)?;
-    _ = worker_set.join_all();
-
-    // Wait for rollup to finish if it hasn't already
-    if let Ok(rollup_result) = rollup_rx.try_recv() {
-        match rollup_result {
-            Ok(Ok(_)) => info!("Rollup process finished successfully"),
-            Ok(Err(e)) => tracing::error!("Rollup process failed: {}", e),
-            Err(_) => tracing::error!("Failed to get rollup process result"),
-        }
-    }
-    info!(
-        "Rollup process finished. Processed {} txs in  {} slots. Average throughput: {} txs/slot",
-        num_soak_txs,
-        num_soak_slots,
-        num_soak_txs as f64 / num_soak_slots as f64
-    );
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
-    Ok(result)
+    Ok(())
 }
 
 /// Runs a sequence of two batches, one with a create token, and one with a mint and transfer.
 /// Since we know exactly what state will be generated, we can make fine-grained assertions about the state using this manual setup.
 async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> {
     info!("Rollup started, waiting for sequencer to be ready");
-    // Wait up to two minutes for the sequencer to be ready
-    for _ in 0..1200 {
-        if let Ok(response) = reqwest::get(format!("{}/sequencer/ready", API_URL)).await {
-            if response.status().is_success() {
-                break;
-            }
-        }
-        thread::sleep(Duration::from_millis(100));
-    }
+    wait_for_sequencer_ready().await?;
     info!("Sequencer is ready, sending txs");
+
     // Send the known good txs: Create token, mint token, transfer token
     let client = get_rollup_client()?;
     let http_client = reqwest::Client::new();
 
-    let mut slot_monitor = SlotMonitor::new(&client, directories.output_dir.clone()).await?;
+    let mut slot_monitor = SlotMonitor::new(&client, &directories).await?;
 
     let mut sequencer_events = client.subscribe_to_events().await?;
     let mut sequencer_txs = client.subscribe_to_txs(None).await?;
@@ -431,7 +227,7 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
     info!("Next batch posted, fetching and comparing slots");
 
     let last_slot = slot_monitor.prev_slot_with_children.as_ref().unwrap();
-    let slot_fetcher = SlotFetcher::new(client, directories.output_dir.clone());
+    let slot_fetcher = SlotFetcher::new(client, &directories);
     for slotnum in 0..first_subscribed_slot_number {
         let _slot = slot_fetcher
             .fetch_and_compare_slot(slotnum, GetItemBehavior::SaveSnapshot)

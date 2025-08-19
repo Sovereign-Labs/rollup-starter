@@ -6,6 +6,8 @@ use sov_rollup_interface::node::ledger_api::IncludeChildren;
 use std::path::PathBuf;
 use tokio_stream::StreamExt;
 
+use crate::Directories;
+
 fn assert_slots_match_excluding_batches(slot1: &Slot, slot2: &Slot, description: &str) {
     assert_eq!(
         slot1.batch_range, slot2.batch_range,
@@ -67,20 +69,25 @@ fn assert_slots_match_json_excluding_batches(
     Ok(())
 }
 
-fn compare_against_snapshot(
+pub fn compare_against_snapshot(
     slot: &Slot,
-    snapshot_json: &str,
+    snapshot: serde_json::Value,
     description: &str,
     exclude_batches: bool,
-) -> Result<(), anyhow::Error> {
-    let slot_json = slot_to_json(slot, exclude_batches)?;
-    let snapshot: Value = serde_json::from_str(snapshot_json)?;
+) -> Result<(), ValidationError> {
+    let slot_json = slot_to_json(slot, exclude_batches).expect("Failed to convert slot to JSON");
 
     if slot_json != snapshot {
         println!("❌ {} snapshot mismatch:", description);
-        println!("Actual: {}", serde_json::to_string_pretty(&slot_json)?);
-        println!("Expected: {}", serde_json::to_string_pretty(&snapshot)?);
-        anyhow::bail!("{}: Snapshot comparison failed", description);
+        println!(
+            "Actual: {}",
+            serde_json::to_string_pretty(&slot_json).expect("Failed to convert slot to JSON")
+        );
+        println!(
+            "Expected: {}",
+            serde_json::to_string_pretty(&snapshot).expect("Failed to convert snapshot to JSON")
+        );
+        return Err(ValidationError::InvalidSnapshot);
     }
     Ok(())
 }
@@ -96,19 +103,38 @@ pub fn save_slot_snapshot(slot: &Slot, output_dir: &PathBuf) -> Result<(), anyho
     Ok(())
 }
 
-fn validate_against_snapshot(
+#[derive(Debug, thiserror::Error)]
+pub enum ValidationError {
+    #[error("Missing snapshot")]
+    MissingSnapshot(std::io::Error),
+    #[error("Invalid snapshot")]
+    InvalidSnapshot,
+}
+
+pub fn load_snapshot_json(
+    slot_number: u64,
+    output_dir: &PathBuf,
+) -> Result<serde_json::Value, std::io::Error> {
+    let filename = format!("slot_{:04}_with_children.json", slot_number);
+    let filepath = output_dir.join(&filename);
+    let snapshot_json = std::fs::read_to_string(&filepath)?;
+    Ok(serde_json::from_str(&snapshot_json).expect("Failed to parse snapshot JSON"))
+}
+
+pub fn validate_against_snapshot(
     slot: &Slot,
     output_dir: &PathBuf,
     description: &str,
-) -> Result<(), anyhow::Error> {
-    let filename = format!("slot_{:04}_with_children.json", slot.number);
-    let filepath = output_dir.join(&filename);
-    let snapshot_json = std::fs::read_to_string(&filepath)?;
-    compare_against_snapshot(slot, &snapshot_json, description, false)
+) -> Result<(), ValidationError> {
+    let json = load_snapshot_json(slot.number, output_dir)
+        .map_err(|e| ValidationError::MissingSnapshot(e))?;
+
+    compare_against_snapshot(slot, json, description, false)
 }
 
 pub enum GetItemBehavior {
     SaveSnapshot,
+    DoNothing,
     CheckAgainstSnapshot,
 }
 pub struct SlotMonitor {
@@ -117,14 +143,14 @@ pub struct SlotMonitor {
     finalized_slots: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
     finalized_slots_with_children: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
     pub prev_slot_with_children: Option<Slot>,
-    output_dir: PathBuf,
+    snapshots_dir: PathBuf,
     expected_slot_number: Option<u64>,
 }
 
 impl SlotMonitor {
     pub async fn new(
         client: &sov_api_spec::Client,
-        output_dir: PathBuf,
+        directories: &Directories,
     ) -> Result<Self, anyhow::Error> {
         let finalized_slots = client.subscribe_finalized_slots().await?;
         let finalized_slots_with_children = client
@@ -135,17 +161,13 @@ impl SlotMonitor {
             .subscribe_slots_with_children(IncludeChildren::new(true))
             .await?;
 
-        // Create snapshots directory if it doesn't exist
-        let snapshots_dir = output_dir.join("snapshots");
-        std::fs::create_dir_all(&snapshots_dir)?;
-
         Ok(Self {
             slots: Box::new(slots),
             slots_with_children: Box::new(slots_with_children),
             finalized_slots: Box::new(finalized_slots),
             finalized_slots_with_children: Box::new(finalized_slots_with_children),
             prev_slot_with_children: None,
-            output_dir: snapshots_dir,
+            snapshots_dir: directories.snapshots_dir.clone(),
             expected_slot_number: None,
         })
     }
@@ -215,14 +237,17 @@ impl SlotMonitor {
         // Save the next_slot_with_children snapshot
         match behavior {
             GetItemBehavior::SaveSnapshot => {
-                save_slot_snapshot(&next_slot_with_children, &self.output_dir)?;
+                save_slot_snapshot(&next_slot_with_children, &self.snapshots_dir)?;
             }
             GetItemBehavior::CheckAgainstSnapshot => {
                 validate_against_snapshot(
                     &next_slot_with_children,
-                    &self.output_dir,
+                    &self.snapshots_dir,
                     "Next slot with children",
                 )?;
+            }
+            GetItemBehavior::DoNothing => {
+                // Do nothing
             }
         }
 
@@ -252,14 +277,10 @@ pub struct SlotFetcher {
 }
 
 impl SlotFetcher {
-    pub fn new(client: sov_api_spec::Client, output_dir: PathBuf) -> Self {
-        // Create snapshots directory if it doesn't exist
-        let snapshots_dir = output_dir.join("snapshots");
-        std::fs::create_dir_all(&snapshots_dir).ok();
-
+    pub fn new(client: sov_api_spec::Client, directories: &Directories) -> Self {
         Self {
             client,
-            output_dir: snapshots_dir,
+            output_dir: directories.snapshots_dir.clone(),
             stream: None,
         }
     }
@@ -391,6 +412,9 @@ impl SlotFetcher {
                     &self.output_dir,
                     &format!("Fetched slot {}", slot_number),
                 )?;
+            }
+            GetItemBehavior::DoNothing => {
+                // Do nothing
             }
         }
 
