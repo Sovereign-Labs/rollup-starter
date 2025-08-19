@@ -215,7 +215,9 @@ async fn worker_task(
     Ok(())
 }
 
-fn start_workers(salt: u32) -> Result<
+fn start_workers(
+    salt: u32,
+) -> Result<
     (
         tokio::sync::watch::Sender<bool>,
         JoinSet<Result<(), anyhow::Error>>,
@@ -285,14 +287,19 @@ pub async fn run_soak(
     let mut num_soak_txs = 0;
     let mut num_soak_slots = 0;
     let mut num_soak_batches = 0;
-    let num_previous_txs =  slot_fetcher.fetch_batch_without_children(num_previous_batches).await.expect("Failed to fetch previous batch").tx_range.end;
+    let num_previous_txs = slot_fetcher
+        .fetch_batch_without_children(num_previous_batches)
+        .await
+        .expect("Failed to fetch previous batch")
+        .tx_range
+        .end;
 
     loop {
         tokio::select! {
             // On each slot, we update our counters and save a snapshot of the slot.
             // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
             new_slot = slot_fetcher.next_slot() => {
-                
+
                 if let Some(slot) = new_slot? {
                     // Get the latest tx number after the slot
                     if slot.batch_range.start != slot.batch_range.end {
@@ -306,7 +313,7 @@ pub async fn run_soak(
                                 }
                             }
                             Err(e) => {
-                                // If we're very close to the end of the test, the rollup might have shut down before we could finish querying. 
+                                // If we're very close to the end of the test, the rollup might have shut down before we could finish querying.
                                 // The test shouldn't fail for this reason, so we just skip the batch.
                                 if num_soak_batches + 15 > NUM_SOAK_BATCHES {
                                     tracing::warn!("Encountered an error very near the end of the test. Assuming the rollup shut down.");

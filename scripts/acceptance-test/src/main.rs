@@ -41,7 +41,10 @@ async fn run_test() -> Result<(), anyhow::Error> {
     let directories = Directories::new()?;
     interpolate_config(&password, &directories)?;
 
-    tracing::info!("Removing rollup data path: {}", directories.rollup_data_path.display());
+    tracing::info!(
+        "Removing rollup data path: {}",
+        directories.rollup_data_path.display()
+    );
     std::fs::remove_dir_all(&directories.rollup_data_path)?;
 
     // Start the sequencer postgres and wait for it to be ready
@@ -100,7 +103,10 @@ async fn run_test() -> Result<(), anyhow::Error> {
                     panic!("Missing snapshot for slot {}", slot_number);
                 } else {
                     // Once we've passed NUM_SOAK_BATCHES, and we find the first missing snapshot, we're done
-                    tracing::info!("Missing snapshot found at slot {}. Finished resyncing.", slot_number);
+                    tracing::info!(
+                        "Missing snapshot found at slot {}. Finished resyncing.",
+                        slot_number
+                    );
                     break 'outer;
                 }
             };
@@ -127,11 +133,16 @@ async fn run_test() -> Result<(), anyhow::Error> {
     tracing::info!("Rollup resync complete. All slots match their snapshots.");
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
 
-    let new_throughput_report = run_soak(directories.clone(), rollup, latest_batch_num, false).await?;
-    let previous_throughput_report: ThroughputReport = serde_json::from_str::<ThroughputReport>(&std::fs::read_to_string(directories.output_dir.join("throughput_report.json"))?)?;
-    let previous_throughput = previous_throughput_report.num_txs as f64 / previous_throughput_report.num_slots as f64;
-    let new_throughput = new_throughput_report.num_txs as f64 / new_throughput_report.num_slots as f64;
-    if new_throughput < (previous_throughput  * 0.9){
+    let new_throughput_report =
+        run_soak(directories.clone(), rollup, latest_batch_num, false).await?;
+    let previous_throughput_report: ThroughputReport = serde_json::from_str::<ThroughputReport>(
+        &std::fs::read_to_string(directories.output_dir.join("throughput_report.json"))?,
+    )?;
+    let previous_throughput =
+        previous_throughput_report.num_txs as f64 / previous_throughput_report.num_slots as f64;
+    let new_throughput =
+        new_throughput_report.num_txs as f64 / new_throughput_report.num_slots as f64;
+    if new_throughput < (previous_throughput * 0.9) {
         anyhow::bail!("Throughput is less than 90% of the previous throughput. This is likely due to a bug in the rollup. Old throughput: {:.2} txs/slot, new throughput: {:.2} txs/slot", previous_throughput, new_throughput);
     }
 
