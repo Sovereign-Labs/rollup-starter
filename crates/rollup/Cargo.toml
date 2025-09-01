@@ -31,7 +31,7 @@ sov-db = { workspace = true }
 sov-sequencer = { workspace = true }
 sov-rollup-interface = { workspace = true }
 sov-mock-da = { workspace = true, features = ["native"], optional = true }
-sov-celestia-adapter = { workspace = true, features = ["native", ], optional = true }
+sov-celestia-adapter = { workspace = true, features = ["native"], optional = true }
 
 axum = { workspace = true }
 anyhow = { workspace = true }
@@ -42,7 +42,6 @@ serde = { workspace = true }
 tracing = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
-sha2 = { workspace = true }
 prometheus_exporter = { workspace = true }
 
 risc0-starter = { path = "../provers/risc0", optional = true }
@@ -54,13 +53,10 @@ sov-sp1-adapter = { workspace = true, features = ["native"], optional = true }
 # binary dependencies
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing-panic = "0.1.2"
-bytes = "1.7.2"
-rand = "0.8.5"
 
 [dev-dependencies]
 tempfile = { workspace = true }
 sov-mock-zkvm = { workspace = true, features = ["native"] }
-sov-test-utils = { workspace = true }
 futures = { version = "0.3", default-features = false }
 sov-address = { workspace = true, features = ["evm"] }
 

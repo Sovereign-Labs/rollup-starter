@@ -7,8 +7,7 @@ freeze = [1, 1]
 
 
 [constants]
-# We use the ID 4321 for demo purposes. Change this value before deploying!
-CHAIN_ID = 4321
+CHAIN_ID = 4332
 CHAIN_NAME = "TestChain"
 # How many rollup blocks to wait before terminating setup mode. While setup mode is enabled,
 # the rollup does not charge gas. This is useful when initializing the rollup with a bridged gas token.
@@ -97,6 +96,10 @@ BIAS_BORSH_DESERIALIZATION = [1, 1]
 # The cost of deserializing a tx using Borsh
 TX_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 TX_BIAS_BORSH_DESERIALIZATION = [1, 1]
+
+# The cost of deserializing a tx using JSON
+TX_GAS_TO_CHARGE_PER_BYTE_JSON_DESERIALIZATION = [1, 1]
+TX_BIAS_JSON_DESERIALIZATION = [1, 1]
 
 # The cost of deserializing a proof using Borsh
 PROOF_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]

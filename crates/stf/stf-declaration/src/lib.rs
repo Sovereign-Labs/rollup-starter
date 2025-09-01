@@ -47,7 +47,6 @@ pub type Mailbox<S> = RawMailbox<S, Warp<S>>;
 ///  The `DispatchCall` implementation (derived by a macro) forwards the message to the appropriate module and executes its `call` method.
 #[derive(Clone, Default, Genesis, Hooks, DispatchCall, Event, MessageCodec, RuntimeRestApi)]
 #[cfg_attr(feature = "native", derive(CliWallet), expose_rpc)]
-#[genesis(serde(bound = "S::Address: serde::de::DeserializeOwned"))]
 pub struct Runtime<S: Spec>
 where
     S::Address: HyperlaneAddress,
