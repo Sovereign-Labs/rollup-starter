@@ -15,10 +15,20 @@ sovstarter:
     - http: http://host.docker.internal:12346
 solanatestnet:
   name: solanatestnet
+  displayName: Solana Testnet
   domainId: 1399811150
+  chainId: 1399811150
   isTestnet: true
+  # testnet mailbox, from here https://docs.hyperlane.xyz/docs/reference/addresses/deployments/mailbox
+  mailbox: 75HBBLae3ddeneJVrZeyrDfv6vb7SMC3aCpBucSXS5aR
+  nativeToken:
+    decimals: 9
+    name: SOL
+    symbol: SOL
+  protocol: sealevel
   rpcUrls:
     - http: https://api.testnet.solana.com
+# Local anvil
 ethtest:
   chainId: 31337
   displayName: EthTest
@@ -32,3 +42,4 @@ ethtest:
   protocol: ethereum
   rpcUrls:
     - http: http://host.docker.internal:8545
+# TODO: Sepolia eth testnet
