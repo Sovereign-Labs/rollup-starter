@@ -1,2 +1,3 @@
 include:
-  - docker-compose.celestia.yml
+  - celestia/docker-compose.yml
+  - hyperlane/docker-compose.yml

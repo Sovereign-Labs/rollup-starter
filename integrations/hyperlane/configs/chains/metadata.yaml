@@ -1,0 +1,34 @@
+---
+sovstarter:
+  name: sovstarter
+  displayName: Sov Starter
+  domainId: 5577
+  # Taken from `../../../constants.toml
+  chaindId: 4321
+  isTestnet: true
+  nativeToken:
+    decimals: 8
+    name: SovToken
+    symbol: sov
+  protocol: sovereign
+  rpcUrls:
+    - http: http://host.docker.internal:12346
+solanatestnet:
+  name: solanatestnet
+  domainId: 1399811150
+  isTestnet: true
+  rpcUrls:
+    - http: https://api.testnet.solana.com
+ethtest:
+  chainId: 31337
+  displayName: EthTest
+  domainId: 31337_90210
+  isTestnet: true
+  name: ethtest
+  nativeToken:
+    decimals: 18
+    name: Ether
+    symbol: ETH
+  protocol: ethereum
+  rpcUrls:
+    - http: http://host.docker.internal:8545

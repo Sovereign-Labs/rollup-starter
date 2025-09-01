@@ -49,3 +49,4 @@ clean: ## Clean up all docker compose resources
 	else \
 		echo "Docker is not running. Skipping integrations cleanup."; \
 	fi
+	rm -rf hyperlane/docker-data/*
