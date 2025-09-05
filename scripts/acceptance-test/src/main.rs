@@ -18,7 +18,7 @@ async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,hyper=info")),
         )
         .init();
 
@@ -28,11 +28,25 @@ async fn main() -> Result<(), anyhow::Error> {
     let result = run_test().await;
     if let Err(e) = &result {
         tracing::error!("Acceptance test failed: {}", e);
+    } else {
+        info!("Acceptance test completed");
     }
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
 
-    info!("Acceptance test completed");
     result
+}
+
+fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Error> {
+    tracing::info!("Copying persistent mock data back to mock_da.sqlite");
+    std::fs::copy(directories.output_dir.join("persistent_mock_da.sqlite"), directories.output_dir.join("mock_da.sqlite"))?;
+    if let Err(e) = std::fs::copy(directories.output_dir.join("persistent_mock_da.sqlite-shm"), directories.output_dir.join("mock_da.sqlite-shm")) {
+        tracing::warn!("Failed to copy persistent_mock_da.sqlite-shm back to mock_da.sqlite-shm: {}. Proceeding anyway.", e);
+    }
+    if let Err(e) = std::fs::copy(directories.output_dir.join("persistent_mock_da.sqlite-wal"), directories.output_dir.join("mock_da.sqlite-wal")) {
+        tracing::warn!("Failed to copy persistent_mock_da.sqlite-wal back to mock_da.sqlite-wal: {}. Proceeding anyway.", e);
+    }
+    tracing::info!("Persistent mock data copied back to mock_da.sqlite");
+    Ok(())
 }
 
 async fn run_test() -> Result<(), anyhow::Error> {
@@ -46,6 +60,9 @@ async fn run_test() -> Result<(), anyhow::Error> {
         directories.rollup_data_path.display()
     );
     std::fs::remove_dir_all(&directories.rollup_data_path)?;
+
+    // Copy the persistent mock data back to mock_da.sqlite. This way we don't grow our DA files with each run.
+    copy_persistent_mock_data(&directories)?;
 
     // Start the sequencer postgres and wait for it to be ready
     start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
@@ -130,8 +147,7 @@ async fn run_test() -> Result<(), anyhow::Error> {
         checked = slot.number;
     }
 
-    tracing::info!("Rollup resync complete. All slots match their snapshots.");
-    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
+    tracing::info!("Rollup resync complete. All slots match their snapshots. Found {} batches.", latest_batch_num);
 
     let new_throughput_report =
         run_soak(directories.clone(), rollup, latest_batch_num, false).await?;
@@ -146,6 +162,8 @@ async fn run_test() -> Result<(), anyhow::Error> {
         anyhow::bail!("Throughput is less than 90% of the previous throughput. This is likely due to a bug in the rollup. Old throughput: {:.2} txs/slot, new throughput: {:.2} txs/slot", previous_throughput, new_throughput);
     }
 
+    // Save throughput report to acceptance test directory
+    std::fs::write(directories.acceptance_test_dir.join("accepted_throughput_report.json"), serde_json::to_string(&new_throughput_report)?)?;
     Ok(())
 }
 
