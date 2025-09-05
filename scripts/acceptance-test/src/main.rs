@@ -38,11 +38,20 @@ async fn main() -> Result<(), anyhow::Error> {
 
 fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Error> {
     tracing::info!("Copying persistent mock data back to mock_da.sqlite");
-    std::fs::copy(directories.output_dir.join("persistent_mock_da.sqlite"), directories.output_dir.join("mock_da.sqlite"))?;
-    if let Err(e) = std::fs::copy(directories.output_dir.join("persistent_mock_da.sqlite-shm"), directories.output_dir.join("mock_da.sqlite-shm")) {
+    std::fs::copy(
+        directories.output_dir.join("persistent_mock_da.sqlite"),
+        directories.output_dir.join("mock_da.sqlite"),
+    )?;
+    if let Err(e) = std::fs::copy(
+        directories.output_dir.join("persistent_mock_da.sqlite-shm"),
+        directories.output_dir.join("mock_da.sqlite-shm"),
+    ) {
         tracing::warn!("Failed to copy persistent_mock_da.sqlite-shm back to mock_da.sqlite-shm: {}. Proceeding anyway.", e);
     }
-    if let Err(e) = std::fs::copy(directories.output_dir.join("persistent_mock_da.sqlite-wal"), directories.output_dir.join("mock_da.sqlite-wal")) {
+    if let Err(e) = std::fs::copy(
+        directories.output_dir.join("persistent_mock_da.sqlite-wal"),
+        directories.output_dir.join("mock_da.sqlite-wal"),
+    ) {
         tracing::warn!("Failed to copy persistent_mock_da.sqlite-wal back to mock_da.sqlite-wal: {}. Proceeding anyway.", e);
     }
     tracing::info!("Persistent mock data copied back to mock_da.sqlite");
@@ -147,7 +156,10 @@ async fn run_test() -> Result<(), anyhow::Error> {
         checked = slot.number;
     }
 
-    tracing::info!("Rollup resync complete. All slots match their snapshots. Found {} batches.", latest_batch_num);
+    tracing::info!(
+        "Rollup resync complete. All slots match their snapshots. Found {} batches.",
+        latest_batch_num
+    );
 
     let new_throughput_report =
         run_soak(directories.clone(), rollup, latest_batch_num, false).await?;
@@ -163,7 +175,12 @@ async fn run_test() -> Result<(), anyhow::Error> {
     }
 
     // Save throughput report to acceptance test directory
-    std::fs::write(directories.acceptance_test_dir.join("accepted_throughput_report.json"), serde_json::to_string(&new_throughput_report)?)?;
+    std::fs::write(
+        directories
+            .acceptance_test_dir
+            .join("accepted_throughput_report.json"),
+        serde_json::to_string(&new_throughput_report)?,
+    )?;
     Ok(())
 }
 

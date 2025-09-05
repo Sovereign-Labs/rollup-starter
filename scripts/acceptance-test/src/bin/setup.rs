@@ -279,12 +279,23 @@ fn save_mock_data(directories: Directories) -> Result<(), anyhow::Error> {
     for input in ["mock_da.sqlite", "mock_da.sqlite-shm", "mock_da.sqlite-wal"] {
         let mut target = "persistent_".to_string();
         target.push_str(input);
-        if let Err(err) = std::fs::rename(directories.output_dir.join(input), directories.output_dir.join(target)) { 
+        if let Err(err) = std::fs::rename(
+            directories.output_dir.join(input),
+            directories.output_dir.join(target),
+        ) {
             if input == "mock_da.sqlite" {
-                tracing::error!("Failed to rename {} for persistence accross runs: {}", input, err);
+                tracing::error!(
+                    "Failed to rename {} for persistence accross runs: {}",
+                    input,
+                    err
+                );
                 return Err(anyhow::anyhow!("Failed to rename {}: {}", input, err));
             } else {
-                tracing::warn!("Failed to rename {} for persistence accross runs: {}. Ignoring.", input, err);
+                tracing::warn!(
+                    "Failed to rename {} for persistence accross runs: {}. Ignoring.",
+                    input,
+                    err
+                );
             }
         }
     }
