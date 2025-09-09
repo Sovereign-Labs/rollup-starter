@@ -44,13 +44,13 @@ where
     #[cfg(feature = "native")]
     fn endpoints(api_state: sov_modules_api::rest::ApiState<S>) -> sov_modules_api::NodeEndpoints {
         use ::sov_modules_api::rest::HasRestApi;
-        use ::sov_rollup_apis::endpoints::dedup::{DeDupEndpoint, NonceDeDupEndpoint};
+        use ::sov_rollup_apis::endpoints::dedup::{DeDupEndpoint, SovereignDeDupEndpoint};
         use ::sov_rollup_apis::endpoints::schema::{SchemaEndpoint, StandardSchemaEndpoint};
 
         let axum_router = Self::default().0.rest_api(api_state.clone());
         // Provide an endpoint to return dedup information associated with addresses.
         // Since our runtime is using the uniqueness module, we can use the provided `NonceDeDupEndpoint` implementation.
-        let dedup_endpoint = NonceDeDupEndpoint::new(api_state.clone());
+        let dedup_endpoint = SovereignDeDupEndpoint::new(api_state.clone());
         let axum_router = axum_router.merge(dedup_endpoint.axum_router());
         let axum_router = axum_router.merge(sov_rollup_apis::endpoints::constants::axum_router());
 
