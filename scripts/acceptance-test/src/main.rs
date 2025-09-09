@@ -46,13 +46,28 @@ fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Er
         directories.output_dir.join("persistent_mock_da.sqlite-shm"),
         directories.output_dir.join("mock_da.sqlite-shm"),
     ) {
-        tracing::warn!("Failed to copy persistent_mock_da.sqlite-shm back to mock_da.sqlite-shm: {}. Proceeding anyway.", e);
+        if e.kind() != std::io::ErrorKind::NotFound {
+            anyhow::bail!(
+                "Failed to copy persistent_mock_da.sqlite-shm back to mock_da.sqlite-shm: {}",
+                e
+            );
+        }
+        tracing::trace!(
+            "No persistent_mock_da.sqlite-shm found: {}. Proceeding anyway.",
+            e
+        );
     }
     if let Err(e) = std::fs::copy(
         directories.output_dir.join("persistent_mock_da.sqlite-wal"),
         directories.output_dir.join("mock_da.sqlite-wal"),
     ) {
-        tracing::warn!("Failed to copy persistent_mock_da.sqlite-wal back to mock_da.sqlite-wal: {}. Proceeding anyway.", e);
+        if e.kind() != std::io::ErrorKind::NotFound {
+            anyhow::bail!(
+                "Failed to copy persistent_mock_da.sqlite-wal back to mock_da.sqlite-wal: {}",
+                e
+            );
+        }
+        tracing::trace!("Failed to copy persistent_mock_da.sqlite-wal back to mock_da.sqlite-wal: {}. Proceeding anyway.", e);
     }
     tracing::info!("Persistent mock data copied back to mock_da.sqlite");
     Ok(())

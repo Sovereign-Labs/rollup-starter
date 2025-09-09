@@ -1,6 +1,6 @@
 ## Acceptance Test
 
-This crate runs a test which sync's the rollup against a known set of block and asserts that all
+This crate runs a test which syncs the rollup against a known set of block and asserts that all
 of the *ledger* state responses are as expected. This guarantees the correct state roots are being
 calculated - which transitively guarantees that the state is correct. After resyncing, we run a 
 soak test for a fixed length of time and ensure that (1) there are no errors and (2) the throughput

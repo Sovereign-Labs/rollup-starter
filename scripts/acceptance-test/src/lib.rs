@@ -20,7 +20,7 @@ pub const API_URL: &str = "http://localhost:12348";
 
 // Save a full snapshot of the slot every N slots
 const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
-pub const NUM_SOAK_BATCHES: u64 = 100;
+pub const NUM_SOAK_BATCHES: u64 = 1000;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
@@ -186,7 +186,7 @@ pub async fn wait_for_sequencer_ready() -> Result<(), anyhow::Error> {
                 break;
             }
         }
-        thread::sleep(Duration::from_millis(100));
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
     Ok(())
 }
