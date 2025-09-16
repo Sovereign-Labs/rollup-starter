@@ -3,12 +3,12 @@
 resolver = "2"
 
 members = [
-  "crates/rollup",
-  "crates/stf",
-  "crates/stf/stf-declaration",
-  "examples/value-setter", 
-  "scripts/acceptance-test",
-  "scripts/soak-test",
+    "crates/rollup",
+    "crates/stf",
+    "crates/stf/stf-declaration",
+    "examples/value-setter",
+    "scripts/acceptance-test",
+    "scripts/soak-test",
 ]
 default-members = ["crates/rollup"]
 
@@ -22,7 +22,7 @@ rust-version = "1.88"
 
 [workspace.dependencies]
 sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3633c09de823dd929121a12a545b2f71205fc347", features = [
-  "evm",
+    "evm",
 ] }
 sov-accounts = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3633c09de823dd929121a12a545b2f71205fc347" }
 sov-api-spec = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3633c09de823dd929121a12a545b2f71205fc347" }
@@ -36,7 +36,7 @@ sov-celestia-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.
 sov-cli = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3633c09de823dd929121a12a545b2f71205fc347" }
 sov-db = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3633c09de823dd929121a12a545b2f71205fc347" }
 sov-hyperlane-integration = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3633c09de823dd929121a12a545b2f71205fc347", features = [
-  "evm",
+    "evm",
 ] }
 sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3633c09de823dd929121a12a545b2f71205fc347" }
 sov-ledger-apis = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3633c09de823dd929121a12a545b2f71205fc347" }
@@ -85,5 +85,6 @@ tokio = { version = "1", features = ["full"] }
 lazy_static = "1.5.0"
 tempfile = "3.20"
 jsonrpsee = { version = "0.26", features = ["jsonrpsee-types"] }
+url = { version = "2.5.7", features = ["serde"] }
 
 risc0-build = "2.1"

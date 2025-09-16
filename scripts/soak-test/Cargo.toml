@@ -21,6 +21,7 @@ sov-test-utils = { workspace = true, features = ["arbitrary"] }
 sov-risc0-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] }
 sov-sp1-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] }
 sov-celestia-adapter = {workspace = true, features = ["arbitrary", "native",]}
+url = { version = "2.5.7", features = ["serde"] }
 
 rollup-starter = { path = "../../crates/rollup/", default-features = false }
 

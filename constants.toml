@@ -9,6 +9,7 @@ freeze = [1, 1]
 [constants]
 CHAIN_ID = 4332
 CHAIN_NAME = "TestChain"
+EVM_BLOCK_PRUNING_THRESHOLD = 1000
 # How many rollup blocks to wait before terminating setup mode. While setup mode is enabled,
 # the rollup does not charge gas. This is useful when initializing the rollup with a bridged gas token.
 SETUP_MODE_TERMINATION_HEIGHT = 0 # Disable setup mode entirely by default.

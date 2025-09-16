@@ -7,7 +7,7 @@ import {maxU128} from "./hyperlane_consts";
 console.log("Starting....");
 export const createWarpRoute: RuntimeCall = {
     warp: {
-        Register: {
+        register: {
             // The warp route cannot be modified
             admin: AdminEnum.None,
             ism: {
