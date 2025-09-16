@@ -6,7 +6,8 @@ members = [
   "crates/rollup",
   "crates/stf",
   "crates/stf/stf-declaration",
-  "examples/value-setter",
+  "examples/value-setter", 
+  "scripts/acceptance-test",
   "scripts/soak-test",
 ]
 default-members = ["crates/rollup"]

@@ -1,0 +1,80 @@
+# This file is intentionally duplicated from configs/mock/rollup.toml so that 
+# any changes to that file will *not* automatically propagate here. That way, 
+# any breaking changes to the config will cause breakage in the acceptance test.
+# Do *not* modify this file unless you intend to make a breaking change!
+[da]
+# Connection string for SQL database to have stored blocks, for example"
+#  - "sqlite://demo_data/da.sqlite?mode=rwc"
+#  - "sqlite::memory:"
+#  - "postgresql://root:hunter2@aws.amazon.com/mock-da"
+connection_string = "{sqlite_connection_string}"
+# String representation of sequencer address.
+# For initial full node should match genesis of sequencer-registry.
+# It is going to be a DA address that blobs from this node will be associated.
+sender_address = "0000000000000000000000000000000000000000000000000000000000000000"
+finalization = 0
+# Defines how new blocks should be produced.
+[da.block_producing.periodic]
+block_time_ms = 3_000
+
+[storage]
+# The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
+path = "{rollup_data_path}"
+user_commit_concurrency = 6
+# The number of 4kb buckets to allocate for the state DB
+# The state DB will not exceed this size, and you'll get a warning when it fills up to 90% capacity.
+user_hashtable_buckets = 16_000_000 # 64 GB. You will need much more for production deployments
+kernel_commit_concurrency = 2
+# Run pruning once every 1000 blocks. Prune any keys more than 100 versions old
+pruner_block_interval = 1000
+pruner_versions_to_keep = 100
+
+# We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
+# any blocks before this height
+[runner]
+genesis_height = 1  # Use a non-zero genesis height
+da_polling_interval_ms = 1000
+
+[runner.http_config]
+bind_host = "0.0.0.0"
+bind_port = 12348
+public_address = "http://127.0.0.1:12348"
+
+[monitoring]
+telegraf_address = "127.0.0.1:8094"
+# Defines how many measurements a rollup node will accumulate before sending it to the Telegraf.
+# It is expected from the rollup node to produce metrics all the time,
+# so measurements are buffered by size and not sent by time.
+# and below 67 KB, which is the maximal UDP packet size.
+# It also means that if a single serialized metric is larger than this value, a UDP packet will be larger.
+# The default value is 508.
+# max_datagram_size = 508
+# How many metrics are allowed to be in pending state, before new metrics will be dropped.
+# This is a number of metrics, not serialized bytes.
+# The total number of bytes to be held in memory might vary per metric + `max_datagram_size`
+# max_pending_metrics = 100
+
+
+[proof_manager]
+aggregated_proof_block_jump = 1
+prover_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
+max_number_of_transitions_in_db = 100
+max_number_of_transitions_in_memory = 20
+
+
+[sequencer]
+max_batch_size_bytes = 4048576
+max_concurrent_blobs = 128
+max_allowed_node_distance_behind = 10
+rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
+blob_processing_timeout_secs = 60
+
+[sequencer.preferred]
+disable_state_root_consistency_checks = true
+# Strategy for handling recovery scenarios when the sequencer is too far behind.
+# "None" - Shutdown the sequencer instead of attempting recovery (default)
+# "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
+recovery_strategy = "TryToSave"
+batch_execution_time_limit_millis = 3000 # This should be adjusted depending on the DA layer's block times
+postgres_connection_string = "postgres://postgres:{password}@localhost:5432/postgres"
+ideal_lag_behind_finalized_slot = 1

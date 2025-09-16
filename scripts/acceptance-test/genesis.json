@@ -1,0 +1,105 @@
+{
+	"accounts": {
+	  "accounts": []
+	},
+	"operator_incentives": {
+	  "reward_address": "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
+	},
+	"attester_incentives": {
+	  "minimum_attester_bond": [1000, 1000],
+	  "minimum_challenger_bond": [1000, 1000],
+	  "initial_attesters": [
+		["0xA6edfca3AA985Dd3CC728BFFB700933a986aC085", "200000"]
+	  ],
+	  "rollup_finality_period": 5,
+	  "maximum_attested_height": 0,
+	  "light_client_finalized_height": 0
+	},
+	"bank": {
+	  "gas_token_config": {
+		"token_name": "sov-token",
+		"address_and_balances": [
+		  [
+			"0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
+			"10000000000000000"
+		  ],
+		  [
+			"0x23B6445f524daDee9fb576627740AaD23Afbe8b7",
+			"1000000000"
+		  ],
+		  [
+			"0x9b08ce57a93751aE790698A2C9ebc76A78F23E25",
+			"1000000000"
+		  ],
+		  [
+			"0xB14D211d69aff5190451b336bDe0975b57555D36",
+			"1000000000"
+		  ],
+		  [
+			"0xe78B5e6d2BfF36b462cc29772526Dd4EBF42E98b",
+			"1000000000"
+		  ],
+		  [
+			"0x0E0BcFa6A9D9C5694B754Aa3BF86360EE23eb52B",
+			"1000000000"
+		  ],
+		  [
+			"0x267d5F5Ba12AcD07Ce5D0831B17aB5927fEBCd48",
+			"1000000000"
+		  ]
+		],
+		"admins": ["0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"]
+	  },
+	  "tokens": []
+	},
+	"chain_state": {
+	  "current_time": 0,
+	  "operating_mode": "operator",
+	  "inner_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
+	  "outer_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
+	  "genesis_da_height": 0
+	},
+	"paymaster": {
+	  "payers": [
+		{
+		  "payer_address": "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
+		  "policy": {
+			"default_payee_policy": {
+			  "allow": {}
+			},
+			"payees": [],
+			"authorized_updaters": [],
+			"authorized_sequencers": "all"
+		  },
+		  "sequencers_to_register": [
+			"0000000000000000000000000000000000000000000000000000000000000000"
+		  ]
+		}
+	  ]
+	},
+	"prover_incentives": {
+	  "proving_penalty": [10, 10],
+	  "minimum_bond": [1000, 1000],
+	  "initial_provers": [
+		["0xA6edfca3AA985Dd3CC728BFFB700933a986aC085", "200000"]
+	  ]
+	},
+	"sequencer_registry": {
+	  "minimum_bond": "5000",
+	  "sequencer_config": {
+		"seq_rollup_address": "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
+		"seq_da_address": "0000000000000000000000000000000000000000000000000000000000000000",
+		"seq_bond": "100000000000",
+		"is_preferred_sequencer": true
+	  }
+	},
+	"uniqueness": null,
+	"blob_storage": null,
+	"revenue_share": null,
+	"mailbox": null,
+	"interchain_gas_paymaster": null,
+	"merkle_tree_hook": null,
+	"warp": null,
+	"value_setter": null
+  }
+  
