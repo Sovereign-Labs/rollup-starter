@@ -6,71 +6,71 @@ services:
       - "8545:8545"
 
   # TODO: Add hyperlane deploy to anvil
-
-  validator:
-    env_file: .env
-    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-2
-    container_name: sov-hyperlane-validator
-#    restart: unless-stopped
-    environment:
-      # CONFIG_FILES is used internally by the agent entrypoint script
-      - CONFIG_FILES=/configs/agent-config.json
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      # Mount the interpolated agent configuration
-      - ./agent-config.json:/configs/agent-config.json:ro
-      # Mount persistent storage for the validator database
-      - ./docker-data/validator:/hyperlane_db
-      # Mount the shared volume for validator signatures
-      - ./docker-data/validator/signatures:/validator-signatures
-    # Note: If your rollup runs in Docker, add 'depends_on' and ensure network connectivity.
-    command: >
-      /app/validator
-      --db /hyperlane_db
-      --originChainName sovstarter
-      --checkpointSyncer.type localStorage
-      --checkpointSyncer.path /validator-signatures
-      --originChainName sovstarter
-      --chains.sovstarter.signer.type sovereignKey
-      --chains.sovstarter.signer.accountType ethereum
-      --log.level info
-      --log.format pretty
-
-  relayer:
-    env_file: .env
-    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-2
-    container_name:  sov-hyperlane-relayer
-#    restart: unless-stopped
-    ports:
-      - "9091:9091"
-    environment:
-      # CONFIG_FILES is used internally by the agent entrypoint script
-      - CONFIG_FILES=/configs/agent-config.json
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      # Mount the interpolated agent configuration: TODO: rename host file
-      - ./agent-config.json:/configs/agent-config.json:ro
-      # Mount persistent storage for the relayer database
-      - ./docker-data/relayer:/hyperlane_db
-      # Mount the shared volume for validator signatures (read-only)
-      - ./docker-data/validator/signatures:/validator-signatures:ro
-      # Mount the shared volume for chain configurations
-      - ./configs/chains:/root/.hyperlane/chains:ro
-    # Note: If your rollup runs in Docker, add 'depends_on' and ensure network connectivity.
-    command: >
-      /app/relayer
-      --db /hyperlane_db
-      --relayChains sovstarter,solanatestnet
-      --chains.sovstarter.signer.type sovereignKey
-      --chains.sovstarter.signer.accountType ethereum
-      --allowLocalCheckpointSyncers true
-      --metrics-port 9091
-      --gasPaymentEnforcement '[{"type":"none"}]'
-      --log.level info
-      --log.format pretty
-
-volumes:
-  validator-signatures:
-    driver: local
+#
+#  validator:
+#    env_file: .env
+#    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-2
+#    container_name: sov-hyperlane-validator
+##    restart: unless-stopped
+#    environment:
+#      # CONFIG_FILES is used internally by the agent entrypoint script
+#      - CONFIG_FILES=/configs/agent-config.json
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+#    volumes:
+#      # Mount the interpolated agent configuration
+#      - ./agent-config.json:/configs/agent-config.json:ro
+#      # Mount persistent storage for the validator database
+#      - ./docker-data/validator:/hyperlane_db
+#      # Mount the shared volume for validator signatures
+#      - ./docker-data/validator/signatures:/validator-signatures
+#    # Note: If your rollup runs in Docker, add 'depends_on' and ensure network connectivity.
+#    command: >
+#      /app/validator
+#      --db /hyperlane_db
+#      --originChainName sovstarter
+#      --checkpointSyncer.type localStorage
+#      --checkpointSyncer.path /validator-signatures
+#      --originChainName sovstarter
+#      --chains.sovstarter.signer.type sovereignKey
+#      --chains.sovstarter.signer.accountType ethereum
+#      --log.level info
+#      --log.format pretty
+#
+#  relayer:
+#    env_file: .env
+#    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-2
+#    container_name:  sov-hyperlane-relayer
+##    restart: unless-stopped
+#    ports:
+#      - "9091:9091"
+#    environment:
+#      # CONFIG_FILES is used internally by the agent entrypoint script
+#      - CONFIG_FILES=/configs/agent-config.json
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+#    volumes:
+#      # Mount the interpolated agent configuration: TODO: rename host file
+#      - ./agent-config.json:/configs/agent-config.json:ro
+#      # Mount persistent storage for the relayer database
+#      - ./docker-data/relayer:/hyperlane_db
+#      # Mount the shared volume for validator signatures (read-only)
+#      - ./docker-data/validator/signatures:/validator-signatures:ro
+#      # Mount the shared volume for chain configurations
+#      - ./configs/chains:/root/.hyperlane/chains:ro
+#    # Note: If your rollup runs in Docker, add 'depends_on' and ensure network connectivity.
+#    command: >
+#      /app/relayer
+#      --db /hyperlane_db
+#      --relayChains sovstarter,solanatestnet
+#      --chains.sovstarter.signer.type sovereignKey
+#      --chains.sovstarter.signer.accountType ethereum
+#      --allowLocalCheckpointSyncers true
+#      --metrics-port 9091
+#      --gasPaymentEnforcement '[{"type":"none"}]'
+#      --log.level info
+#      --log.format pretty
+#
+#volumes:
+#  validator-signatures:
+#    driver: local

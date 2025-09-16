@@ -11,8 +11,9 @@
   "description": "",
   "type": "module",
   "dependencies": {
-    "@sovereign-sdk/signers": "0.2.0",
+    "@sovereign-sdk/signers": "0.2.1",
     "@sovereign-sdk/web3": "0.10.0",
+    "@sovereign-sdk/serializers": "0.1.1",
     "ethers": "^6.15.0"
   },
   "devDependencies": {

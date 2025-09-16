@@ -1,0 +1,13 @@
+name: solanatestnet
+displayName: Solana Testnet
+domainId: 1399811150
+chainId: 1399811150
+isTestnet: true
+mailbox: 75HBBLae3ddeneJVrZeyrDfv6vb7SMC3aCpBucSXS5aR
+nativeToken:
+  decimals: 9
+  name: SOL
+  symbol: SOL
+protocol: sealevel
+rpcUrls:
+  - http: https://icy-misty-gadget.solana-testnet.quiknode.pro/a7baac5fbd103795f294acd9246bec0e0619cb67/

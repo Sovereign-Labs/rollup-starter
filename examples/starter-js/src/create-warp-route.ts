@@ -3,7 +3,7 @@ import { RuntimeCall } from "./types";
 // An example of a call to register a warp route.
 export const createWarpRoute: RuntimeCall = {
   warp: {
-    Register: {
+    register: {
       // The admin can modify the ISM (aka. trusted relayer/validators)
       admin: {
         InsecureOwner:

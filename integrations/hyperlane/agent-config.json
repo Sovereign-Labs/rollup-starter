@@ -4,7 +4,7 @@
       "name": "sovstarter",
       "displayName": "Sov Starter",
       "isTestnet": true,
-      "chainId": "4321",
+      "chainId": "4332",
       "domainId": "5577",
       "protocol": "sovereign",
       "rpcUrls": [{ "http": "http://host.docker.internal:12346" }],

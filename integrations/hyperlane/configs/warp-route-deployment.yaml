@@ -1,0 +1,7 @@
+ethtest:
+  type: native
+  name: "EthNativeToken"
+  symbol: "nativeETH"
+  decimals: 18
+  owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  interchainSecurityModule: "0x0000000000000000000000000000000000000000"
