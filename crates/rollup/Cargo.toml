@@ -24,7 +24,7 @@ sov-modules-rollup-blueprint = { workspace = true, features = ["native"] }
 sov-modules-stf-blueprint = { workspace = true, features = ["native"] }
 sov-stf-runner = { workspace = true }
 sov-cli = { workspace = true }
-sov-hyperlane-integration = { workspace = true }
+sov-hyperlane-integration = { workspace = true, features = ["native"] }
 sov-address = { workspace = true, features = ["evm"] }
 
 sov-db = { workspace = true }
