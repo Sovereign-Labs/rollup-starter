@@ -62,3 +62,8 @@ bench = [
   "sov-modules-stf-blueprint/bench",
   "sov-celestia-adapter?/bench",
 ]
+
+arbitrary = [
+  "sov-mock-da?/arbitrary",
+  "sov-celestia-adapter?/arbitrary",
+]

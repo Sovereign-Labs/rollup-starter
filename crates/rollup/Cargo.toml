@@ -29,9 +29,9 @@ sov-address = { workspace = true, features = ["evm"] }
 
 sov-db = { workspace = true }
 sov-sequencer = { workspace = true }
-sov-rollup-interface = { workspace = true }
+sov-rollup-interface = { workspace = true, features = ["arbitrary"] }
 sov-mock-da = { workspace = true, features = ["native"], optional = true }
-sov-celestia-adapter = { workspace = true, features = ["native"], optional = true }
+sov-celestia-adapter = { workspace = true, features = ["native", "arbitrary"], optional = true }
 
 axum = { workspace = true }
 anyhow = { workspace = true }
@@ -59,10 +59,11 @@ rand = "0.8.5"
 
 [dev-dependencies]
 tempfile = { workspace = true }
-sov-mock-zkvm = { workspace = true, features = ["native"] }
+sov-mock-zkvm = { workspace = true, features = ["native", "arbitrary"] }
+sov-celestia-adapter = { workspace = true, features = ["native", "arbitrary"] }
 sov-test-utils = { workspace = true }
 futures = { version = "0.3", default-features = false }
-sov-address = { workspace = true, features = ["evm"] }
+sov-address = { workspace = true, features = ["evm", "arbitrary"] }
 
 [features]
 default = ["mock_da", "mock_zkvm"]
@@ -71,6 +72,10 @@ celestia_da = ["sov-celestia-adapter", "stf-starter/celestia_da"]
 sp1 = ["sov-sp1-adapter", "sp1-starter"]
 risc0 = ["sov-risc0-adapter", "risc0-starter"]
 mock_zkvm = []
+arbitrary = [
+    "stf-starter/arbitrary",
+    "sov-celestia-adapter?/arbitrary"
+]
 
 [[bin]]
 name = "rollup"
