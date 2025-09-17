@@ -4,7 +4,7 @@ use clap::Parser;
 use rollup_starter::rollup::StarterRollup;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_rollup_interface::execution_mode::Native;
-use sov_soak_testing::{run_generator_task_for_bank, ValidityProfile};
+use sov_soak_testing_lib::{run_generator_task_for_bank, ValidityProfile};
 use tokio::signal::unix::SignalKind;
 use tokio::sync::watch::Receiver;
 use tokio::task::JoinSet;

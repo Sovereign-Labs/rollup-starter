@@ -12,13 +12,14 @@ clap = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 reqwest = { version = "0.12", features = ["rustls-tls"] }
+url = { version = "2.5.4", features = ["serde", "std"] }
 
-sov-soak-testing = { workspace = true }
+sov-soak-testing-lib = { workspace = true }
 sov-api-spec = { workspace = true }
 sov-rollup-interface = { workspace = true, features = ["arbitrary"] }
 sov-modules-rollup-blueprint = { workspace = true, features = ["native"] }
 sov-test-utils = { workspace = true, features = ["arbitrary"] }
-sov-risc0-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] } 
+sov-risc0-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] }
 sov-sp1-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] }
 
 rollup-starter = { path = "../../crates/rollup/", default-features = false }
