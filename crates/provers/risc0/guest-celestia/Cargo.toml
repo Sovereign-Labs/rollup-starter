@@ -12,16 +12,16 @@ anyhow = { version = "1.0.95" }
 risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
 risc0-zkvm-platform = { version = "2.0" }
 
-sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3", features = ["evm"] }
-sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3" }
-sov-celestia-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3" }
-sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3" }
-sov-modules-stf-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3" }
-sov-risc0-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3" }
-sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3" }
-sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3" }
-sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3" }
-sov-metrics = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "8b82656c83ced7acf617d0bb7f5974eb118619b3", optional = true }
+sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8", features = ["evm"] }
+sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8" }
+sov-celestia-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8" }
+sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8" }
+sov-modules-stf-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8" }
+sov-risc0-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8" }
+sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8" }
+sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8" }
+sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8" }
+sov-metrics = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3c6ab09c53f67a6fad7db6203a20f4abd7b7f1c8", optional = true }
 
 stf-starter = { path = "../../../stf", default-features = false, features = ["celestia_da"] }
 
