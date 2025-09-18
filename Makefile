@@ -61,6 +61,9 @@ clean-db: ## Clean all databases
 	rm -rf test-data/rollup-starter-data-celestia
 	rm -rf test-data/mock_da.sqlite
 	rm -rf test-data/docker
+	rm -rf test-data/relayer-db/*
+	rm -rf test-data/validator-db/*
+	rm -rf test-data/validator-signatures/*
 
 # Add `--build-arg BUILD_MODE=release` for release builds
 build-docker-mock-da: ## Build docker container for the rollup with MockDa

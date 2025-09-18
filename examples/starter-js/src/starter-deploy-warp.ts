@@ -1,10 +1,12 @@
 import {createStandardRollup} from "@sovereign-sdk/web3";
 import {RuntimeCall, AdminEnum} from "./types";
-import {Ed25519Signer, Secp256k1Signer} from "@sovereign-sdk/signers";
-import {maxU128} from "./hyperlane_consts";
+import {Secp256k1Signer} from "@sovereign-sdk/signers";
+import {maxU128, ETHTEST_DOMAIN, ANVIL_ADDRESS_0} from "./hyperlane_consts";
 
 
-console.log("Starting....");
+// TODO: Update after warp deployed on
+const ETHTEST_TOKEN_ID: string = "0x00000000000000000000000059b670e9fA9D0A427751Af201D676719a970857b";
+
 export const createWarpRoute: RuntimeCall = {
     warp: {
         register: {
@@ -13,27 +15,30 @@ export const createWarpRoute: RuntimeCall = {
             ism: {
                 MessageIdMultisig: {
                     threshold: 1,
-                    // The validators address, always ethereum style. Anvil account 0
-                    validators: ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"],
+                    validators: [ANVIL_ADDRESS_0],
                 },
             },
             token_source: {
                 Synthetic: {
-                    remote_token_id: "0x00000000000000000000000059b670e9fA9D0A427751Af201D676719a970857b",
+                    remote_token_id: ETHTEST_TOKEN_ID,
                     local_decimals: 18,
                     remote_decimals: 18,
                 },
             },
             remote_routers: [
                 [
-                    31337,
+                    ETHTEST_DOMAIN,
                     // What is this??
                     "0x00000000000000000000000059b670e9fA9D0A427751Af201D676719a970857b",
                 ],
             ],
+            // @ts-ignore
             inbound_transferrable_tokens_limit: maxU128,
+            // @ts-ignore
             inbound_limit_replenishment_per_slot: maxU128,
+            // @ts-ignore
             outbound_transferrable_tokens_limit: maxU128,
+            // @ts-ignore
             outbound_limit_replenishment_per_slot: maxU128,
         },
     },
@@ -51,10 +56,10 @@ const rollup = await createStandardRollup({
 console.log("Rollup client initialized");
 
 try {
-    console.log("")
-    const response = await rollup.call(createWarpRoute, { signer });
-
+    const response = await rollup.call(createWarpRoute, {signer});
+    console.log("Full response");
     console.log(JSON.stringify(response.response));
+    console.log("-------");
 } catch (e) {
     console.error("failed to call rollup:", e);
 }

@@ -134,6 +134,5 @@ ELASTICITY_MULTIPLIER = 2
 # --- End Gas fee adjustment parameters ---
 
 # --- Hyperlane constants ---
-# TODO: Validate that
 HYPERLANE_BRIDGE_DOMAIN = 5577
 # --- End Hyperlane constants ---

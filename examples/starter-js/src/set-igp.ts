@@ -54,7 +54,25 @@ function setRelayerConfigPayload(relayer_address: string): SetRelayerConfig {
 export function setIgpCall(relayer_address: string): RuntimeCall {
   return {
     interchain_gas_paymaster: {
-      set_relayer_config: setRelayerConfigPayload(relayer_address),
-    },
+      update_oracle_data: {
+        domain: SOLANA_TESTNET_DOMAIN,
+        oracle_data: {
+          gas_price: 1,
+          token_exchange_rate: 1,
+        }
+      }
+    }
   };
+}
+
+export const updateGasOracle: RuntimeCall = {
+  interchain_gas_paymaster: {
+    update_oracle_data: {
+        domain: SOLANA_TESTNET_DOMAIN,
+        oracle_data: {
+            gas_price: 1,
+            token_exchange_rate: 1,
+        }
+    },
+  }
 }
