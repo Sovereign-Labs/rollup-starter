@@ -64,6 +64,8 @@ clean-db: ## Clean all databases
 	rm -rf test-data/relayer-db/*
 	rm -rf test-data/validator-db/*
 	rm -rf test-data/validator-signatures/*
+	rm integrations/hyperlane/config/chains/ethtest/addresses.yaml
+	rm -rf integrations/hyperlane/config/deployments/*
 
 # Add `--build-arg BUILD_MODE=release` for release builds
 build-docker-mock-da: ## Build docker container for the rollup with MockDa

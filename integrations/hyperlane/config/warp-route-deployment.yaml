@@ -1,11 +1,13 @@
 ethtest:
   type: native
+  # Explicitly mark this as native ETH, not an ERC20 token
+  isNft: false
   name: "Ether"
-  symbol: "nativeETH"
+  symbol: "ETH"
   decimals: 18
   # Anvil Account 0
   owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  mailbox: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
   interchainSecurityModule: "0x0000000000000000000000000000000000000000"
-  remoteRouters:
-    5577:
-      address: "0x0000000000000000000000000000000000000000000000000000000000000001"
+  # Remote routers must be enrolled separately after deployment using:
+  # hyperlane warp update --chain ethtest --config <update-config.yaml>
