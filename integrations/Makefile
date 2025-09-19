@@ -43,7 +43,7 @@ clean: ## Clean up all docker compose resources
 	@if docker info >/dev/null 2>&1; then \
 		echo "Cleaning up all docker compose resources..."; \
 		$(compose_down) --volumes --remove-orphans 2>/dev/null || true; \
-		docker compose -f docker-compose.hyp-evm.yml down --volumes --remove-orphans  2>/dev/null || true; \
+		docker compose -f hyperlane/docker-compose.hyp-evm.yml down --volumes --remove-orphans  2>/dev/null || true; \
 		echo "Removing any dangling images..."; \
 		docker image prune -f 2>/dev/null || true; \
 		echo "Docker compose cleanup complete."; \

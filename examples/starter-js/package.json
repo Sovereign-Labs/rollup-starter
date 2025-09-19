@@ -4,7 +4,9 @@
   "main": "index.ts",
   "scripts": {
     "schema": "quicktype -s schema ../../crates/stf/.artifacts/json-schema.json -o src/types.ts --top-level RuntimeCall",
-    "start": "npm run schema && node --experimental-wasm-modules --loader ts-node/esm src/index.ts"
+    "start": "npm run schema && node --experimental-wasm-modules --loader ts-node/esm src/index.ts",
+    "warp-setup": "npm run schema && node --experimental-wasm-modules --loader ts-node/esm src/hyperlane/starter-setup-warp-route.ts",
+    "enroll-evm-router": "node --loader ts-node/esm src/hyperlane/enroll-evm-router.ts"
   },
   "author": "",
   "license": "ISC",
@@ -13,7 +15,9 @@
   "dependencies": {
     "@sovereign-sdk/signers": "0.2.0",
     "@sovereign-sdk/web3": "0.10.0",
-    "ethers": "^6.15.0"
+    "@types/js-yaml": "^4.0.9",
+    "ethers": "^6.15.0",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.1",

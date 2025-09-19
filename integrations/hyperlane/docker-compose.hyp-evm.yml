@@ -89,8 +89,8 @@ services:
       - CONFIG_FILES=/configs/agent-config.json
       # Anvil account 2 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
       - HYP_CHAINS_ETHTEST_SIGNER_KEY=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
-      # token_deployer_private_key.json
-      - HYP_CHAINS_SOVSTARTER_SIGNER_KEY=0x0187c12ea7c12024b3f70ac5d73587463af17c8bce2bd9e6fe87389310196c64
+      # minter_private_key.json
+      - HYP_CHAINS_SOVSTARTER_SIGNER_KEY="0d87c12ea7c12024b3f70a26d735874608f17c8bce2b48e6fe87389310191264
     # TODO: Healthcheck
     volumes:
       - ./configs:/configs

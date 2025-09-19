@@ -4,7 +4,7 @@ import {
   DomainOracleData,
   DomainDefaultGas,
   SetRelayerConfig,
-} from "./types";
+} from "../types";
 
 // --- Define constants that were present in the Rust code ---
 // These would typically come from your configuration or environment

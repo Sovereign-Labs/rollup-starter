@@ -1,4 +1,4 @@
-.PHONY: help check lint install-risc0-toolchain install-sp1-toolchain clean clean-db build-docker-mock-da run-docker-mock-da stop-docker-mock-da start-obs stop-obs start-celestia stop-celestia
+.PHONY: help check lint install-risc0-toolchain install-sp1-toolchain clean clean-db build-docker-mock-da run-docker-mock-da stop-docker-mock-da start-obs stop-obs start-celestia stop-celestia print-hyperlane-ethtest-warp
 
 # Should remain at the top, otherwise `make` won't print help
 help: ## Display this help message
@@ -108,3 +108,13 @@ start-celestia: ## Start Celestia docker compose
 
 stop-celestia: ## Stop Celestia docker compose
 	$(MAKE) -C integrations stop-celestia
+
+print-hyperlane-ethtest-warp:
+	@docker run --rm \
+		-v ./integrations/hyperlane/configs:/configs \
+		ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3 \
+		warp read \
+		--registry https://github.com/Sovereign-Labs/hyperlane-registry \
+		--registry /configs \
+		--chain ethtest \
+		--address $(shell grep "addressOrDenom:" integrations/hyperlane/configs/deployments/warp_routes/ETH/warp-route-deployment-config.yaml | cut -d'"' -f2)
