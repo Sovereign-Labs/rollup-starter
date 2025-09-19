@@ -1,6 +1,6 @@
 ## Bridging in tokens via Hyperlane
 
-This tutorial assumes you're bridging from Sepolia tesnet.
+This tutorial assumes you're bridging from Solana testnet.
 
 ### Step 1: Deploy Contracts
 
@@ -14,7 +14,7 @@ To get started, you'll need to do a one-time deployment to your counterparty cha
 - Generating new keys for your validator set and relayer
 - Deploying new ISM smart contracts to each of your counter-party chains
 - Deploying new warp route contracts on your counterparty chains which point to your new ISM
-- We're working on ways to automate this, but for now we'd recommend getting in touch with the Sovereign Labs team to help with this intial deployment
+- We're working on ways to automate this, but for now we'd recommend getting in touch with the Sovereign Labs team to help with this initial deployment
 
 ### Create a Warp Route on the Sovereign Chain
 
@@ -53,11 +53,11 @@ To get started, you'll need to do a one-time deployment to your counterparty cha
 
 ### Step 3: Send Tokens
 
-To send from ETH -> Sov, you can use our fork of the Hyperlane Warp UI
+To send from SOL -> Sov, you can use our fork of the Hyperlane Warp UI
 
-To send from Sov -> ETH, use the following callmessage:
+To send from Sov -> SOL, use the following callmessage:
 
-````
+```
 TransferRemote {
     warp_route: route_id,
     destination_domain: {DESTINATION_DOMAIN},
@@ -66,5 +66,4 @@ TransferRemote {
     relayer: Some(relayer.address()),  // Optional
     gas_payment_limit: Amount::MAX,
 })
-    ```
-````
+```

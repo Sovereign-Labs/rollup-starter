@@ -1,0 +1,19 @@
+ethtest:
+  type: native
+  # Explicitly mark this as native ETH, not an ERC20 token
+  isNft: false
+  name: "Ether"
+  symbol: "ETH"
+  decimals: 18
+  # Anvil Account 0
+  owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  # TODO: Verify that it matches what was in addresses.
+  mailbox: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+  # Start with testIsm so any message is relayer
+  interchainSecurityModule:
+    type: testIsm
+#  interchainSecurityModule:
+#    type: merkleRootMultisigIsm
+#    validators:
+#      - "0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747" # tx_signer
+#    threshold: 1

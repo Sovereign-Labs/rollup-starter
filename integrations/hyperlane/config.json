@@ -7,7 +7,7 @@
       "chainId": "4321",
       "domainId": "5555",
       "protocol": "sovereign",
-      "rpcUrls": [{ "http": "HTTP://host.docker.internal:12346" }],
+      "rpcUrls": [{ "http": "http://host.docker.internal:12346" }],
       "mailbox": "0x0000000000000000000000000000000000000000",
       "interchainGasPaymaster": "0x0000000000000000000000000000000000000000",
       "validatorAnnounce": "0x0000000000000000000000000000000000000000",

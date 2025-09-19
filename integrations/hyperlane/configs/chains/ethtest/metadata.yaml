@@ -1,0 +1,14 @@
+chainId: 31337
+displayName: EthTest
+domainId: 3133790210
+isTestnet: true
+name: ethtest
+nativeToken:
+  decimals: 18
+  name: Ether
+  symbol: ETH
+protocol: ethereum
+rpcUrls:
+    - http: http://anvil:8545
+    - http: http://host.docker.internal:8545
+    - http: http://127.0.0.1:8545
