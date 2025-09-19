@@ -1,7 +1,4 @@
 import fs from 'fs';
-import yaml from 'js-yaml';
-import path from 'path';
-import {fileURLToPath} from 'url';
 import {AdminClass, RuntimeCall} from "../types";
 import {
     ANVIL_ADDRESS_0, defaultGas,
@@ -13,11 +10,11 @@ import {
 } from "./consts";
 import {Secp256k1Signer} from "@sovereign-sdk/signers";
 import {createStandardRollup} from "@sovereign-sdk/web3";
-import {readWarpRouteConfig, testDataFile} from "./utils";
+import {readWarpRouteConfig, testDataFile, zeroPad20To32} from "./utils";
 
 function buildCreateWarpRouteCall(domain: number, tokenId: string): RuntimeCall {
     // Pad it with zeros, as rollup expects.
-    const expectedTokenId = "0x" + "00".repeat(12) + tokenId.slice(2);
+    const expectedTokenId = zeroPad20To32(tokenId);
     return {
         warp: {
             register: {
@@ -64,11 +61,11 @@ function parseWarpRouteResponse(response: any): { routeId: string; tokenId: stri
     }
 
     if (receipt.result !== "successful") {
-        console.error("[✗] Transaction failed!");
+        console.error("[✗] Transaction ${response.id} failed!");
         console.error("Receipt:", receipt);
         process.exit(1);
     }
-    console.log("[✓] Transaction successful");
+    console.log(`[✓] Transaction successful: ${response.id}`);
     // @ts-ignore
     console.log("  Gas used:", receipt.data?.gas_used || "unknown");
 
@@ -166,13 +163,11 @@ const ethtestTokenId = readWarpRouteConfig();
 const createWarpRoute = buildCreateWarpRouteCall(ETHTEST_DOMAIN, ethtestTokenId);
 
 let deployerSigner = new Secp256k1Signer(deployerPrivateKey);
-console.log("Signer is done:", deployerSigner);
-
 
 const warpRegisterResponse = await rollup.call(createWarpRoute, {signer: deployerSigner});
 console.log("Create warp router response:");
-console.log(JSON.stringify(warpRegisterResponse.response));
-console.log("-------");
+// console.log(JSON.stringify(warpRegisterResponse.response));
+// console.log("-------");
 
 const {routeId, tokenId} = parseWarpRouteResponse(warpRegisterResponse);
 console.log("\nSummary:");
@@ -183,6 +178,5 @@ console.log(`  Token ID: ${tokenId}`);
 const minterSigner = new Secp256k1Signer(minterPrivateKey);
 
 const response = await rollup.call(setRelayerConfig, {signer: minterSigner});
-console.log("set relayer config response");
+console.log("Relayer config response");
 console.log(JSON.stringify(response.response));
-console.log("-------");

@@ -9,29 +9,51 @@ This tutorial demonstrates how configure bridging from EVM-like chain.
 
 1. +Start docker compose with anvil and hyperlane agents
 2. +Start the rollup
-3. ~Register warp router and relayer on rollup
-4. Enroll anvil warp route
-5. Make transfers
+3. +Register warp router and relayer on rollup 
+4. +Enroll anvil warp route
+5. ~Make transfers
 
 ## Start Anvil and Hyperlane Agents
 
+Start the anvil and hyperlane and let it run.
+Wait till you see message `Successfully announced validator` from validator container
+Continue working in another console.
 
-```
-# should be background, wait for validator announce message
-cd integrations/hyperlane
-make clean
-docker compose -f docker-compose.hyp-evm.yml up 
+```bash
+$ make start-hyperlane-ethtest
 ```
 
 ### test the setup
 
-print warp route configuration on ethest:
+print warp route configuration on Ethest. Notice, `remoteRouters` map is empty.
 
 ```bash
-make print-hyperlane-ethtest-warp
+$ make print-hyperlane-ethtest-warp
+✅ Warp route config read successfully:
+
+    ethtest:
+      owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      mailbox: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+      hook: "0x0000000000000000000000000000000000000000"
+      interchainSecurityModule:
+        address: "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
+        type: testIsm
+      remoteRouters: {}
+      name: Ether
+      symbol: ETH
+      decimals: 18
+      isNft: false
+      contractVersion: 9.0.6
+      type: native
+      allowedRebalancers: []
+      allowedRebalancingBridges: {}
+      proxyAdmin:
+        address: "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
+        owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      destinationGas: {}
 ```
 
-print validator announcement message:
+Print validator announcement message:
 
 ```bash
 $ cat integrations/hyperlane/docker-data/validator-ethtest/signatures/announcement.json
@@ -52,30 +74,114 @@ $ cat integrations/hyperlane/docker-data/validator-ethtest/signatures/announceme
 ```
 
 
-3. call relayer metrics endpoint and see details.
+TODO: Call relayer metrics
 
 ## Start the rollup
 
+Start the rollup and let it run.
+
 ```
-cargo run
+$ cargo run
 ```
 
+Install dependencies if it wasn't done previously
+
+```
+$ cd examples/starter-js && npm install
+```
+
+Setup warp route on rollup side. This script will:
+
+* Register a warp router and add a remote route on ethtest
+* Configure a relayer state on rollup
+
+```
+npm run hyperlane-warp-setup
+Summary:
+  Route ID: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
+  Token ID: token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf
+```
+
+Check the total supply of this token should be 0:
+
+```
+curl http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
+```
+
+Check the warp configuration. 
+Note ism configuration and admin.
+`remote_token_id` should match 
+
+```
+$ curl http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
+{
+  "key": "0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a",
+  "value": {
+    "token_source": {
+      "Synthetic": {
+        "remote_token_id": "0x0000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c1",
+        "local_decimals": 18,
+        "remote_decimals": 18,
+        "local_token_id": "token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"
+      }
+    },
+    "admin": {
+      "InsecureOwner": "0xd2c1be33a0bcd2007136afd8ed61cc7561ada747"
+    },
+    "ism": {
+      "MessageIdMultisig": {
+        "validators": [
+          "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+        ],
+        "threshold": 1
+      }
+    },
+    "enrolled_destinations": [
+      3133790210
+    ],
+    "inbound_rate_limiter": {
+      "max_transferrable_tokens": "340282366920938463463374607431768211455",
+      "current_transferrable_tokens": "340282366920938463463374607431768211455",
+      "limit_replenishment_per_slot": "340282366920938463463374607431768211455",
+      "last_seen_visible_slot": 72
+    },
+    "outbound_rate_limiter": {
+      "max_transferrable_tokens": "340282366920938463463374607431768211455",
+      "current_transferrable_tokens": "340282366920938463463374607431768211455",
+      "limit_replenishment_per_slot": "340282366920938463463374607431768211455",
+      "last_seen_visible_slot": 72
+    }
+  }
+}
+```
+
+Or enrolled routers in particular:
+
+```
+$ curl http://127.0.0.1:12346/modules/warp/route/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a/routers
+[{"domain":3133790210,"address":"0x0000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c1"}]
+```
+
+**TODO: Check the relayer metrics**
+
+```
+curl http://
+```
 
 ## Enroll rollup route onto anvil
 
 ```
-cast send 0x59b670e9fA9D0A427751Af201D676719a970857b \
-    "enrollRemoteRouter(uint32,bytes32)" \
-    5577 \
-    0x1383103db8d7d56968f9b1c69a7cd1379ef0f2df41ed3a728489ae26a7cdf151 \
-    --rpc-url http://localhost:8545 \
-    --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+$ npm run hyperlane-enroll-router-on-ethtest
+[*] Enrolling remote router...
+  Contract: 0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
+  Domain: 5555
+  Router: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
 ```
 
-Now remote route should be shown:
+Now remoteRouters should have element:
 
 ```
-$ make print-hyperlane-ethtest-warp
+$ cd ../../ && make print-hyperlane-ethtest-warp
 ✅ Warp route config read successfully:
 
     ethtest:
@@ -103,11 +209,40 @@ $ make print-hyperlane-ethtest-warp
         "5555": "0"
 ```
 
+
+## Make transfers
+
+Before start inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` let's check that its balance of bridged ETH is zero.
+
+Bank endpoint will return 404.
+
+```bash
+curl http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
+{"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
+```
+
+```
+$ cd examples/starter-js && npm run hyperlane-inbound
+[*] Making inbound warp transfer...
+  Contract:  0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
+  Domain:    5555
+  Router:    0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
+  Recipient: 0x000000000000000000000000D2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
+  Amount:    0.01 ETH
+  Gas:       0.0 ETH
+  Total:     0.01 ETH
+[] Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d452b
+```
+
 # Rest
+
+Balance on the rollup
+
+
+
 ```
 curl -s -X POST -H "Content-Type: application/json" \
   --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' \
   http://127.0.0.1:8545
-
 ```
 

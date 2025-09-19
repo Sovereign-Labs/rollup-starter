@@ -31,3 +31,29 @@ export function readWarpRouteConfig(): string {
         process.exit(1);
     }
 }
+
+export function readWarpRouteIdOnRollup(): string {
+    try {
+        if (!fs.existsSync(testDataFile)) {
+            throw new Error(`Test data file not found at ${testDataFile}`);
+        }
+
+        const fileContent = fs.readFileSync(testDataFile, 'utf8');
+        const data = JSON.parse(fileContent);
+
+        if (!data.warp_route_id) {
+            throw new Error('warp_route_id not found in test data file');
+        }
+
+        console.log(`[✓] Read router address from test data: ${data.warp_route_id}`);
+        return data.warp_route_id;
+
+    } catch (error) {
+        console.error(`[✗] Error reading router address: ${error}`);
+        process.exit(1);
+    }
+}
+
+export function zeroPad20To32(input: string): string {
+    return "0x" + "00".repeat(12) + input.slice(2);
+}
