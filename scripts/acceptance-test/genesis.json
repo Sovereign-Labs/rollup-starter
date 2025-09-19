@@ -1,6 +1,7 @@
 {
 	"accounts": {
-	  "accounts": []
+      "accounts": [],
+      "enable_custom_account_mappings": false
 	},
 	"operator_incentives": {
 	  "reward_address": "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
