@@ -41,7 +41,7 @@ stop-celestia:
 
 start-hyperlane-ethtest:
 	@echo "Starting hyperlane ethtest docker compose..."
-	mkdir -p ./docker-data/relayer && ./docker-data/validator-ethtest/signatures
+	mkdir -p ./docker-data/relayer && mkdir -p ./docker-data/validator-ethtest/signatures
 	cd hyperlane && docker compose -f docker-compose.hyp-evm.yml up --build --force-recreate -d --quiet-pull
 	@echo "waiting for containers to become operational (timeout: 300 seconds)..."
 	@start_time=$$(date +%s); \
