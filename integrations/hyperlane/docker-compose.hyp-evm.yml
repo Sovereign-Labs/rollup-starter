@@ -14,7 +14,7 @@ services:
       - "8545:8545"
 
   hyperlane-core-deploy:
-    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-4
+    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3
     depends_on:
       anvil:
         condition: service_healthy
@@ -32,7 +32,7 @@ services:
       --yes
 
   hyperlane-warp-deploy:
-    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-4
+    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3
     depends_on:
       hyperlane-core-deploy:
         condition: service_completed_successfully
@@ -51,7 +51,7 @@ services:
 
 
   validator-ethtest:
-    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-2
+    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-4
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
@@ -61,6 +61,7 @@ services:
       - HYP_VALIDATOR_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
       # minter_private_key.json
       - HYP_CHAINS_SOVSTARTER_SIGNER_KEY=0x0d87c12ea7c12024b3f70a26d735874608f17c8bce2b48e6fe87389310191264
+      - NO_COLOR=1
     # TODO: Healthcheck
     volumes:
       - ./configs:/configs
@@ -81,7 +82,7 @@ services:
   # TODO: validator-sovstarter
 
   relayer:
-    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-2
+    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-4
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
@@ -89,8 +90,9 @@ services:
       - CONFIG_FILES=/configs/agent-config.json
       # Anvil account 2 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
       - HYP_CHAINS_ETHTEST_SIGNER_KEY=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
-      # minter_private_key.json
-      - HYP_CHAINS_SOVSTARTER_SIGNER_KEY="0d87c12ea7c12024b3f70a26d735874608f17c8bce2b48e6fe87389310191264
+      # token_deployer.json
+      - HYP_CHAINS_SOVSTARTER_SIGNER_KEY=0x0187c12ea7c12024b3f70ac5d73587463af17c8bce2bd9e6fe87389310196c64
+      - NO_COLOR=1
     # TODO: Healthcheck
     volumes:
       - ./configs:/configs

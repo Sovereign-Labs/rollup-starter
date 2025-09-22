@@ -41,6 +41,7 @@ try {
         transferAmount,
         {value: totalValue}
     );
+    // TODO: Print events or get hyperlane message id
     console.log(`[] Transaction sent: ${tx.hash}`);
     // Wait for confirmation
     const receipt = await tx.wait();

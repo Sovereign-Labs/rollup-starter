@@ -105,8 +105,8 @@ Summary:
 Check the total supply of this token should be 0:
 
 ```bash,test-ci,bashtestmd:compare-output
-$ curl http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
-{}
+$ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
+{"amount":"0","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
 Check the warp configuration. 
@@ -114,7 +114,7 @@ Note ism configuration and admin.
 `remote_token_id` should match 
 
 ```bash,test-ci,bashtestmd:compare-output
-$ curl http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
+$ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
 {
   "key": "0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a",
   "value": {
@@ -144,13 +144,13 @@ $ curl http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40
       "max_transferrable_tokens": "340282366920938463463374607431768211455",
       "current_transferrable_tokens": "340282366920938463463374607431768211455",
       "limit_replenishment_per_slot": "340282366920938463463374607431768211455",
-      "last_seen_visible_slot": 72
+      "last_seen_visible_slot": 14
     },
     "outbound_rate_limiter": {
       "max_transferrable_tokens": "340282366920938463463374607431768211455",
       "current_transferrable_tokens": "340282366920938463463374607431768211455",
       "limit_replenishment_per_slot": "340282366920938463463374607431768211455",
-      "last_seen_visible_slot": 72
+      "last_seen_visible_slot": 14
     }
   }
 }
