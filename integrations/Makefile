@@ -42,16 +42,34 @@ stop-celestia:
 start-hyperlane-ethtest:
 	@echo "Starting hyperlane ethtest docker compose..."
 	cd hyperlane && docker compose -f docker-compose.hyp-evm.yml up --build --force-recreate -d --quiet-pull
-	@echo "waiting for containers to become operational..."
-	@while true; do \
+	@echo "waiting for containers to become operational (timeout: 300 seconds)..."
+	@start_time=$$(date +%s); \
+	timeout_seconds=300; \
+	while true; do \
 		timestamp=$$(date '+%Y-%m-%d %H:%M:%S'); \
+		current_time=$$(date +%s); \
+		elapsed=$$((current_time - start_time)); \
 		validator_health=$$(docker inspect --format='{{.State.Health.Status}}' hyperlane-validator-ethtest-1 2>/dev/null || echo "not found"); \
 		relayer_health=$$(docker inspect --format='{{.State.Health.Status}}' hyperlane-relayer-1 2>/dev/null || echo "not found"); \
+		echo "[$$timestamp] Health check - validator: '$$validator_health', relayer: '$$relayer_health' (elapsed: $${elapsed}s)"; \
 		if [ "$$validator_health" = "healthy" ] && [ "$$relayer_health" = "healthy" ]; then \
-			echo "[$$timestamp] All hyperlane containers are healthy"; \
+			echo "[$$timestamp] ✔ All hyperlane containers are healthy"; \
 			break; \
+		elif [ $$elapsed -ge $$timeout_seconds ]; then \
+			echo "[$$timestamp] ✗ Timeout reached after $$timeout_seconds seconds"; \
+			echo "Final health status - validator: '$$validator_health', relayer: '$$relayer_health'"; \
+			echo ""; \
+			echo "Detailed health information for debugging:"; \
+			echo "==========================================="; \
+			echo "Validator (hyperlane-validator-ethtest-1) State.Health:"; \
+			docker inspect --format='{{json .State.Health}}' hyperlane-validator-ethtest-1 2>/dev/null | jq '.' 2>/dev/null || echo "Container not found or jq not available"; \
+			echo ""; \
+			echo "Relayer (hyperlane-relayer-1) State.Health:"; \
+			docker inspect --format='{{json .State.Health}}' hyperlane-relayer-1 2>/dev/null | jq '.' 2>/dev/null || echo "Container not found or jq not available"; \
+			echo "==========================================="; \
+			exit 1; \
 		else \
-			echo "[$$timestamp] validator: '$$validator_health', relayer: '$$relayer_health': Waiting for hyperlane containers to be up and running..."; \
+			echo "[$$timestamp] Waiting for hyperlane containers to be up and running..."; \
 		fi; \
 		sleep 3; \
 	done

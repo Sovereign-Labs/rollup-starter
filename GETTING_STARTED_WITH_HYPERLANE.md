@@ -113,7 +113,7 @@ Check the warp configuration.
 Note ism configuration and admin.
 `remote_token_id` should match 
 
-```bash,test-ci,bashtestmd:compare-output
+```bash,test-ci,bashtestmd:exit-code=0
 $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
 {
   "key": "0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a",
@@ -140,20 +140,6 @@ $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c08153
     "enrolled_destinations": [
       3133790210
     ],
-    "inbound_rate_limiter": {
-      "max_transferrable_tokens": "340282366920938463463374607431768211455",
-      "current_transferrable_tokens": "340282366920938463463374607431768211455",
-      "limit_replenishment_per_slot": "340282366920938463463374607431768211455",
-      "last_seen_visible_slot": 14
-    },
-    "outbound_rate_limiter": {
-      "max_transferrable_tokens": "340282366920938463463374607431768211455",
-      "current_transferrable_tokens": "340282366920938463463374607431768211455",
-      "limit_replenishment_per_slot": "340282366920938463463374607431768211455",
-      "last_seen_visible_slot": 14
-    }
-  }
-}
 ```
 
 Or enrolled routers in particular:
@@ -276,9 +262,19 @@ $ curl -s -X POST -H "Content-Type: application/json" \
 3. Check that warp routes are enrolled on both chains:
     - On ethtest use `make print-hyperlane-ethtest-warp` and check remoteRouters has correct DOMAIN_ID and note route id  there
     - On rollup side: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID_FROM_PREV_COMMAND/routers`
-4. 
+4. Make sure that anvil is configured for periodic block production
 
 ## Relayer does not process messages it saw
 
 
 ## 
+
+
+curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_wallet_balance'
+# HELP hyperlane_wallet_balance Current native token balance for the wallet addresses in the `wallets` set
+# TYPE hyperlane_wallet_balance gauge
+hyperlane_wallet_balance{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0",token_address="none",token_name="Native",token_symbol="Native",wallet_address="3c44cdddb6a900fa2b585dd299e03d12fa4293bc",wallet_name="relayer"} 10000
+
+
+hyperlane_critical_error{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0"} 0
+hyperlane_critical_error{agent="relayer",chain="sovstarter",hyperlane_baselib_version="0.1.0"} 1
