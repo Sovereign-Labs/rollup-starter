@@ -19,7 +19,7 @@ Start the anvil and hyperlane and let it run.
 Wait till you see message `Successfully announced validator` from validator container
 Continue working in another console.
 
-```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=Successfully announced validator
+```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=Successfully.announced.validator"
 $ make start-hyperlane-ethtest
 ```
 
@@ -260,3 +260,20 @@ $ curl -s -X POST -H "Content-Type: application/json" \
   http://127.0.0.1:8545
 ```
 
+
+# Common problems
+
+## Validator isn't posting checkpoints
+
+#### Check configuration
+
+1. Mailbox matches in all configurations:
+```
+grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
+grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
+```
+
+## Relayer does not process messages it saw
+
+
+## 
