@@ -1,5 +1,6 @@
 services:
   anvil:
+#    image: ghcr.io/foundry-rs/foundry:v1.3.6
     image: ghcr.io/foundry-rs/foundry:v1.1.0
     environment:
       - ANVIL_IP_ADDR=0.0.0.0
@@ -9,7 +10,8 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
-    command: ["anvil", "--host", "0.0.0.0", "--port", "8545", "--block-time", "5", "--no-rate-limit"]
+    # Intentional hack to have all params in a single string, otherwise arguments go to `sh -c` and not into anvil
+    command: ["anvil --port 8545 --block-time 5"]
     ports:
       - "8545:8545"
 

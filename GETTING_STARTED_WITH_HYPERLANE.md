@@ -19,7 +19,7 @@ Start the anvil and hyperlane and let it run.
 Wait till you see message `Successfully announced validator` from validator container
 Continue working in another console.
 
-```bash,test-ci,bashtestmd:exit-code=0"
+```bash,test-ci,bashtestmd:exit-code=0
 $ make start-hyperlane-ethtest
 ```
 
@@ -269,11 +269,14 @@ $ curl -s -X POST -H "Content-Type: application/json" \
 
 1. Check CHAIN_ID and DOMAIN_ID for both chains in all necessary files:
 2. Mailbox matches in all configurations:
-  ```
-  grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
-  grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
-  ```
-3Check
+    ```
+    grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
+    grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
+    ```
+3. Check that warp routes are enrolled on both chains:
+    - On ethtest use `make print-hyperlane-ethtest-warp` and check remoteRouters has correct DOMAIN_ID and note route id  there
+    - On rollup side: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID_FROM_PREV_COMMAND/routers`
+4. 
 
 ## Relayer does not process messages it saw
 
