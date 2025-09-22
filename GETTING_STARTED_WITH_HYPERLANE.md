@@ -19,7 +19,7 @@ Start the anvil and hyperlane and let it run.
 Wait till you see message `Successfully announced validator` from validator container
 Continue working in another console.
 
-```bash
+```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=Successfully announced validator
 $ make start-hyperlane-ethtest
 ```
 
@@ -27,7 +27,7 @@ $ make start-hyperlane-ethtest
 
 print warp route configuration on Ethest. Notice, `remoteRouters` map is empty.
 
-```bash
+```bash,test-ci,bashtestmd:compare-output
 $ make print-hyperlane-ethtest-warp
 ✅ Warp route config read successfully:
 
@@ -55,7 +55,7 @@ $ make print-hyperlane-ethtest-warp
 
 Print validator announcement message:
 
-```bash
+```bash,test-ci,bashtestmd:compare-output
 $ cat integrations/hyperlane/docker-data/validator-ethtest/signatures/announcement.json
 {
   "value": {
@@ -80,13 +80,13 @@ TODO: Call relayer metrics
 
 Start the rollup and let it run.
 
-```
+```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=rest_address
 $ cargo run
 ```
 
 Install dependencies if it wasn't done previously
 
-```
+```bash,test-ci,bashtestmd:exit-code=0
 $ cd examples/starter-js && npm install
 ```
 
@@ -95,8 +95,8 @@ Setup warp route on rollup side. This script will:
 * Register a warp router and add a remote route on ethtest
 * Configure a relayer state on rollup
 
-```
-npm run hyperlane-warp-setup
+```bash,test-ci,bashtestmd:compare-output
+$ npm run hyperlane-warp-setup
 Summary:
   Route ID: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
   Token ID: token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf
@@ -104,15 +104,16 @@ Summary:
 
 Check the total supply of this token should be 0:
 
-```
-curl http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
+```bash,test-ci,bashtestmd:compare-output
+$ curl http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
+{}
 ```
 
 Check the warp configuration. 
 Note ism configuration and admin.
 `remote_token_id` should match 
 
-```
+```bash,test-ci,bashtestmd:compare-output
 $ curl http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
 {
   "key": "0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a",
@@ -157,7 +158,7 @@ $ curl http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40
 
 Or enrolled routers in particular:
 
-```
+```bash,test-ci,bashtestmd:compare-output
 $ curl http://127.0.0.1:12346/modules/warp/route/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a/routers
 [{"domain":3133790210,"address":"0x0000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c1"}]
 ```
@@ -170,7 +171,7 @@ curl http://
 
 ## Enroll rollup route onto anvil
 
-```
+```bash,test-ci,bashtestmd:compare-output
 $ npm run hyperlane-enroll-router-on-ethtest
 [*] Enrolling remote router...
   Contract: 0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
@@ -180,7 +181,7 @@ $ npm run hyperlane-enroll-router-on-ethtest
 
 Now remoteRouters should have element:
 
-```
+```bash,test-ci,bashtestmd:compare-output
 $ cd ../../ && make print-hyperlane-ethtest-warp
 ✅ Warp route config read successfully:
 
@@ -212,16 +213,18 @@ $ cd ../../ && make print-hyperlane-ethtest-warp
 
 ## Make transfers
 
+### Inbound
+
 Before start inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` let's check that its balance of bridged ETH is zero.
 
 Bank endpoint will return 404.
 
-```bash
-curl http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
+```bash,test-ci,bashtestmd:compare-output
+$ curl http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
 {"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
 ```
 
-```
+```bash,test-ci,bashtestmd:compare-output
 $ cd examples/starter-js && npm run hyperlane-inbound
 [*] Making inbound warp transfer...
   Contract:  0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
@@ -234,6 +237,17 @@ $ cd examples/starter-js && npm run hyperlane-inbound
 [] Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d452b
 ```
 
+**TODO**: How to wait till transfer is processed???. Bash script that pulls balance? Checking logs 
+
+```bash,test-ci,bashtestmd:compare-output
+$ curl http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
+{"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
+```
+
+### Outbound
+
+
+
 # Rest
 
 Balance on the rollup
@@ -241,7 +255,7 @@ Balance on the rollup
 
 
 ```
-curl -s -X POST -H "Content-Type: application/json" \
+$ curl -s -X POST -H "Content-Type: application/json" \
   --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' \
   http://127.0.0.1:8545
 ```

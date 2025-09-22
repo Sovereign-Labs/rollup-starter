@@ -14,7 +14,7 @@ services:
       - "8545:8545"
 
   hyperlane-core-deploy:
-    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3
+    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-4
     depends_on:
       anvil:
         condition: service_healthy
@@ -32,7 +32,7 @@ services:
       --yes
 
   hyperlane-warp-deploy:
-    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3
+    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-4
     depends_on:
       hyperlane-core-deploy:
         condition: service_completed_successfully

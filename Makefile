@@ -115,7 +115,7 @@ start-hyperlane-ethtest:
 print-hyperlane-ethtest-warp:
 	@docker run --rm \
 		-v ./integrations/hyperlane/configs:/configs \
-		ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3 \
+		ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-4 \
 		warp read \
 		--registry https://github.com/Sovereign-Labs/hyperlane-registry \
 		--registry /configs \

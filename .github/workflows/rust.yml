@@ -114,3 +114,15 @@ jobs:
         chmod +x scripts/rollup-starter-celestia.sh
         ./scripts/rollup-starter-celestia.sh
     secrets: inherit
+
+  run-hyperlane-tutorial:
+    if: github.repository == 'Sovereign-Labs/rollup-starter'
+    uses: ./.github/workflows/reusable-job.yml
+    with:
+      job-name: "Run Hyperlane Tutorial"
+      env-vars: "SKIP_GUEST_BUILD=1"
+      command: |
+        bashtestmd --input GETTING_STARTED_WITH_HYPERLANE.md --output scripts/rollup-starter-hyperlane.sh --tag=test-ci
+        chmod +x scripts/rollup-starter-hyperlane.sh
+        ./scripts/rollup-starter-hyperlane.sh
+    secrets: inherit
