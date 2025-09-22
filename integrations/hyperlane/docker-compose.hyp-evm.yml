@@ -70,9 +70,9 @@ services:
       retries: 10
       start_period: 90s
     volumes:
-      - ./configs:/configs
-      - ./docker-data/validator-ethtest:/hyperlane_db
-      - ./docker-data/validator-ethtest/signatures:/ethtest-validator-signatures
+      - ./configs:/configs:ro
+      - ./docker-data/validator-ethtest:/hyperlane_db:rw
+      - ./docker-data/validator-ethtest/signatures:/ethtest-validator-signatures:rw
     ports:
       - "9092:9092"
     command: >
@@ -108,9 +108,9 @@ services:
       retries: 10
       start_period: 90s
     volumes:
-      - ./configs:/configs
-      - ./docker-data/relayer:/hyperlane_db
-      - ./docker-data/validator-ethtest/signatures:/ethtest-validator-signatures
+      - ./configs:/configs:ro
+      - ./docker-data/relayer:/hyperlane_db:rw
+      - ./docker-data/validator-ethtest/signatures:/ethtest-validator-signatures:ro
     ports:
       - "9091:9091"
     command: >

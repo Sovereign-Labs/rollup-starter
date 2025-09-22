@@ -95,7 +95,7 @@ Setup warp route on the rollup side. This script will:
 * Register a warp router and add a remote route on ethtest
 * Configure a relayer state on rollup
 
-```bash,test-ci,bashtestmd:compare-output
+```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ npm run hyperlane-warp-setup
 Summary:
   Route ID: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
@@ -104,7 +104,7 @@ Summary:
 
 Check the total supply of this token should be 0:
 
-```bash,test-ci,bashtestmd:compare-output
+```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
 {"amount":"0","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
@@ -144,7 +144,7 @@ $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c08153
 
 Or enrolled routers in particular:
 
-```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit_code=0
+```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ curl -Ss http://127.0.0.1:12346/modules/warp/route/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a/routers
 [{"domain":3133790210,"address":"0x0000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c1"}]
 ```
@@ -157,7 +157,7 @@ curl http://
 
 ## Enroll rollup route onto anvil
 
-```bash,test-ci,bashtestmd:compare-output
+```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ npm run hyperlane-enroll-router-on-ethtest
 [*] Enrolling remote router...
   Contract: 0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
@@ -210,7 +210,7 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm9
 {"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
 ```
 
-```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit_code=0
+```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ cd examples/starter-js && npm run hyperlane-inbound
 [*] Making inbound warp transfer...
   Contract:  0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
