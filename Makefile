@@ -109,8 +109,11 @@ start-celestia: ## Start Celestia docker compose
 stop-celestia: ## Stop Celestia docker compose
 	$(MAKE) -C integrations stop-celestia
 
-start-hyperlane-ethtest:
-	cd integrations/hyperlane && docker compose -f docker-compose.hyp-evm.yml up
+start-hyperlane-ethtest: ## Start Hyperlane ethtest docker compose
+	$(MAKE) -C integrations start-hyperlane-ethtest
+
+stop-hyperlane-ethtest: ## Stop Hyperlane ethtest docker compose
+	$(MAKE) -C integrations stop-hyperlane-ethtest
 
 print-hyperlane-ethtest-warp:
 	@docker run --rm \

@@ -39,6 +39,27 @@ start-celestia:
 stop-celestia:
 	$(compose_down)
 
+start-hyperlane-ethtest:
+	@echo "Starting hyperlane ethtest docker compose..."
+	cd hyperlane && docker compose -f docker-compose.hyp-evm.yml up --build --force-recreate -d --quiet-pull
+	@echo "waiting for containers to become operational..."
+	@while true; do \
+		timestamp=$$(date '+%Y-%m-%d %H:%M:%S'); \
+		validator_health=$$(docker inspect --format='{{.State.Health.Status}}' hyperlane-validator-ethtest-1 2>/dev/null || echo "not found"); \
+		relayer_health=$$(docker inspect --format='{{.State.Health.Status}}' hyperlane-relayer-1 2>/dev/null || echo "not found"); \
+		if [ "$$validator_health" = "healthy" ] && [ "$$relayer_health" = "healthy" ]; then \
+			echo "[$$timestamp] All hyperlane containers are healthy"; \
+			break; \
+		else \
+			echo "[$$timestamp] validator: '$$validator_health', relayer: '$$relayer_health': Waiting for hyperlane containers to be up and running..."; \
+		fi; \
+		sleep 3; \
+	done
+	@echo " ✔ Hyperlane ethtest containers are ready."
+
+stop-hyperlane-ethtest:
+	cd hyperlane && docker compose -f docker-compose.hyp-evm.yml down
+
 clean: ## Clean up all docker compose resources
 	@if docker info >/dev/null 2>&1; then \
 		echo "Cleaning up all docker compose resources..."; \

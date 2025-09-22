@@ -1,6 +1,6 @@
 # Bridging in tokens via Hyperlane
 
-This tutorial demonstrates how configure bridging from EVM-like chain.
+This tutorial demonstrates how to configure bridging from an EVM-like chain.
 
 [Anvil](https://getfoundry.sh/anvil/reference/#anvil) is used for demonstration because it can be run locally.
 
@@ -19,13 +19,13 @@ Start the anvil and hyperlane and let it run.
 Wait till you see message `Successfully announced validator` from validator container
 Continue working in another console.
 
-```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=Successfully.announced.validator"
+```bash,test-ci,bashtestmd:exit-code=0"
 $ make start-hyperlane-ethtest
 ```
 
 ### test the setup
 
-print warp route configuration on Ethest. Notice, `remoteRouters` map is empty.
+Print warp route configuration on Ethtest. Notice, `remoteRouters` map is empty.
 
 ```bash,test-ci,bashtestmd:compare-output
 $ make print-hyperlane-ethtest-warp
@@ -90,7 +90,7 @@ Install dependencies if it wasn't done previously
 $ cd examples/starter-js && npm install
 ```
 
-Setup warp route on rollup side. This script will:
+Setup warp route on the rollup side. This script will:
 
 * Register a warp router and add a remote route on ethtest
 * Configure a relayer state on rollup
@@ -267,11 +267,13 @@ $ curl -s -X POST -H "Content-Type: application/json" \
 
 #### Check configuration
 
-1. Mailbox matches in all configurations:
-```
-grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
-grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
-```
+1. Check CHAIN_ID and DOMAIN_ID for both chains in all necessary files:
+2. Mailbox matches in all configurations:
+  ```
+  grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
+  grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
+  ```
+3Check
 
 ## Relayer does not process messages it saw
 

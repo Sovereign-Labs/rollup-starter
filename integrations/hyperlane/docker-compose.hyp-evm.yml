@@ -62,11 +62,18 @@ services:
       # minter_private_key.json
       - HYP_CHAINS_SOVSTARTER_SIGNER_KEY=0x0d87c12ea7c12024b3f70a26d735874608f17c8bce2b48e6fe87389310191264
       - NO_COLOR=1
-    # TODO: Healthcheck
+    healthcheck:
+      test: [ "CMD", "/bin/sh", "-c", "test -f /ethtest-validator-signatures/announcement.json" ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
     volumes:
       - ./configs:/configs
       - ./docker-data/validator-ethtest:/hyperlane_db
       - ./docker-data/validator-ethtest/signatures:/ethtest-validator-signatures
+    ports:
+      - "9092:9092"
     command: >
       /app/validator
       --db /hyperlane_db
@@ -75,7 +82,7 @@ services:
       --chains.sovstarter.signer.accountType "ethereum"
       --checkpointSyncer.type localStorage
       --checkpointSyncer.path /ethtest-validator-signatures
-      --metrics-port 9090
+      --metrics-port 9092
       --log.level debug
       --log.format "pretty"
 
@@ -93,7 +100,12 @@ services:
       # token_deployer.json
       - HYP_CHAINS_SOVSTARTER_SIGNER_KEY=0x0187c12ea7c12024b3f70ac5d73587463af17c8bce2bd9e6fe87389310196c64
       - NO_COLOR=1
-    # TODO: Healthcheck
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "test -d /hyperlane_db && test -f /hyperlane_db/CURRENT"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
     volumes:
       - ./configs:/configs
       - ./docker-data/relayer:/hyperlane_db
