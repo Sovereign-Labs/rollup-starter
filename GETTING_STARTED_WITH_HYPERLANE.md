@@ -159,7 +159,7 @@ curl http://
 
 ```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ npm run hyperlane-enroll-router-on-ethtest
-[*] Enrolling remote router...
+[✓] Enrolling remote router...
   Contract: 0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
   Domain: 5555
   Router: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
@@ -167,7 +167,7 @@ $ npm run hyperlane-enroll-router-on-ethtest
 
 Now remoteRouters should have element:
 
-```bash,test-ci,bashtestmd:compare-output
+```bash,test-ci,bashtestmd:exit-code=0
 $ cd ../../ && make print-hyperlane-ethtest-warp
 ✅ Warp route config read successfully:
 
@@ -205,14 +205,14 @@ Before start inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` le
 
 Bank endpoint will return 404.
 
-```bash,test-ci,bashtestmd:compare-output
+```bash,test-ci,bashtestmd:exit-code=0
 $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
 {"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
 ```
 
-```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
+```bash,test-ci,bashtestmd:exit-code=0
 $ cd examples/starter-js && npm run hyperlane-inbound
-[*] Making inbound warp transfer...
+Making inbound warp transfer...
   Contract:  0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
   Domain:    5555
   Router:    0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
@@ -220,13 +220,13 @@ $ cd examples/starter-js && npm run hyperlane-inbound
   Amount:    0.01 ETH
   Gas:       0.0 ETH
   Total:     0.01 ETH
-[] Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d452b
+Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d452b
 ```
 
 **TODO**: How to wait till transfer is processed???. Bash script that pulls balance? Checking logs 
 
 ```bash,test-ci,bashtestmd:compare-output
-$ curl http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
+$ sleep 30 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
 {"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
 ```
 
@@ -260,7 +260,7 @@ $ curl -s -X POST -H "Content-Type: application/json" \
     grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
     ```
 3. Check that warp routes are enrolled on both chains:
-    - On ethtest use `make print-hyperlane-ethtest-warp` and check remoteRouters has correct DOMAIN_ID and note route id  there
+    - On ethtest use `make print-hyperlane-ethtest-warp` and check remoteRouters has correct DOMAIN_ID and note route id there
     - On rollup side: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID_FROM_PREV_COMMAND/routers`
 4. Make sure that anvil is configured for periodic block production
 

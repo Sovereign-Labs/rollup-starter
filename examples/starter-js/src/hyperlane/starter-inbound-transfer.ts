@@ -22,7 +22,7 @@ try {
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
     const warpRoute = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
     const recipient = zeroPad20To32(deployerAddress);
-    console.log('[*] Making inbound warp transfer...');
+    console.log('Making inbound warp transfer...');
     console.log(`  Contract:  ${CONTRACT_ADDRESS}`);
     console.log(`  Domain:    ${DOMAIN}`);
     console.log(`  Router:    ${ROUTER_ADDRESS}`);
@@ -43,19 +43,20 @@ try {
         {value: totalValue}
     );
     // TODO: Print events or get hyperlane message id
-    console.log(`[] Transaction sent: ${tx.hash}`);
+    console.log(`Transaction sent: ${tx.hash}`);
     // Wait for confirmation
     const receipt = await tx.wait();
-    console.log(`[] Transaction confirmed in block: ${receipt.blockNumber}`);
+    console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
     console.log(`  Gas used: ${receipt.gasUsed.toString()}`);
 
     // The Dispatch event is emitted by the Mailbox contract
     const dispatchEventSignature = ethers.id('Dispatch(address,uint32,bytes32,bytes)');
+    // @ts-ignore
     const dispatchLog = receipt.logs.find(log => log.topics[0] === dispatchEventSignature);
 
     if (dispatchLog && dispatchLog.topics[1]) {
         const messageId = dispatchLog.topics[1];
-        console.log(`[] Hyperlane Message ID: ${messageId}`);
+        console.log(`[✓] Hyperlane Message ID: ${messageId}`);
     }
 
     const sentTransferRemoteEvent = receipt.logs.find(log => {
@@ -69,7 +70,7 @@ try {
 
     if (sentTransferRemoteEvent) {
         const parsed = warpRoute.interface.parseLog(sentTransferRemoteEvent);
-        console.log(`[] SentTransferRemote Event:`);
+        console.log(`[✓] SentTransferRemote Event:`);
         console.log(`  Destination: ${parsed.args.destination}`);
         console.log(`  Recipient: ${parsed.args.recipient}`);
         console.log(`  Amount: ${ethers.formatEther(parsed.args.amount)} ETH`);
@@ -77,6 +78,6 @@ try {
 
 
 } catch (error) {
-    console.error(`[] Error: ${error}`);
+    console.error(`[✗] Error: ${error}`);
     process.exit(1);
 }

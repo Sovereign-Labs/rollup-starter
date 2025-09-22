@@ -115,10 +115,16 @@ start-hyperlane-ethtest: ## Start Hyperlane ethtest docker compose
 stop-hyperlane-ethtest: ## Stop Hyperlane ethtest docker compose
 	$(MAKE) -C integrations stop-hyperlane-ethtest
 
+print-hyperlane-ethtest-warp-local:
+	hyperlane warp read \
+		--registry https://github.com/Sovereign-Labs/hyperlane-registry \
+		--registry ./integrations/hyperlane/baremetal-configs \
+		--chain ethtest \
+		--address $(shell grep "addressOrDenom:" integrations/hyperlane/configs/deployments/warp_routes/ETH/warp-route-deployment-config.yaml | cut -d'"' -f2)
+
 print-hyperlane-ethtest-warp:
-	@docker run --rm \
-		-v ./integrations/hyperlane/configs:/configs \
-		ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3 \
+	cd integrations/hyperlane && docker compose -f docker-compose.hyp-evm.yml run --rm \
+		hyperlane-cli \
 		warp read \
 		--registry https://github.com/Sovereign-Labs/hyperlane-registry \
 		--registry /configs \

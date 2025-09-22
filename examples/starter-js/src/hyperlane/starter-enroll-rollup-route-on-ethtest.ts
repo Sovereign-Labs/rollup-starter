@@ -20,20 +20,20 @@ try {
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
     const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
-    console.log('[*] Enrolling remote router...');
+    console.log('[✓] Enrolling remote router...');
     console.log(`  Contract: ${CONTRACT_ADDRESS}`);
     console.log(`  Domain: ${DOMAIN}`);
     console.log(`  Router: ${ROUTER_ADDRESS}`);
 
     // Send the transaction
     const tx = await contract.enrollRemoteRouter(DOMAIN, ROUTER_ADDRESS);
-    console.log(`[] Transaction sent: ${tx.hash}`);
+    console.log(`[✓] Transaction sent: ${tx.hash}`);
 
     // Wait for confirmation
     const receipt = await tx.wait();
-    console.log(`[] Transaction confirmed in block: ${receipt.blockNumber}`);
+    console.log(`[✓] Transaction confirmed in block: ${receipt.blockNumber}`);
     console.log(`  Gas used: ${receipt.gasUsed.toString()}`);
 } catch (error) {
-    console.error(`[] Error: ${error}`);
+    console.error(`[✓] Error: ${error}`);
     process.exit(1);
 }

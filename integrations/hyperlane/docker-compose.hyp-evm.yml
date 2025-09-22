@@ -123,3 +123,14 @@ services:
       --metrics-port 9091
       --log.level debug
       --log.format "pretty"
+
+  # Utility service for running hyperlane-cli commands
+  hyperlane-cli:
+    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3
+    profiles: ["cli"]
+    depends_on:
+      anvil:
+        condition: service_healthy
+    volumes:
+      - ./configs:/configs:ro
+    command: ["echo", "This service is used for running CLI commands"]
