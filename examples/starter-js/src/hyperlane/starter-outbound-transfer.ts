@@ -77,6 +77,7 @@ try {
         const decimalAmount = BigInt(hexAmount).toString();
         console.log(`    Amount (hex): ${hexAmount}`);
         console.log(`    Amount (decimal): ${decimalAmount}`);
+        console.log("Completed");
     }
 } catch (e) {
     console.error("failed to call rollup:", e);

@@ -167,8 +167,6 @@ let deployerSigner = new Secp256k1Signer(deployerPrivateKey);
 
 const warpRegisterResponse = await rollup.call(createWarpRoute, {signer: deployerSigner});
 console.log("Create warp router response:");
-// console.log(JSON.stringify(warpRegisterResponse.response));
-// console.log("-------");
 
 const {routeId, tokenId} = parseWarpRouteResponse(warpRegisterResponse);
 console.log("\nSummary:");

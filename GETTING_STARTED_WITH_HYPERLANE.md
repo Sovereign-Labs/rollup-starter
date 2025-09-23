@@ -6,10 +6,10 @@ This tutorial demonstrates how to configure bridging from an EVM-like chain.
 
 ## High Level overview
 
-1. +Start the rollup
-2. +Start docker compose with anvil and hyperlane agents
-3. Connfigure warp routes
-4. ~Make inbound transfers
+1. Start the rollup
+2. Start docker compose with anvil and hyperlane agents
+3. Configure warp routes
+4. Make inbound transfers
 5. Make outbound transfer
 6. Next steps
 7. Troubleshooting
@@ -268,7 +268,7 @@ Then initiate outbound transfer:
 ```bash,test-ci,bashtestmd:compare-output
 $ npm run hyperlane-outbound
 [✓] Receipt result: successful
-[✓] Mailbox/DispatchId (HyperlaneId): 0xf02e770a5fe29dd5c8ded010ccce0d80bdd00eb7a0c87fb759bcdddd9f59416e
+[✓] Mailbox/DispatchId (HyperlaneId): 0x873e0bfeb9251c268fbc483b4dae63a548360dd7594a1768aeb5a1532dd16e5c
 [✓] Warp/TokenTransferredRemote:
     Route ID: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
     To Domain: 3133790210
@@ -282,6 +282,11 @@ Wait 30 seconds and check that balance on ethtest has changed.
 ```bash,test-ci,bashtestmd:compare-output
 $ sleep 30  &&curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' http://127.0.0.1:8545
 {"jsonrpc":"2.0","id":1,"result":"0x702d54e2f800"
+```
+
+And the total supply of the synthetic token has changed too:
+
+```
 ```
 
 # Common problems
@@ -304,7 +309,7 @@ $ sleep 30  &&curl -s -X POST -H "Content-Type: application/json" --data '{"json
 
 ## Relayer does not process messages
 
-1. Check that validator posts checkspoints: `ls TBD:`
+1. Check that validator posts checkpoints: `ls TBD:`
 2. Check that there are no errors or warnings in relayer logs
 3. Check that relayer has balance: curl /metrics | grep hyperlane_wallet_balance
 4. Check key used by validator is present in `validators` in ISM `MessageIdMultisig` for warp route config:
