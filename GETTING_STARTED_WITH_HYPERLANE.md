@@ -23,7 +23,9 @@ $ cargo run
 
 ## 2. Start Anvil and Hyperlane Agents
 
-Start Anvil (local Ethereum node) and the Hyperlane agents:
+Start Anvil (local Ethereum node) and the Hyperlane agents.
+
+Consider login into Github `docker login ghcr.io` if there's rate-limit issue about pulling the images
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ make start-hyperlane-ethtest
