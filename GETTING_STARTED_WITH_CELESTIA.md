@@ -1,5 +1,32 @@
 # Getting Started with Celestia
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Overview](#overview)
+- [Stage 1: Celestia Local Devnet](#stage-1-celestia-local-devnet)
+  - [Starting Celestia Devnet](#starting-celestia-devnet)
+  - [Running the Rollup](#running-the-rollup)
+- [Stage 2: Celestia Testnet](#stage-2-celestia-testnet)
+  - [Stopping the Devnet](#stopping-the-devnet)
+  - [Setting Up a Celestia Light Node](#setting-up-a-celestia-light-node)
+    - [Installation and Setup](#installation-and-setup)
+    - [Optimizing Initial Sync](#optimizing-initial-sync)
+  - [Preparing Your Node](#preparing-your-node)
+    - [Getting Your Node Address](#getting-your-node-address)
+    - [Funding Your Node](#funding-your-node)
+  - [Verifying Your Light Node](#verifying-your-light-node)
+  - [Configuring Your Rollup](#configuring-your-rollup)
+  - [Running on Testnet](#running-on-testnet)
+  - [Testing Transactions](#testing-transactions)
+- [Success!](#success)
+- [Next Steps](#next-steps)
+- [Stage 3: Celestia Mainnet](#stage-3-celestia-mainnet)
+  - [Prepare celestia node](#prepare-celestia-node)
+  - [Review configuration](#review-configuration)
+  - [Start and monitor](#start-and-monitor)
+- [Troubleshooting](#troubleshooting)
+
 Sovereign SDK rollups support Celestia as a Data Availability (DA) layer. Celestia has been designed for accommodating rollups, offering instant finality and significant data throughput.
 
 This tutorial will guide you through running the rollup starter on Celestia, from local development to testnet deployment.
@@ -262,6 +289,69 @@ Congratulations! Your rollup is now running on Celestia testnet. You can monitor
 - Explore the [Sovereign SDK documentation](https://docs.sovereign.xyz/) for advanced rollup features
 - Learn about [Celestia's architecture](https://docs.celestia.org/) for deeper integration
 - Plan your mainnet deployment strategy
+
+## Stage 3: Celestia Mainnet
+
+Your rollup has been tested on Celestia Testnet; now it's time to launch mainnet.
+
+1. Prepare your celestia node setup
+2. Review your genesis and rollup configuration
+3. Start and monitor
+
+### Prepare celestia node
+
+Add a new key using OS keyring backend as more secure and suitable for the mainnet:
+
+```bash
+./cel-key add sov-mainnet --keyring-backend os --node.type light
+using directory:  /home/ubuntu/.celestia-light/keys
+Enter keyring passphrase:
+Re-enter keyring passphrase:
+
+- address: celestia1v3mugr5g37mth6k67wxyx8j4lhqkap7me8lhfr
+  name: sov-mainnet
+  pubkey: '{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"A6h6NdmFLwxNqRdklOWb3ugNe8C4oR3A2ij52819P9jS"}'
+  type: local
+```
+
+Top up enough TIA to this address based on your rollup data usage.
+
+Follow the same [Setting up a Celestia light node](https://docs.celestia.org/how-to-guides/light-node) guide, but this time for mainnet and complete configuration.
+Also, it is good time to [run light node as a SystemD service](https://docs.celestia.org/how-to-guides/systemd#celestia-light-node)
+
+Make sure that in ~/.celestia-light/config.toml, the correct backend and key name are used
+
+```toml
+[State]
+  DefaultKeyName = "sov-mainnet"
+  DefaultBackendName = "os"
+```
+
+Start celestia light node and monitor that it has synced.
+
+### Review configuration
+
+Now it's time to review the rollup configuration. 
+
+The following places should be checked:
+
+* `constants.toml`: verify CHAIN_ID and CHAIN_NAME
+* `configs/genesis.json`: 
+  * check if some addresses need to be rotated
+  * decide if bank balances or your module data needs to be migrated from testnet
+  * update the sequencer address with a new celestia address from the previous section
+  * review paymaster section
+  * review chain_state section and `genesis.json`
+* `configs/rollup.toml`
+ * update `da` section according to new celestia light node setup: address, new authentication key.
+ * review `runner` section, genesis_height and public address
+ * check remaining values.
+
+Ensure that the revenue share module is included in the rollup STF.
+
+### Start and monitor
+
+Start your rollup with updated configuration and monitor for the logs.
 
 ## Troubleshooting
 
