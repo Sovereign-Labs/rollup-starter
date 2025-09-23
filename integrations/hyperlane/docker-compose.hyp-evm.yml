@@ -26,8 +26,8 @@ services:
       - ./configs:/configs
     command: >
       core deploy
-      --registry https://github.com/Sovereign-Labs/hyperlane-registry
       --registry /configs
+      --disableProxy
       --config /configs/core-config.yaml
       --chain ethtest
       --yes
@@ -42,11 +42,10 @@ services:
       - HYP_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
     volumes:
       - ./configs:/configs
-    # TODO: Disable registry github quires at all?
     command: >
       warp deploy
-      --registry https://github.com/Sovereign-Labs/hyperlane-registry
       --registry /configs
+      --disableProxy
       --config /configs/warp-route-deployment.yaml
       --yes
 

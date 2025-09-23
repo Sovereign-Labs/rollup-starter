@@ -1,13 +1,12 @@
 export const maxU128 = "340282366920938463463374607431768211455";
 export const defaultGas: number = 2000;
 
-// TODO: Point to file
 export const deployerAddress = "0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747";
 export const deployerPrivateKey = "5087c12ea7c12024b3f798c5d73587463af17c9fce04d9e6fe873893102a6c64";
 export const minterAddress = "0x9b08ce57a93751aE790698A2C9ebc76A78F23E25";
 export const minterPrivateKey = "0d87c12ea7c12024b3f70a26d735874608f17c8bce2b48e6fe87389310191264";
 
-// Anvil Ethetest
+// Anvil Ethtest
 export const ETHTEST_CHAIN_ID: number = 31337;
 export const ETHTEST_DOMAIN: number = 3133790210;
 export const ANVIL_ADDRESS_0: string = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";

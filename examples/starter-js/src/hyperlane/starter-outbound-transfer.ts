@@ -16,7 +16,6 @@ const transferRemote: RuntimeCall = {
             gas_payment_limit: 20_000,
             recipient: OUTBOUND_ADDRESS,
             warp_route: ROLLUP_WARP_ROUTE_ID,
-            // TODO: try `relayer: null`
             relayer: minterAddress,
         }
     }

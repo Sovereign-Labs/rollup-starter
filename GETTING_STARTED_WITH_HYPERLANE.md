@@ -94,14 +94,16 @@ $ cat integrations/hyperlane/docker-data/validator-ethtest/signatures/announceme
 }
 ```
 
-TODO: Call relayer metrics
+Relayer is up and metrics show meaning data, for instance balance for ethtest:
 
 ```bash
 $ curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_wallet_balance'
 hyperlane_wallet_balance{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0",token_address="none",token_name="Native",token_symbol="Native",wallet_address="3c44cdddb6a900fa2b585dd299e03d12fa4293bc",wallet_name="relayer"} 10000
 ```
 
-Install dependencies if it wasn't done previously
+## 3. Configuring warp routes
+
+First, install dependencies for js scripts, if it wasn't done previously"
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ cd examples/starter-js && npm install
@@ -169,13 +171,7 @@ $ curl -Ss http://127.0.0.1:12346/modules/warp/route/0x9c081539d40ef7b02d359c5d6
 [{"domain":3133790210,"address":"0x0000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c1"}]
 ```
 
-**TODO: Check the relayer metrics**
-
-```
-curl http://
-```
-
-## Enroll rollup route onto anvil
+#### 3.1 Enroll rollup route onto anvil
 
 ```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ npm run hyperlane-enroll-router-on-ethtest
@@ -216,9 +212,7 @@ $ cd ../../ && make print-hyperlane-ethtest-warp
         "5555": "0"
 ```
 
-## Make transfers
-
-### Inbound
+## 4. Make transfers inbound transfer
 
 Before start inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` let's check that its balance of bridged
 ETH is zero.
@@ -245,14 +239,19 @@ Making inbound warp transfer...
 Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d452b
 ```
 
-**TODO**: How to wait till transfer is processed???. Bash script that pulls balance? Checking logs
+Wait for some time and check that total supply of the synthetic token has increased, as well as balance of recipient.
+
+```bash
+$ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
+{"amount":"10000000000000000","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
+```
 
 ```bash,test-ci,bashtestmd:compare-output
 $ sleep 30 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
 {"amount":"10000000000000000","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
-### Outbound
+## 6. Make outbound transfers
 
 We are going send funds back to: `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747`
 
@@ -277,7 +276,7 @@ $ npm run hyperlane-outbound
     Amount (decimal): 123340000000000
 ```
 
-Wait 30 seconds and check that the balance on ethtest has changed.
+Wait some time and check that the balance on ethtest has changed.
 
 ```bash,test-ci,bashtestmd:compare-output
 $ sleep 30  &&curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' http://127.0.0.1:8545
@@ -286,7 +285,9 @@ $ sleep 30  &&curl -s -X POST -H "Content-Type: application/json" --data '{"json
 
 And the total supply of the synthetic token has changed too:
 
-```
+```bash,test-ci,bashtestmd:compare-output
+$ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
+{"amount":"0","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
 # Common problems
@@ -295,7 +296,11 @@ And the total supply of the synthetic token has changed too:
 
 #### Check configuration
 
-1. Check CHAIN_ID and DOMAIN_ID for both chains in all necessary files:
+1. Check `CHAIN_ID` and `DOMAIN_ID` for both chains in all necessary files:
+   * `constants.toml`
+   * `integrations/hyperlane/configs/agent-config.json`
+   * `integrations/hyperlane/configs/chains/ethtest/metadata.yaml`
+   * `examples/starter-js/src/hyperlane/consts.ts`
 2. Mailbox matches in all configurations:
     ```
     grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
@@ -309,9 +314,9 @@ And the total supply of the synthetic token has changed too:
 
 ## Relayer does not process messages
 
-1. Check that validator posts checkpoints: `ls TBD:`
-2. Check that there are no errors or warnings in relayer logs
-3. Check that relayer has balance: curl /metrics | grep hyperlane_wallet_balance
+1. Check that validator posts checkpoints: `ls integrations/hyperlane/docker-data/validator-ethtest/signatures` should have at least one file `0_with_id.json`
+2. Check that there are no errors or warnings in relayer logs: `docker logs hyperlane-relayer-1 | grep -i -E 'error|warn`
+3. Check that relayer has balance: `curl http://127.0.0.1:9091/metrics | grep hyperlane_wallet_balance`
 4. Check key used by validator is present in `validators` in ISM `MessageIdMultisig` for warp route config:
    `curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/<WARP_ROUTE_ID> | jq`
 5. Error: `default IGP fee amount not set`:
@@ -332,6 +337,7 @@ hyperlane_wallet_balance{agent="relayer",chain="ethtest",hyperlane_baselib_versi
 Check there are no errors:
 
 ```
+curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_critical_error'
 hyperlane_critical_error{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0"} 0
 hyperlane_critical_error{agent="relayer",chain="sovstarter",hyperlane_baselib_version="0.1.0"} 0
 ```
