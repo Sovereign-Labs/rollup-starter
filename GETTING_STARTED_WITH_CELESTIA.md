@@ -22,9 +22,14 @@
 - [Success!](#success)
 - [Next Steps](#next-steps)
 - [Stage 3: Celestia Mainnet](#stage-3-celestia-mainnet)
-  - [Prepare celestia node](#prepare-celestia-node)
-  - [Review configuration](#review-configuration)
-  - [Start and monitor](#start-and-monitor)
+  - [Overview](#overview-1)
+  - [Prepare Celestia Node](#prepare-celestia-node)
+    - [Key Management](#key-management)
+    - [Fund Your Node](#fund-your-node)
+    - [Node Configuration](#node-configuration)
+  - [Review Configuration](#review-configuration)
+  - [Security Hardening Checklist](#security-hardening-checklist)
+  - [Start and Monitor](#start-and-monitor)
 - [Troubleshooting](#troubleshooting)
 
 Sovereign SDK rollups support Celestia as a Data Availability (DA) layer. Celestia has been designed for accommodating rollups, offering instant finality and significant data throughput.
@@ -292,15 +297,24 @@ Congratulations! Your rollup is now running on Celestia testnet. You can monitor
 
 ## Stage 3: Celestia Mainnet
 
-Your rollup has been tested on Celestia Testnet; now it's time to launch mainnet.
+After successfully testing your rollup on Celestia Testnet, you're ready to deploy to the mainnet. 
+While the technical setup is similar to testnet, mainnet deployment requires enhanced security measures and careful management of keys and secrets.
 
-1. Prepare your celestia node setup
-2. Review your genesis and rollup configuration
-3. Start and monitor
+**Important**: Mainnet deployment involves real assets and cannot be easily reversed. Take extra care with key management, backup procedures, and security hardening.
 
-### Prepare celestia node
+### Overview
 
-Add a new key using OS keyring backend as more secure and suitable for the mainnet:
+The mainnet deployment process involves three critical steps:
+
+1. **Secure Celestia node setup** - Configure a production-ready Celestia light node with proper key management
+2. **Configuration review and hardening** - Audit all configurations with mainnet-specific values and security considerations
+3. **Deployment and monitoring** - Launch with comprehensive monitoring and alerting
+
+### Prepare Celestia Node
+
+#### Key Management
+
+For mainnet, use the OS keyring backend instead of the test backend for enhanced security:
 
 ```bash
 ./cel-key add sov-mainnet --keyring-backend os --node.type light
@@ -314,44 +328,91 @@ Re-enter keyring passphrase:
   type: local
 ```
 
-Top up enough TIA to this address based on your rollup data usage.
+#### Fund Your Node
 
-Follow the same [Setting up a Celestia light node](https://docs.celestia.org/how-to-guides/light-node) guide, but this time for mainnet and complete configuration.
-Also, it is good time to [run light node as a SystemD service](https://docs.celestia.org/how-to-guides/systemd#celestia-light-node)
+Fund your Celestia address with sufficient TIA tokens based on your expected data usage. Consider:
+- Current TIA price and network fees
+- Your rollup's expected transaction volume
+- Buffer for fee spikes during network congestion
+- Set up monitoring alerts for low balance thresholds
 
-Make sure that in ~/.celestia-light/config.toml, the correct backend and key name are used
+#### Node Configuration
 
-```toml
-[State]
-  DefaultKeyName = "sov-mainnet"
-  DefaultBackendName = "os"
-```
+Follow the [Celestia light node setup guide](https://docs.celestia.org/how-to-guides/light-node) for the mainnet. 
 
-Start celestia light node and monitor that it has synced.
+Key differences from testnet:
 
-### Review configuration
+1. **Run as a system service**: Configure your node to [run as a SystemD service](https://docs.celestia.org/how-to-guides/systemd#celestia-light-node) for automatic restarts and better stability
+2. **Configure secure key storage**: Update `~/.celestia-light/config.toml` to use the OS keyring:
+    ```toml
+    [State]
+    DefaultKeyName = "sov-mainnet"
+    DefaultBackendName = "os"
+    ```
+3. **Start and verify synchronization**: Launch your Celestia light node and ensure it's fully synced before proceeding
 
-Now it's time to review the rollup configuration. 
+### Review Configuration
 
-The following places should be checked:
+Carefully audit all configuration files for mainnet deployment:
 
-* `constants.toml`: verify CHAIN_ID and CHAIN_NAME
-* `configs/genesis.json`: 
-  * check if some addresses need to be rotated
-  * decide if bank balances or your module data needs to be migrated from testnet
-  * update the sequencer address with a new celestia address from the previous section
-  * review paymaster section
-  * review chain_state section and `genesis.json`
-* `configs/rollup.toml`
- * update `da` section according to new celestia light node setup: address, new authentication key.
- * review `runner` section, genesis_height and public address
- * check remaining values.
+#### 1. Chain Constants (`constants.toml`)
+- Verify `CHAIN_ID` and `CHAIN_NAME` are set to production values
+- Ensure these cannot be confused with testnet values
 
-Ensure that the revenue share module is included in the rollup STF.
+#### 2. Genesis Configuration (`configs/genesis.json`)
+- **Address rotation**: Replace all testnet addresses with production addresses
+- **State migration**: Determine which data (if any) to migrate from testnet:
+  - Bank balances
+  - Module-specific state
+  - User accounts
+- **Sequencer configuration**: Update with your new mainnet Celestia address
+- **Paymaster settings**: Review and configure production paymaster parameters
+- **Chain state**: Finalize all genesis parameters
 
-### Start and monitor
+#### 3. Rollup Configuration (`configs/rollup.toml`)
+- **DA settings**: Update with mainnet Celestia node details:
+  - New authentication token (get with `celestia light auth admin`)
+  - Correct RPC address
+  - Mainnet signer address
+- **Runner configuration**: 
+  - Set appropriate `genesis_height` for mainnet
+  - Configure production public endpoints
+- **Performance tuning**: Adjust batch sizes and intervals for mainnet load
 
-Start your rollup with updated configuration and monitor for the logs.
+#### 4. Revenue Share Module
+Verify that the revenue share module is properly configured in your rollup's STF for mainnet economics.
+
+#### 5. Nginx proxy
+
+Nginx can be placed in front of the rollup node to handle DDoS separately, terminate TLS and other standard web deployment practices.
+
+### Security Hardening Checklist
+
+Before mainnet launch, ensure:
+
+- [ ] All private keys are stored securely (never in code or configuration files)
+- [ ] Authentication tokens are managed through environment variables or secure vaults
+- [ ] Backup procedures are documented and tested
+- [ ] Monitoring and alerting systems are configured
+- [ ] Rate limiting and DDoS protection are in place
+- [ ] Access controls are configured for all endpoints
+- [ ] Audit logs are enabled and stored securely
+- [ ] Disaster recovery plan is documented
+
+### Start and Monitor
+
+1. **Pre-launch verification**: Double-check all configurations and ensure your Celestia node is healthy
+2. **Launch your rollup**: Start with your production configuration and closely monitor initial behavior
+3. **Post-launch monitoring**: Track:
+   - Transaction throughput and latency
+   - DA layer submission success rate
+   - Node resource usage
+   - Error rates and patterns
+4. **Set up alerts** for:
+   - Low TIA balance
+   - Failed DA submissions
+   - Abnormal transaction patterns
+   - System resource thresholds
 
 ## Troubleshooting
 
