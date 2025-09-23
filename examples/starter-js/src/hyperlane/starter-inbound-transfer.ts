@@ -49,21 +49,20 @@ try {
     console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
     console.log(`  Gas used: ${receipt.gasUsed.toString()}`);
 
-    // The Dispatch event is emitted by the Mailbox contract
-    // Event signature: Dispatch(address indexed sender, uint32 indexed destination, bytes32 indexed messageId, bytes message)
-    const dispatchEventSignature = ethers.id('Dispatch(address,uint32,bytes32,bytes)');
+    // The DispatchId event is emitted by the Mailbox contract with the message ID
+    // Event signature: DispatchId(bytes32 indexed messageId)
+    const dispatchIdEventSignature = ethers.id('DispatchId(bytes32)');
     // @ts-ignore
-    const dispatchLog = receipt.logs.find(log => log.topics[0] === dispatchEventSignature);
+    const dispatchIdLog = receipt.logs.find(log => log.topics[0] === dispatchIdEventSignature);
 
-    if (dispatchLog && dispatchLog.topics[3]) {
+    if (dispatchIdLog && dispatchIdLog.topics[1]) {
         // topics[0] = event signature
-        // topics[1] = indexed sender (address)
-        // topics[2] = indexed destination (uint32)
-        // topics[3] = indexed messageId (bytes32)
-        const messageId = dispatchLog.topics[3];
+        // topics[1] = indexed messageId (bytes32)
+        const messageId = dispatchIdLog.topics[1];
         console.log(`[✓] Hyperlane Message ID: ${messageId}`);
     }
 
+    // @ts-ignore
     const sentTransferRemoteEvent = receipt.logs.find(log => {
         try {
             const parsed = warpRoute.interface.parseLog(log);
@@ -76,8 +75,11 @@ try {
     if (sentTransferRemoteEvent) {
         const parsed = warpRoute.interface.parseLog(sentTransferRemoteEvent);
         console.log(`[✓] SentTransferRemote Event:`);
+        // @ts-ignore
         console.log(`  Destination: ${parsed.args.destination}`);
+        // @ts-ignore
         console.log(`  Recipient: ${parsed.args.recipient}`);
+        // @ts-ignore
         console.log(`  Amount: ${ethers.formatEther(parsed.args.amount)} ETH`);
     }
 

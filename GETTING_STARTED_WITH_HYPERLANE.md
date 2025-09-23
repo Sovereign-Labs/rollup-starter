@@ -7,13 +7,23 @@ This tutorial demonstrates how to configure bridging from an EVM-like chain.
 
 ## High Level overview
 
-1. +Start docker compose with anvil and hyperlane agents
-2. +Start the rollup
-3. +Register warp router and relayer on rollup 
-4. +Enroll anvil warp route
-5. ~Make transfers
+1. +Start the rollup
+2. +Start docker compose with anvil and hyperlane agents
+3. Connfigure warp routes 
+4. ~Make inbound transfers
+5. Make outbound transfer
+6. Next steps
+7. Troubleshooting
 
-## Start Anvil and Hyperlane Agents
+## 1. Start the rollup
+
+Start the rollup and let it run.
+
+```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=rest_address
+$ cargo run
+```
+
+## 2. Start Anvil and Hyperlane Agents
 
 Start the anvil and hyperlane agents
 
@@ -35,7 +45,7 @@ waiting for containers to become operational (timeout: 300 seconds)...
 
 Hyperlane core contracts will be deployed, as well as warp route.
 
-### test the setup
+### 2.1 Check the setup
 
 Print warp route configuration on Ethtest. Notice, `remoteRouters` map is empty.
 
@@ -91,14 +101,6 @@ TODO: Call relayer metrics
 ```bash
 $ curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_wallet_balance'
 hyperlane_wallet_balance{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0",token_address="none",token_name="Native",token_symbol="Native",wallet_address="3c44cdddb6a900fa2b585dd299e03d12fa4293bc",wallet_name="relayer"} 10000
-```
-
-## Start the rollup
-
-Start the rollup and let it run.
-
-```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=rest_address
-$ cargo run
 ```
 
 Install dependencies if it wasn't done previously
@@ -223,7 +225,7 @@ Before start inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` le
 Bank endpoint will return 404.
 
 ```bash,test-ci,bashtestmd:exit-code=0
-$ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
+$ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
 {"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
 ```
 
@@ -243,12 +245,27 @@ Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d
 **TODO**: How to wait till transfer is processed???. Bash script that pulls balance? Checking logs 
 
 ```bash,test-ci,bashtestmd:compare-output
-$ sleep 30 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
-{"token": "token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc", "amount": 1000000}
+$ sleep 30 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
+{"amount":"10000000000000000","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
 ### Outbound
 
+We are going send funds back, but to a different address: `0x9b08ce57a93751aE790698A2C9ebc76A78F23E25`
+
+First, let's check that it's balance is zero on ethtest:
+
+```bash,test-ci,bashtestmd:compare-output
+$ curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x9b08ce57a93751aE790698A2C9ebc76A78F23E25", "latest"],"id":1}' http://127.0.0.1:8545
+{"jsonrpc":"2.0","id":1,"result":"0x0"}
+```
+
+Then initiate outbound transfer:
+
+
+```bash,test-ci,bashtestmd:compare-output
+
+```
 
 
 # Rest
@@ -257,11 +274,7 @@ Balance on the rollup
 
 
 
-```
-$ curl -s -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' \
-  http://127.0.0.1:8545
-```
+
 
 
 # Common problems
@@ -286,6 +299,7 @@ $ curl -s -X POST -H "Content-Type: application/json" \
 1. Check that validator posts checkspoints: `ls TBD:`
 2. Check that there's no errors or warnings in relayer logs
 3. Check that relayer has balance: curl /metrics | grep hyperlane_wallet_balance
+4. Check key that is used by validator is present in `validators` in  ISM `MessageIdMultisig` for warp route config: `curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/<WARP_ROUTE_ID> | jq`
 
 ## 
 

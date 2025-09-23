@@ -117,6 +117,7 @@ services:
       - ./docker-data/validator-ethtest/signatures:/ethtest-validator-signatures:ro
     ports:
       - "9091:9091"
+    # Option to consider: --gasPaymentEnforcement '[{"type":"none"}]'
     command: >
       /app/relayer
       --db /hyperlane_db

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import {AdminClass, RuntimeCall} from "../types";
 import {
-    ANVIL_ADDRESS_0, defaultGas,
+    ANVIL_ADDRESS_0, ANVIL_ADDRESS_1, ANVIL_ADDRESS_2, defaultGas,
     deployerAddress,
     deployerPrivateKey,
     ETHTEST_DEFAULT_GAS,
@@ -23,7 +23,8 @@ function buildCreateWarpRouteCall(domain: number, tokenId: string): RuntimeCall 
                 ism: {
                     MessageIdMultisig: {
                         threshold: 1,
-                        validators: [ANVIL_ADDRESS_0],
+                        // Should match what is used in ../../../../integrations/hyperlane/docker-compose.hyp-evm.yml for ethtest validator
+                        validators: [ANVIL_ADDRESS_1],
                     },
                 },
                 token_source: {
