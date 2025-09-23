@@ -1,22 +1,21 @@
-# Bridging in tokens via Hyperlane
+# Bridging Tokens via Hyperlane
 
-This tutorial demonstrates how to configure bridging from an EVM-like chain.
+This tutorial demonstrates how to configure token bridging from an EVM-compatible chain to your rollup using Hyperlane.
 
 [Anvil](https://getfoundry.sh/anvil/reference/#anvil) is used for demonstration because it can be run locally.
 
-## High Level overview
+## High-Level Overview
 
 1. Start the rollup
-2. Start docker compose with anvil and hyperlane agents
+2. Start Docker Compose with Anvil and Hyperlane agents
 3. Configure warp routes
 4. Make inbound transfers
-5. Make outbound transfer
-6. Next steps
-7. Troubleshooting
+5. Make outbound transfers
+6. Troubleshooting
 
-## 1. Start the rollup
+## 1. Start the Rollup
 
-Start the rollup and let it run.
+Start the rollup and keep it running throughout this tutorial.
 
 ```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=rest_address
 $ cargo run
@@ -24,7 +23,7 @@ $ cargo run
 
 ## 2. Start Anvil and Hyperlane Agents
 
-Start the anvil and hyperlane agents
+Start Anvil (local Ethereum node) and the Hyperlane agents:
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ make start-hyperlane-ethtest
@@ -42,11 +41,11 @@ waiting for containers to become operational (timeout: 300 seconds)...
  ✔ Hyperlane ethtest containers are ready.
 ```
 
-Hyperlane core contracts will be deployed, as well as warp route.
+This command will deploy Hyperlane core contracts and set up the warp route.
 
-### 2.1 Check the setup
+### 2.1 Verify the Setup
 
-Print warp route configuration on Ethtest. Notice, `remoteRouters` map is empty.
+Print the warp route configuration on Ethtest. Notice that the `remoteRouters` map is initially empty:
 
 ```bash,test-ci,bashtestmd:compare-output
 $ make print-hyperlane-ethtest-warp
@@ -74,7 +73,7 @@ $ make print-hyperlane-ethtest-warp
       destinationGas: {}
 ```
 
-Print validator announcement message:
+Verify the validator announcement message:
 
 ```bash,test-ci,bashtestmd:compare-output
 $ cat integrations/hyperlane/docker-data/validator-ethtest/signatures/announcement.json
@@ -94,25 +93,25 @@ $ cat integrations/hyperlane/docker-data/validator-ethtest/signatures/announceme
 }
 ```
 
-Relayer is up and metrics show meaning data, for instance balance for ethtest:
+Confirm that the relayer is running and metrics show meaningful data. For example, check the balance for ethtest:
 
 ```bash
 $ curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_wallet_balance'
 hyperlane_wallet_balance{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0",token_address="none",token_name="Native",token_symbol="Native",wallet_address="3c44cdddb6a900fa2b585dd299e03d12fa4293bc",wallet_name="relayer"} 10000
 ```
 
-## 3. Configuring warp routes
+## 3. Configure Warp Routes
 
-First, install dependencies for js scripts, if it wasn't done previously"
+First, install dependencies for the JavaScript scripts if not already done:
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ cd examples/starter-js && npm install
 ```
 
-Setup warp route on the rollup side. This script will:
+Set up the warp route on the rollup side. This script will:
 
 * Register a warp router and add a remote route on ethtest
-* Configure a relayer state on rollup
+* Configure relayer state on the rollup
 
 ```bash,test-ci,bashtestmd:compare-output
 $ npm run hyperlane-warp-setup
@@ -121,19 +120,19 @@ Summary:
   Token ID: token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf
 ```
 
-Check the total supply of this token should be 0:
+Verify that the total supply of this token is initially 0:
 
 ```bash,test-ci,bashtestmd:compare-output
 $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
 {"amount":"0","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
-Check the warp configuration, the following fields require attention:
+Verify the warp configuration. Pay attention to these important fields:
 
-* ISM configuration: `validators` should match address of validatory key
-* `remote_token_id` should match what has been configured on ethtest
-* `enrolled_destination` should match domain id of ethtest
-* `local_token_id` will be used later to check that transfers work
+* ISM configuration: `validators` should match the validator key address
+* `remote_token_id` should match the configuration on ethtest
+* `enrolled_destinations` should include the domain ID of ethtest
+* `local_token_id` will be used later to verify transfers
 
 ```bash,test-ci,bashtestmd:compare-output
 $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
@@ -164,14 +163,14 @@ $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c08153
     ],
 ```
 
-Or enrolled routers in particular:
+You can also check the enrolled routers specifically:
 
 ```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ curl -Ss http://127.0.0.1:12346/modules/warp/route/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a/routers
 [{"domain":3133790210,"address":"0x0000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c1"}]
 ```
 
-#### 3.1 Enroll rollup route onto anvil
+### 3.1 Enroll Rollup Route on Anvil
 
 ```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
 $ npm run hyperlane-enroll-router-on-ethtest
@@ -181,7 +180,7 @@ $ npm run hyperlane-enroll-router-on-ethtest
   Router: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
 ```
 
-Now remoteRouters should have element:
+Now the `remoteRouters` should contain an entry for the rollup:
 
 ```bash,test-ci,bashtestmd:compare-output
 $ cd ../../ && make print-hyperlane-ethtest-warp
@@ -212,19 +211,18 @@ $ cd ../../ && make print-hyperlane-ethtest-warp
         "5555": "0"
 ```
 
-## 4. Make transfers inbound transfer
+## 4. Make Inbound Transfers
 
-Before start inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` let's check that its balance of bridged
-ETH is zero.
+Before initiating an inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747`, let's verify that its balance of bridged ETH is zero.
 
-Bank endpoint will return 404.
+The bank endpoint will return a 404 error for non-existent balances:
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
 {"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
 ```
 
-Go back to `examples/starter-js` and run inbound transfer:
+Navigate to `examples/starter-js` and execute the inbound transfer:
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ npm run hyperlane-inbound
@@ -239,7 +237,7 @@ Making inbound warp transfer...
 Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d452b
 ```
 
-Wait for some time and check that total supply of the synthetic token has increased, as well as balance of recipient.
+Wait a moment for the transfer to process, then verify that the total supply of the synthetic token has increased along with the recipient's balance:
 
 ```bash
 $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
@@ -251,18 +249,18 @@ $ sleep 30 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0
 {"amount":"10000000000000000","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
-## 6. Make outbound transfers
+## 5. Make Outbound Transfers
 
-We are going send funds back to: `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747`
+Now we'll send funds back to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` on ethtest.
 
-First, let's check that its balance is zero on ethtest:
+First, verify that its balance is zero on ethtest:
 
 ```bash,test-ci,bashtestmd:compare-output
 $ curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' http://127.0.0.1:8545
 {"jsonrpc":"2.0","id":1,"result":"0x0"}
 ```
 
-Then initiate outbound transfer:
+Then initiate the outbound transfer:
 
 ```bash,test-ci,bashtestmd:compare-output
 $ npm run hyperlane-outbound
@@ -276,56 +274,58 @@ $ npm run hyperlane-outbound
     Amount (decimal): 123340000000000
 ```
 
-Wait some time and check that the balance on ethtest has changed.
+Wait for the transfer to process and verify that the balance on ethtest has increased:
 
 ```bash,test-ci,bashtestmd:compare-output
-$ sleep 30  &&curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' http://127.0.0.1:8545
+$ sleep 30 && curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' http://127.0.0.1:8545
 {"jsonrpc":"2.0","id":1,"result":"0x702d54e2f800"}
 ```
 
-And the total supply of the synthetic token has changed too:
+Confirm that the total supply of the synthetic token has decreased accordingly:
 
 ```bash,test-ci,bashtestmd:compare-output
 $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
-{"amount":"0","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
+{"amount":"9876660000000000","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
-# Common problems
+## 6. Troubleshooting
 
-## Validator isn't posting checkpoints
+### Validator Not Posting Checkpoints
 
-#### Check configuration
+**Check Configuration:**
 
-1. Check `CHAIN_ID` and `DOMAIN_ID` for both chains in all necessary files:
+1. Verify `CHAIN_ID` and `DOMAIN_ID` for both chains in all configuration files:
    * `constants.toml`
    * `integrations/hyperlane/configs/agent-config.json`
    * `integrations/hyperlane/configs/chains/ethtest/metadata.yaml`
    * `examples/starter-js/src/hyperlane/consts.ts`
-2. Mailbox matches in all configurations:
+2. Ensure mailbox addresses match across all configurations:
     ```
     grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
     grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
     ```
-3. Check that warp routes are enrolled on both chains:
-    - On ethtest use `make print-hyperlane-ethtest-warp` and check remoteRouters has correct DOMAIN_ID and note route id
-      there
-    - On rollup side: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID_FROM_PREV_COMMAND/routers`
-4. Make sure that anvil is configured for periodic block production
+3. Verify that warp routes are enrolled on both chains:
+    - On ethtest: use `make print-hyperlane-ethtest-warp` and check that remoteRouters contains the correct DOMAIN_ID (note the route ID)
+    - On rollup: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID>/routers`
+4. Ensure Anvil is configured for periodic block production
 
-## Relayer does not process messages
+### Relayer Not Processing Messages
 
-1. Check that validator posts checkpoints: `ls integrations/hyperlane/docker-data/validator-ethtest/signatures` should have at least one file `0_with_id.json`
-2. Check that there are no errors or warnings in relayer logs: `docker logs hyperlane-relayer-1 | grep -i -E 'error|warn`
-3. Check that relayer has balance: `curl http://127.0.0.1:9091/metrics | grep hyperlane_wallet_balance`
-4. Check key used by validator is present in `validators` in ISM `MessageIdMultisig` for warp route config:
+1. Verify that the validator is posting checkpoints: 
+   `ls integrations/hyperlane/docker-data/validator-ethtest/signatures` should contain at least one file `0_with_id.json`
+2. Check for errors or warnings in relayer logs: 
+   `docker logs hyperlane-relayer-1 | grep -i -E 'error|warn'`
+3. Verify that the relayer has sufficient balance: 
+   `curl http://127.0.0.1:9091/metrics | grep hyperlane_wallet_balance`
+4. Confirm the validator key is present in the ISM `MessageIdMultisig` configuration:
    `curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/<WARP_ROUTE_ID> | jq`
-5. Error: `default IGP fee amount not set`:
-   `curl http://127.0.0.1:12346/modules/interchain-gas-paymaster/state/relayer-default-gas/items/<RELAYER_SOV_ADDRESS>`.
-   Make sure relayer in the message is correct
+5. If you see "default IGP fee amount not set" error:
+   Check: `curl http://127.0.0.1:12346/modules/interchain-gas-paymaster/state/relayer-default-gas/items/<RELAYER_SOV_ADDRESS>`
+   Ensure the relayer address in the message is correct
 
-## Other helpful commands
+### Additional Helpful Commands
 
-Check that relayer has balance:
+**Check relayer balance:**
 
 ```
 curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_wallet_balance'
@@ -334,7 +334,7 @@ curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_wallet_balance'
 hyperlane_wallet_balance{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0",token_address="none",token_name="Native",token_symbol="Native",wallet_address="3c44cdddb6a900fa2b585dd299e03d12fa4293bc",wallet_name="relayer"} 10000
 ```
 
-Check there are no errors:
+**Verify no critical errors:**
 
 ```
 curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_critical_error'
