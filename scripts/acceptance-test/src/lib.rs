@@ -5,7 +5,7 @@ use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
-use sov_soak_testing::{run_generator_task_for_bank, ValidityProfile};
+use sov_soak_testing_lib::{run_generator_task_for_bank, ValidityProfile};
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
 use tokio::sync::watch;
