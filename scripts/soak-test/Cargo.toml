@@ -13,7 +13,7 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 reqwest = { version = "0.12", features = ["rustls-tls"] }
 
-sov-soak-testing = { workspace = true }
+sov-soak-testing-lib = { workspace = true }
 sov-api-spec = { workspace = true }
 sov-rollup-interface = { workspace = true, features = ["arbitrary"] }
 sov-modules-rollup-blueprint = { workspace = true, features = ["native"] }
