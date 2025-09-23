@@ -50,12 +50,17 @@ try {
     console.log(`  Gas used: ${receipt.gasUsed.toString()}`);
 
     // The Dispatch event is emitted by the Mailbox contract
+    // Event signature: Dispatch(address indexed sender, uint32 indexed destination, bytes32 indexed messageId, bytes message)
     const dispatchEventSignature = ethers.id('Dispatch(address,uint32,bytes32,bytes)');
     // @ts-ignore
     const dispatchLog = receipt.logs.find(log => log.topics[0] === dispatchEventSignature);
 
-    if (dispatchLog && dispatchLog.topics[1]) {
-        const messageId = dispatchLog.topics[1];
+    if (dispatchLog && dispatchLog.topics[3]) {
+        // topics[0] = event signature
+        // topics[1] = indexed sender (address)
+        // topics[2] = indexed destination (uint32)
+        // topics[3] = indexed messageId (bytes32)
+        const messageId = dispatchLog.topics[3];
         console.log(`[✓] Hyperlane Message ID: ${messageId}`);
     }
 

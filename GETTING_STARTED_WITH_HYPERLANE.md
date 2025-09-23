@@ -15,13 +15,25 @@ This tutorial demonstrates how to configure bridging from an EVM-like chain.
 
 ## Start Anvil and Hyperlane Agents
 
-Start the anvil and hyperlane and let it run.
-Wait till you see message `Successfully announced validator` from validator container
-Continue working in another console.
+Start the anvil and hyperlane agents
 
 ```bash,test-ci,bashtestmd:exit-code=0
 $ make start-hyperlane-ethtest
+ ✔ Network hyperlane_default                    Created                                                                                                                                                                                  0.0s
+ ✔ Container hyperlane-anvil-1                  Healthy                                                                                                                                                                                  5.7s
+ ✔ Container hyperlane-hyperlane-core-deploy-1  Exited                                                                                                                                                                                 102.8s
+ ✔ Container hyperlane-hyperlane-warp-deploy-1  Exited                                                                                                                                                                                 175.4s
+ ✔ Container hyperlane-relayer-1                Started                                                                                                                                                                                175.5s
+ ✔ Container hyperlane-validator-ethtest-1      Started                                                                                                                                                                                175.5s
+waiting for containers to become operational (timeout: 300 seconds)...
+[2025-09-22 19:18:18] Health check - validator: 'starting', relayer: 'starting' (elapsed: 0s)
+[2025-09-22 19:18:18] Waiting for hyperlane containers to be up and running...
+[2025-09-22 19:18:21] Health check - validator: 'healthy', relayer: 'healthy' (elapsed: 3s)
+[2025-09-22 19:18:21] ✔ All hyperlane containers are healthy
+ ✔ Hyperlane ethtest containers are ready.
 ```
+
+Hyperlane core contracts will be deployed, as well as warp route.
 
 ### test the setup
 
@@ -76,6 +88,11 @@ $ cat integrations/hyperlane/docker-data/validator-ethtest/signatures/announceme
 
 TODO: Call relayer metrics
 
+```bash
+$ curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_wallet_balance'
+hyperlane_wallet_balance{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0",token_address="none",token_name="Native",token_symbol="Native",wallet_address="3c44cdddb6a900fa2b585dd299e03d12fa4293bc",wallet_name="relayer"} 10000
+```
+
 ## Start the rollup
 
 Start the rollup and let it run.
@@ -95,7 +112,7 @@ Setup warp route on the rollup side. This script will:
 * Register a warp router and add a remote route on ethtest
 * Configure a relayer state on rollup
 
-```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
+```bash,test-ci,bashtestmd:compare-output
 $ npm run hyperlane-warp-setup
 Summary:
   Route ID: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
@@ -104,7 +121,7 @@ Summary:
 
 Check the total supply of this token should be 0:
 
-```bash,test-ci,bashtestmd:compare-output,bashtestmd:exit-code=0
+```bash,test-ci,bashtestmd:compare-output
 $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/total-supply
 {"amount":"0","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
@@ -113,7 +130,7 @@ Check the warp configuration.
 Note ism configuration and admin.
 `remote_token_id` should match 
 
-```bash,test-ci,bashtestmd:exit-code=0
+```bash,test-ci,bashtestmd:compare-output
 $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
 {
   "key": "0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a",
@@ -167,7 +184,7 @@ $ npm run hyperlane-enroll-router-on-ethtest
 
 Now remoteRouters should have element:
 
-```bash,test-ci,bashtestmd:exit-code=0
+```bash,test-ci,bashtestmd:compare-output
 $ cd ../../ && make print-hyperlane-ethtest-warp
 ✅ Warp route config read successfully:
 
@@ -227,7 +244,7 @@ Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d
 
 ```bash,test-ci,bashtestmd:compare-output
 $ sleep 30 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
-{"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
+{"token": "token_1s0242cee5dvg7vazxm98nu62axnrh4k60fsr5we7xl0cymzz4qfqtqgruc", "amount": 1000000}
 ```
 
 ### Outbound
@@ -264,8 +281,11 @@ $ curl -s -X POST -H "Content-Type: application/json" \
     - On rollup side: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID_FROM_PREV_COMMAND/routers`
 4. Make sure that anvil is configured for periodic block production
 
-## Relayer does not process messages it saw
+## Relayer does not process messages
 
+1. Check that validator posts checkspoints: `ls TBD:`
+2. Check that there's no errors or warnings in relayer logs
+3. Check that relayer has balance: curl /metrics | grep hyperlane_wallet_balance
 
 ## 
 

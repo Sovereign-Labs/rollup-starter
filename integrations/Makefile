@@ -58,56 +58,6 @@ start-hyperlane-ethtest:
 			break; \
 		elif [ $$elapsed -ge $$timeout_seconds ]; then \
 			echo "[$$timestamp] ✗ Timeout reached after $$timeout_seconds seconds"; \
-			echo "Final health status - validator: '$$validator_health', relayer: '$$relayer_health'"; \
-			echo ""; \
-			echo "Detailed debugging information:"; \
-			echo "==========================================="; \
-			echo "CONTAINER STATUS:"; \
-			echo "-----------------"; \
-			cd hyperlane && docker compose -f docker-compose.hyp-evm.yml ps; \
-			echo ""; \
-			echo "VALIDATOR STATE:"; \
-			echo "-----------------"; \
-			echo "Container State:"; \
-			docker inspect --format='{{json .State}}' hyperlane-validator-ethtest-1 2>/dev/null | jq '{Status, Running, Paused, Restarting, OOMKilled, Dead, Pid, ExitCode, Error, StartedAt, FinishedAt, Health}' 2>/dev/null || echo "Container not found"; \
-			echo ""; \
-			echo "Validator last 50 logs:"; \
-			docker logs --tail 50 hyperlane-validator-ethtest-1 2>&1 || echo "Could not get logs"; \
-			echo ""; \
-			echo "RELAYER STATE:"; \
-			echo "-----------------"; \
-			echo "Container State:"; \
-			docker inspect --format='{{json .State}}' hyperlane-relayer-1 2>/dev/null | jq '{Status, Running, Paused, Restarting, OOMKilled, Dead, Pid, ExitCode, Error, StartedAt, FinishedAt, Health}' 2>/dev/null || echo "Container not found"; \
-			echo ""; \
-			echo "Relayer last 50 logs:"; \
-			docker logs --tail 50 hyperlane-relayer-1 2>&1 || echo "Could not get logs"; \
-			echo ""; \
-			echo "ANVIL STATE:"; \
-			echo "-----------------"; \
-			anvil_health=$$(docker inspect --format='{{.State.Health.Status}}' hyperlane-anvil-1 2>/dev/null || echo "not found"); \
-			echo "Anvil health: '$$anvil_health'"; \
-			echo "Anvil last 20 logs:"; \
-			docker logs --tail 20 hyperlane-anvil-1 2>&1 || echo "Could not get logs"; \
-			echo ""; \
-			echo "DEPLOYMENT CONTAINERS:"; \
-			echo "-----------------"; \
-			echo "Core deploy logs (last 30 lines):"; \
-			docker logs --tail 30 hyperlane-hyperlane-core-deploy-1 2>&1 || echo "Could not get logs"; \
-			echo ""; \
-			echo "Warp deploy logs (last 30 lines):"; \
-			docker logs --tail 30 hyperlane-hyperlane-warp-deploy-1 2>&1 || echo "Could not get logs"; \
-			echo ""; \
-			echo "FILE SYSTEM CHECKS:"; \
-			echo "-----------------"; \
-			echo "Validator signatures directory:"; \
-			ls -la hyperlane/docker-data/validator-ethtest/signatures/ 2>/dev/null || echo "Directory not found"; \
-			echo ""; \
-			echo "Validator DB directory:"; \
-			ls -la hyperlane/docker-data/validator-ethtest/ 2>/dev/null | head -10 || echo "Directory not found"; \
-			echo ""; \
-			echo "Relayer DB directory:"; \
-			ls -la hyperlane/docker-data/relayer/ 2>/dev/null | head -10 || echo "Directory not found"; \
-			echo "==========================================="; \
 			exit 1; \
 		else \
 			echo "[$$timestamp] Waiting for hyperlane containers to be up and running..."; \

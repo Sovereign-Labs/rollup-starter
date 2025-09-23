@@ -123,7 +123,7 @@ print-hyperlane-ethtest-warp-local:
 		--address $(shell grep "addressOrDenom:" integrations/hyperlane/configs/deployments/warp_routes/ETH/warp-route-deployment-config.yaml | cut -d'"' -f2)
 
 print-hyperlane-ethtest-warp:
-	cd integrations/hyperlane && docker compose -f docker-compose.hyp-evm.yml run --rm \
+	@cd integrations/hyperlane && docker compose -f docker-compose.hyp-evm.yml run --rm \
 		hyperlane-cli \
 		warp read \
 		--registry https://github.com/Sovereign-Labs/hyperlane-registry \

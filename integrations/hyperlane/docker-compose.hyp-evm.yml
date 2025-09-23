@@ -56,6 +56,8 @@ services:
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - CONFIG_FILES=/configs/agent-config.json
       # Anvil account 1 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
@@ -94,6 +96,8 @@ services:
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - CONFIG_FILES=/configs/agent-config.json
       # Anvil account 2 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
