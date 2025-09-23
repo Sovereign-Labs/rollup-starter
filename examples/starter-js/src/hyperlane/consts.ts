@@ -18,7 +18,7 @@ export const ANVIL_ADDRESS_2: string = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293
 export const ANVIL_ADDRESS_3: string = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
 export const ANVIL_KEY_3: string = "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6";
 export const ANVIL_ADDRESS_4: string = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65";
-// Maid up value. How to choose it?
+// Made up value. How to choose it?
 export const ETHTEST_DEFAULT_GAS: number = 3000;
 
 // Starter

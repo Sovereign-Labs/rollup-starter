@@ -4,12 +4,11 @@ This tutorial demonstrates how to configure bridging from an EVM-like chain.
 
 [Anvil](https://getfoundry.sh/anvil/reference/#anvil) is used for demonstration because it can be run locally.
 
-
 ## High Level overview
 
 1. +Start the rollup
 2. +Start docker compose with anvil and hyperlane agents
-3. Connfigure warp routes 
+3. Connfigure warp routes
 4. ~Make inbound transfers
 5. Make outbound transfer
 6. Next steps
@@ -95,7 +94,6 @@ $ cat integrations/hyperlane/docker-data/validator-ethtest/signatures/announceme
 }
 ```
 
-
 TODO: Call relayer metrics
 
 ```bash
@@ -128,9 +126,12 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jt
 {"amount":"0","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
-Check the warp configuration. 
-Note ism configuration and admin.
-`remote_token_id` should match 
+Check the warp configuration, following fields require attention:
+
+* ISM configuration: `validators` should match address of validatory key
+* `remote_token_id` should match what has been configured on ethtest
+* `enrolled_destination` should match domain id of ethtest
+* `local_token_id` will be used later to check that transfers work
 
 ```bash,test-ci,bashtestmd:compare-output
 $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
@@ -151,7 +152,7 @@ $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c08153
     "ism": {
       "MessageIdMultisig": {
         "validators": [
-          "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+          "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
         ],
         "threshold": 1
       }
@@ -215,12 +216,12 @@ $ cd ../../ && make print-hyperlane-ethtest-warp
         "5555": "0"
 ```
 
-
 ## Make transfers
 
 ### Inbound
 
-Before start inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` let's check that its balance of bridged ETH is zero.
+Before start inbound transfer to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` let's check that its balance of bridged
+ETH is zero.
 
 Bank endpoint will return 404.
 
@@ -229,8 +230,10 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jt
 {"status":404,"message":"Balance '0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747' not found","details":{"id":"0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747"}}
 ```
 
+Go back to `examples/starter-js` and run inbound transfer:
+
 ```bash,test-ci,bashtestmd:exit-code=0
-$ cd examples/starter-js && npm run hyperlane-inbound
+$ npm run hyperlane-inbound
 Making inbound warp transfer...
   Contract:  0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
   Domain:    5555
@@ -242,7 +245,7 @@ Making inbound warp transfer...
 Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d452b
 ```
 
-**TODO**: How to wait till transfer is processed???. Bash script that pulls balance? Checking logs 
+**TODO**: How to wait till transfer is processed???. Bash script that pulls balance? Checking logs
 
 ```bash,test-ci,bashtestmd:compare-output
 $ sleep 30 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
@@ -251,31 +254,35 @@ $ sleep 30 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0
 
 ### Outbound
 
-We are going send funds back, but to a different address: `0x9b08ce57a93751aE790698A2C9ebc76A78F23E25`
+We are going send funds back to: `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747`
 
-First, let's check that it's balance is zero on ethtest:
+First, let's check that its balance is zero on ethtest:
 
 ```bash,test-ci,bashtestmd:compare-output
-$ curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x9b08ce57a93751aE790698A2C9ebc76A78F23E25", "latest"],"id":1}' http://127.0.0.1:8545
+$ curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' http://127.0.0.1:8545
 {"jsonrpc":"2.0","id":1,"result":"0x0"}
 ```
 
 Then initiate outbound transfer:
 
-
 ```bash,test-ci,bashtestmd:compare-output
-
+$ npm run hyperlane-outbound
+[✓] Receipt result: successful
+[✓] Mailbox/DispatchId (HyperlaneId): 0xf02e770a5fe29dd5c8ded010ccce0d80bdd00eb7a0c87fb759bcdddd9f59416e
+[✓] Warp/TokenTransferredRemote:
+    Route ID: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
+    To Domain: 3133790210
+    Recipient: 0x000000000000000000000000d2c1be33a0bcd2007136afd8ed61cc7561ada747
+    Amount (hex): 0x0000000000000000000000000000000000000000000000000000702d54e2f800
+    Amount (decimal): 123340000000000
 ```
 
+Wait 30 seconds and check that balance on ethtest has changed.
 
-# Rest
-
-Balance on the rollup
-
-
-
-
-
+```bash,test-ci,bashtestmd:compare-output
+$ sleep 30  &&curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' http://127.0.0.1:8545
+{"jsonrpc":"2.0","id":1,"result":"0x702d54e2f800"
+```
 
 # Common problems
 
@@ -290,25 +297,36 @@ Balance on the rollup
     grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
     ```
 3. Check that warp routes are enrolled on both chains:
-    - On ethtest use `make print-hyperlane-ethtest-warp` and check remoteRouters has correct DOMAIN_ID and note route id there
+    - On ethtest use `make print-hyperlane-ethtest-warp` and check remoteRouters has correct DOMAIN_ID and note route id
+      there
     - On rollup side: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID_FROM_PREV_COMMAND/routers`
 4. Make sure that anvil is configured for periodic block production
 
 ## Relayer does not process messages
 
 1. Check that validator posts checkspoints: `ls TBD:`
-2. Check that there's no errors or warnings in relayer logs
+2. Check that there are no errors or warnings in relayer logs
 3. Check that relayer has balance: curl /metrics | grep hyperlane_wallet_balance
-4. Check key that is used by validator is present in `validators` in  ISM `MessageIdMultisig` for warp route config: `curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/<WARP_ROUTE_ID> | jq`
+4. Check key used by validator is present in `validators` in ISM `MessageIdMultisig` for warp route config:
+   `curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/<WARP_ROUTE_ID> | jq`
+5. Error: `default IGP fee amount not set`:
+   `curl http://127.0.0.1:12346/modules/interchain-gas-paymaster/state/relayer-default-gas/items/<RELAYER_SOV_ADDRESS>`.
+   Make sure relayer in the message is correct
 
-## 
+## Other helpful commands
 
+Check that relayer has balance:
 
+```
 curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_wallet_balance'
 # HELP hyperlane_wallet_balance Current native token balance for the wallet addresses in the `wallets` set
 # TYPE hyperlane_wallet_balance gauge
 hyperlane_wallet_balance{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0",token_address="none",token_name="Native",token_symbol="Native",wallet_address="3c44cdddb6a900fa2b585dd299e03d12fa4293bc",wallet_name="relayer"} 10000
+```
 
+Check there are no errors:
 
+```
 hyperlane_critical_error{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0"} 0
-hyperlane_critical_error{agent="relayer",chain="sovstarter",hyperlane_baselib_version="0.1.0"} 1
+hyperlane_critical_error{agent="relayer",chain="sovstarter",hyperlane_baselib_version="0.1.0"} 0
+```

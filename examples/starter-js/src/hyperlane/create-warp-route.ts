@@ -1,5 +1,5 @@
 import { RuntimeCall } from "../types";
-import {minterAddress} from "./consts";
+import {minterAddress, SOLANA_TESTNET_DOMAIN} from "./consts";
 
 // An example of a call to register a warp route.
 export const createWarpRoute: RuntimeCall = {
@@ -27,7 +27,7 @@ export const createWarpRoute: RuntimeCall = {
       },
       remote_routers: [
         [
-          1399811150, // Solana testnet's chain ID
+          SOLANA_TESTNET_DOMAIN,
           "0x264ae4d8bb90248557e7e039afaf384b64fbc821e56f45ebb524d74dfe8cc30d",
         ],
       ],

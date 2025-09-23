@@ -1,7 +1,7 @@
 import fs from 'fs';
 import {AdminClass, RuntimeCall} from "../types";
 import {
-    ANVIL_ADDRESS_0, ANVIL_ADDRESS_1, ANVIL_ADDRESS_2, defaultGas,
+    ANVIL_ADDRESS_1, defaultGas,
     deployerAddress,
     deployerPrivateKey,
     ETHTEST_DEFAULT_GAS,
