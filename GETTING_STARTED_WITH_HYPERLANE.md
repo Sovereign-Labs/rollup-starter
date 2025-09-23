@@ -126,7 +126,7 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jt
 {"amount":"0","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
-Check the warp configuration, following fields require attention:
+Check the warp configuration, the following fields require attention:
 
 * ISM configuration: `validators` should match address of validatory key
 * `remote_token_id` should match what has been configured on ethtest
@@ -277,11 +277,11 @@ $ npm run hyperlane-outbound
     Amount (decimal): 123340000000000
 ```
 
-Wait 30 seconds and check that balance on ethtest has changed.
+Wait 30 seconds and check that the balance on ethtest has changed.
 
 ```bash,test-ci,bashtestmd:compare-output
 $ sleep 30  &&curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747", "latest"],"id":1}' http://127.0.0.1:8545
-{"jsonrpc":"2.0","id":1,"result":"0x702d54e2f800"
+{"jsonrpc":"2.0","id":1,"result":"0x702d54e2f800"}
 ```
 
 And the total supply of the synthetic token has changed too:
