@@ -12,6 +12,7 @@ use sov_modules_api::Spec;
 use sov_modules_rollup_blueprint::FullNodeBlueprint;
 use sov_sequencer::preferred::PreferredSequencerConfig;
 use sov_sequencer::preferred::RecoveryStrategy;
+use sov_sequencer::SeqConfigExtension;
 use sov_sequencer::{SequencerConfig, SequencerKindConfig};
 use sov_stf_runner::processes::RollupProverConfig;
 use sov_stf_runner::{HttpServerConfig, MonitoringConfig, ProofManagerConfig};
@@ -38,6 +39,7 @@ pub async fn start_rollup(
             http_config: HttpServerConfig::localhost_on_free_port(),
             concurrent_sync_tasks: Some(1),
             save_tx_bodies: false,
+            da_total_timeout_secs: 3_600,
         },
         da: da_config,
         proof_manager: ProofManagerConfig {
@@ -57,6 +59,9 @@ pub async fn start_rollup(
             admin_addresses: vec![],
             dropped_tx_ttl_secs: 0,
             blob_processing_timeout_secs: 60,
+            extension: Some(SeqConfigExtension {
+                max_log_limit: 20000,
+            }),
             sequencer_kind_config: SequencerKindConfig::Preferred(PreferredSequencerConfig {
                 recovery_strategy: RecoveryStrategy::None,
                 minimum_profit_per_tx: 0,
