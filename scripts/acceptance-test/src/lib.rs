@@ -5,7 +5,7 @@ use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
-use sov_soak_testing_lib::{run_generator_task_for_bank, ValidityProfile};
+use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
 use tokio::sync::watch;
@@ -19,8 +19,8 @@ pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
 pub const API_URL: &str = "http://localhost:12348";
 
 // Save a full snapshot of the slot every N slots
-const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
-pub const NUM_SOAK_BATCHES: u64 = 1000;
+const FULL_SLOT_SAVE_INTERVAL: u64 = 5;
+pub const NUM_SOAK_BATCHES: u64 = 50;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
@@ -198,13 +198,13 @@ async fn worker_task(
     num_workers: u32,
 ) -> anyhow::Result<()> {
     // TODO: Add synthetic load txs
-    let result = run_generator_task_for_bank::<Runtime, Spec>(
+    let runner = SoakTestRunner::<Runtime, Spec>::new().with_bank().with_state_consistency();
+    let result = runner.run(
         client,
         rx,
         worker_id,
         num_workers,
         ValidityProfile::Clean.get_validity(),
-        // TxType::Mixed,
     )
     .await;
 

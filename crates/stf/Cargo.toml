@@ -21,6 +21,7 @@ sov-sequencer-registry = { workspace = true }
 sov-paymaster = { workspace = true }
 sov-hyperlane-integration = { workspace = true }
 sov-bank = { workspace = true }
+sov-test-state-consistency = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }

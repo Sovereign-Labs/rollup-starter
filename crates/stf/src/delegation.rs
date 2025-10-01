@@ -82,6 +82,21 @@ where
     }
 }
 
+impl<S: Spec> EncodeCall<sov_test_state_consistency::StateConsistency<S>> for Runtime<S>
+where
+    <S as Spec>::Address: HyperlaneAddress,
+{
+    fn encode_call(data: <sov_test_state_consistency::StateConsistency<S> as sov_modules_api::Module>::CallMessage) -> Vec<u8> {
+        <RuntimeInner<S> as EncodeCall<sov_test_state_consistency::StateConsistency<S>>>::encode_call(data)
+    }
+
+    fn to_decodable(
+        data: <sov_test_state_consistency::StateConsistency<S> as sov_modules_api::Module>::CallMessage,
+    ) -> Self::Decodable {
+        <RuntimeInner<S> as EncodeCall<sov_test_state_consistency::StateConsistency<S>>>::to_decodable(data)
+    }
+}
+
 impl<S: Spec> BlockHooks for Runtime<S>
 where
     S::Address: HyperlaneAddress,
