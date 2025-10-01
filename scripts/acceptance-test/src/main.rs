@@ -108,6 +108,12 @@ async fn run_test() -> Result<(), anyhow::Error> {
                 .join("config.toml")
                 .display()
                 .to_string(),
+            "--genesis-path",
+            &directories
+                .acceptance_test_dir
+                .join("genesis.json")
+                .display()
+                .to_string(),
             "--stop-at-rollup-height",
             &((NUM_SOAK_BATCHES * 2).to_string()),
         ])

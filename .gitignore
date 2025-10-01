@@ -21,3 +21,6 @@ test-data/mock_da.sqlite*
 test-data/docker
 scripts/rollup-starter.sh
 scripts/rollup-starter-celestia.sh
+
+# Acceptance test data - this may need to be stored somewhere, but for now we're not committing it to git
+scripts/acceptance-test/acceptance-test-data*
