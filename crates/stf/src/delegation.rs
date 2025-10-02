@@ -86,7 +86,9 @@ impl<S: Spec> EncodeCall<sov_test_state_consistency::StateConsistency<S>> for Ru
 where
     <S as Spec>::Address: HyperlaneAddress,
 {
-    fn encode_call(data: <sov_test_state_consistency::StateConsistency<S> as sov_modules_api::Module>::CallMessage) -> Vec<u8> {
+    fn encode_call(
+        data: <sov_test_state_consistency::StateConsistency<S> as sov_modules_api::Module>::CallMessage,
+    ) -> Vec<u8> {
         <RuntimeInner<S> as EncodeCall<sov_test_state_consistency::StateConsistency<S>>>::encode_call(data)
     }
 
