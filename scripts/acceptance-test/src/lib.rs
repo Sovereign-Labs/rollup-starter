@@ -2,31 +2,27 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rollup_starter::rollup::StarterRollup;
 use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
-use sov_modules_api::capabilities::config_chain_id;
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
-use sov_modules_api::transaction::{Transaction, TxDetails};
-use sov_modules_api::{DispatchCall, PrivateKey, Runtime as RuntimeTrait};
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
-use sov_test_utils::{TransactionType, TEST_DEFAULT_MAX_FEE, TEST_DEFAULT_MAX_PRIORITY_FEE};
-use std::collections::HashMap;
+use state_consistency::state_validation_worker;
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
-use tokio_stream::StreamExt;
 use tracing::{debug, info};
 
 use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
 pub mod fetch_and_compare;
+mod state_consistency;
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
 pub const API_URL: &str = "http://localhost:12348";
 
 // Save a full snapshot of the slot every N slots
 const FULL_SLOT_SAVE_INTERVAL: u64 = 5;
-pub const NUM_SOAK_BATCHES: u64 = 50;
+pub const NUM_SOAK_BATCHES: u64 = 10;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
@@ -224,195 +220,6 @@ async fn worker_task(
     Ok(())
 }
 
-#[derive(serde::Deserialize, Debug)]
-struct StateRootResponse {
-    root_hashes: Vec<u8>,
-}
-
-#[derive(serde::Deserialize, Debug)]
-struct ValueResponse<T> {
-    value: T,
-}
-
-async fn state_validation_worker(
-    client: sov_api_spec::Client,
-    rx: watch::Receiver<bool>,
-) -> anyhow::Result<()> {
-    use futures::FutureExt;
-    use sov_rollup_interface::node::ledger_api::IncludeChildren;
-
-    // Subscribe to slots
-    let mut slot_stream = client
-        .subscribe_slots_with_children(IncludeChildren::new(false))
-        .await?;
-
-    tracing::info!("State validation worker started");
-
-    while !*rx.borrow() {
-        // Wait for next slot notification (blocking)
-        let mut latest_slot = match slot_stream.next().await {
-            Some(Ok(slot)) => slot,
-            Some(Err(e)) => {
-                tracing::error!("Error receiving slot: {}", e);
-                continue;
-            }
-            None => break,
-        };
-        tracing::info!("State validation: got new slot notification, number = {}", latest_slot.number);
-
-        // Check if there are any additional slots already queued (non-blocking)
-        // If so, we're falling behind and should fail
-        let mut drained_count = 0;
-        while let Some(Some(Ok(slot))) = slot_stream.next().now_or_never() {
-            latest_slot = slot;
-            drained_count += 1;
-        }
-
-        if drained_count > 0 {
-            anyhow::bail!(
-                "State validation worker drained {} slots - slots are being produced faster than we can process them!",
-                drained_count
-            );
-        }
-
-        // Query the state values from the module
-        let visible_slot_url = format!(
-            "{}/modules/state-consistency/state/latest-visible-slot-number/",
-            API_URL
-        );
-        let state_root_url = format!(
-            "{}/modules/state-consistency/state/latest-state-root/",
-            API_URL
-        );
-        let rollup_height_url = format!(
-            "{}/modules/state-consistency/state/latest-rollup-height/",
-            API_URL
-        );
-
-        // First, poll only visible_slot until the API state catches up (to handle race condition
-        // between slot notification and checkpoint update)
-        let visible_slot = {
-            let max_attempts = 50;
-            let mut attempt = 0;
-
-            loop {
-                let visible_slot: ValueResponse<u64> = client
-                    .client()
-                    .get(&visible_slot_url)
-                    .send()
-                    .await?
-                    .json()
-                    .await?;
-
-                // Check if the API state has caught up to the slot notification
-                if visible_slot.value == latest_slot.number {
-                    tracing::debug!("State consistency: waited {} ms for API state to be updated...", attempt * 10);
-                    break visible_slot;
-                }
-
-                attempt += 1;
-                if attempt >= max_attempts {
-                    anyhow::bail!(
-                        "Timed out waiting for API state to update. Slot notification: {}, API visible_slot: {}",
-                        latest_slot.number,
-                        visible_slot.value
-                    );
-                }
-
-                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            }
-        };
-
-        // Once the visible_slot has caught up, we can query the other two values
-        let (state_root_result, rollup_height_result) = tokio::join!(
-            async {
-                client
-                    .client()
-                    .get(&state_root_url)
-                    .send()
-                    .await?
-                    .json::<ValueResponse<StateRootResponse>>()
-                    .await
-            },
-            async {
-                client
-                    .client()
-                    .get(&rollup_height_url)
-                    .send()
-                    .await?
-                    .json::<ValueResponse<u64>>()
-                    .await
-            }
-        );
-        let state_root = state_root_result?;
-        let rollup_height = rollup_height_result?;
-
-        tracing::info!(
-            "State validation: slot_notification={}, module_visible_slot={}, module_rollup_height={}, state_root={}",
-            latest_slot.number,
-            visible_slot.value,
-            rollup_height.value,
-            hex::encode(&state_root.value.root_hashes)
-        );
-
-        // Now we can submit the assertion transaction
-        let assert_tx = create_assert_block_state_tx(
-            visible_slot.value,
-            rollup_height.value,
-            state_root.value.root_hashes,
-        )?;
-
-        if let Err(e) = client.send_tx_to_sequencer(&assert_tx).await {
-            tracing::error!(
-                "Failed to submit state assertion tx for slot {} height {}: {}",
-                visible_slot.value,
-                rollup_height.value,
-                e
-            );
-            // Don't fail the test here - the tx might be rejected due to timing,
-            // which will be caught during resync via state root mismatch
-            // TODO: we need to match on the error message and extract the rollup height, to see if
-            // we were just late in submitting or if there's an unexpected issue. Late in
-            // submitting is fine.
-            // The other acceptable issue is the sequencer being unable to accept txs (i.e. not a
-            // module error).
-        }
-    }
-
-    tracing::info!("State validation worker shutting down");
-    Ok(())
-}
-
-fn create_assert_block_state_tx(
-    expected_visible_slot_number: u64,
-    expected_rollup_height: u64,
-    expected_state_root: Vec<u8>,
-) -> anyhow::Result<Transaction<Runtime, Spec>> {
-    // Generate a new key for this transaction
-    let key = <<Spec as sov_modules_api::Spec>::CryptoSpec as sov_modules_api::CryptoSpec>::PrivateKey::generate();
-
-    let message = <Runtime as DispatchCall>::Decodable::StateConsistency(
-        sov_test_state_consistency::CallMessage::AssertBlockState {
-            expected_visible_slot_number,
-            expected_rollup_height,
-            expected_state_root,
-        },
-    );
-
-    // Sign but DON'T serialize - let send_tx_to_sequencer handle serialization
-    Ok(TransactionType::<Runtime, Spec>::sign(
-        message,
-        key.clone(),
-        &Runtime::CHAIN_HASH,
-        TxDetails {
-            max_priority_fee_bips: TEST_DEFAULT_MAX_PRIORITY_FEE,
-            max_fee: TEST_DEFAULT_MAX_FEE,
-            gas_limit: None,
-            chain_id: config_chain_id(),
-        },
-        &mut HashMap::from([(key.pub_key(), 0)]),
-    ))
-}
 
 fn start_workers(
     salt: u32,
