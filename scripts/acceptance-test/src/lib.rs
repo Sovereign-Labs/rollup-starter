@@ -203,7 +203,7 @@ async fn worker_task(
     let runner = SoakTestRunner::<Runtime, Spec>::new()
         .with_bank()
         .with_state_consistency();
-    let result = runner
+    runner
         .run(
             client,
             rx,
@@ -211,13 +211,7 @@ async fn worker_task(
             num_workers,
             ValidityProfile::Clean.get_validity(),
         )
-        .await;
-
-    if let Err(e) = result {
-        tracing::error!("Worker task {worker_id} failed: {}", e);
-        std::process::exit(1);
-    }
-    Ok(())
+        .await
 }
 
 
@@ -262,6 +256,57 @@ fn save_slot_snapshot_if_needed(
 pub struct ThroughputReport {
     pub num_txs: u64,
     pub num_slots: u64,
+}
+
+/// Send SIGINT to the rollup process to gracefully shut it down.
+/// If the process doesn't respond within 10 seconds, send SIGKILL.
+fn kill_rollup(rollup_id: u32) {
+    tracing::info!("Sending SIGINT to rollup process {}", rollup_id);
+
+    // Send SIGINT
+    if let Err(e) = Command::new("kill")
+        .args(["-s", "SIGINT", &rollup_id.to_string()])
+        .status()
+    {
+        tracing::error!("Failed to send SIGINT: {}", e);
+        return;
+    }
+
+    // Wait up to 10 seconds for graceful shutdown
+    for _ in 0..100 {
+        thread::sleep(Duration::from_millis(100));
+
+        // Check if process still exists using kill -0
+        match Command::new("kill")
+            .args(["-0", &rollup_id.to_string()])
+            .status()
+        {
+            Ok(status) if !status.success() => {
+                // Process doesn't exist anymore
+                tracing::info!("Rollup process {rollup_id} shut down gracefully");
+                return;
+            }
+            Err(_) => {
+                // Error running kill command, assume process is gone
+                tracing::info!("Unable to check rollup process {rollup_id} status; assuming it no longer exists");
+                return;
+            }
+            Ok(_) => {
+                // Process still exists, continue waiting
+            }
+        }
+    }
+
+    // Process didn't respond to SIGINT, force kill
+    tracing::warn!(
+        "Rollup process {rollup_id} didn't respond to SIGINT after 10s, sending SIGKILL"
+    );
+    if let Err(e) = Command::new("kill")
+        .args(["-9", &rollup_id.to_string()])
+        .status()
+    {
+        tracing::error!("Failed to send SIGKILL: {e}");
+    }
 }
 
 pub async fn run_soak(
@@ -366,32 +411,17 @@ pub async fn run_soak(
             // Signal handlers
             _ = tokio::signal::ctrl_c() => {
                 tracing::info!("Received Ctrl+C, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
+                kill_rollup(rollup_id);
                 break;
             },
             _ = terminate.recv() => {
                 tracing::info!("Received SIGTERM, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
+                kill_rollup(rollup_id);
                 break;
             },
             _ = quit.recv() => {
                 tracing::info!("Received SIGQUIT, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
+                kill_rollup(rollup_id);
                 break;
             },
             // Rollup shutdown
@@ -408,6 +438,24 @@ pub async fn run_soak(
                     }
                 }
                 break;
+            }
+            // Worker task failure
+            Some(worker_result) = worker_set.join_next() => {
+                match worker_result {
+                    Ok(Ok(())) => {
+                        // Worker completed successfully, continue monitoring
+                    }
+                    Ok(Err(e)) => {
+                        tracing::error!("Worker task failed: {}", e);
+                        kill_rollup(rollup_id);
+                        return Err(e);
+                    }
+                    Err(e) => {
+                        tracing::error!("Worker task panicked: {}", e);
+                        kill_rollup(rollup_id);
+                        return Err(e.into());
+                    }
+                }
             }
         }
     }

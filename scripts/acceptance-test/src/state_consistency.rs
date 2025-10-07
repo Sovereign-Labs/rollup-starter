@@ -3,7 +3,6 @@ use sov_modules_api::{DispatchCall, PrivateKey, Runtime as RuntimeTrait};
 use sov_modules_api::transaction::{Transaction, TxDetails};
 use sov_test_utils::{TransactionType, TEST_DEFAULT_MAX_FEE, TEST_DEFAULT_MAX_PRIORITY_FEE};
 use std::collections::HashMap;
-use std::process;
 use tokio_stream::StreamExt;
 use tokio::sync::watch;
 use super::{Runtime, Spec, API_URL};
@@ -154,21 +153,20 @@ pub async fn state_validation_worker(
 
             // Check if this is a "too late" error (actual rollup height > expected)
             if is_too_late_error(&e, rollup_height.value) {
-                tracing::debug!(
-                    "State assertion tx for slot {} height {} was rejected because the rollup already advanced past it - this is expected",
+                tracing::warn!(
+                    "State assertion tx for slot {} height {} was rejected because the rollup already advanced past it. This can happen, but the kernel assertions have been skipped for this slot as a result.",
                     visible_slot.value,
                     rollup_height.value,
                 );
                 continue;
             }
 
-            tracing::error!(
+            anyhow::bail!(
                 "Failed to submit state assertion tx for slot {} height {}: {}",
                 visible_slot.value,
                 rollup_height.value,
                 e
             );
-            process::exit(1);
         }
     }
 
