@@ -5,19 +5,14 @@ use clap::Parser;
 use rollup_starter::da::DaService;
 use rollup_starter::rollup::StarterRollup;
 use rollup_starter::zkvm::{rollup_host_args, InnerZkvm};
-use sov_modules_rollup_blueprint::logging::{
-    default_rust_log_value, should_init_open_telemetry_exporter, OtelGuard,
-};
+use sov_modules_rollup_blueprint::logging::initialize_logging;
 use sov_modules_rollup_blueprint::FullNodeBlueprint;
 use sov_modules_rollup_blueprint::Rollup;
 use sov_rollup_interface::execution_mode::Native;
 use sov_stf_runner::processes::{RollupProverConfig, RollupProverConfigDiscriminants};
 use sov_stf_runner::{from_toml_path, RollupConfig};
-use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::{fmt, EnvFilter};
 
 use sov_address::EthereumAddress;
 use sov_modules_api::capabilities::RollupHeight;
@@ -80,63 +75,12 @@ struct Args {
     stop_at_rollup_height: Option<u64>,
 }
 
-fn init_logging() -> Option<OtelGuard> {
-    // Configuring filter
-    let rust_log_value =
-        env::var("RUST_LOG").unwrap_or_else(|_| default_rust_log_value().to_string());
-    let env_filter = EnvFilter::from_str(&rust_log_value).unwrap();
-
-    // Configuring layers.
-    // Always on: stdout layer
-    let stdout_layer = Some(fmt::layer().with_writer(std::io::stdout).boxed());
-
-    // Option 1: Open Telemetry export.
-    let (otel_guard, otel_layer) = if should_init_open_telemetry_exporter() {
-        let otel = OtelGuard::new().unwrap();
-
-        let otel_layer = otel
-            .otel_tracing_layer()
-            .boxed()
-            .and_then(otel.otel_logging_layer());
-
-        (Some(otel), Some(otel_layer.boxed()))
-    } else {
-        (None, None)
-    };
-
-    // Initializing.
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(stdout_layer)
-        .with(otel_layer)
-        .init();
-
-    print_information_about_logging(&rust_log_value);
-
-    otel_guard
-}
-
-fn print_information_about_logging(current_env_filter: &str) {
-    tracing::info!(
-        RUST_LOG = %current_env_filter,
-        "Logging initialized; you can restart the node with a custom `RUST_LOG` environment variable to customize log filtering"
-    );
-    if !should_init_open_telemetry_exporter() {
-        tracing::info!("Open Telemetry exporter was not enabled");
-    }
-}
-
 #[tokio::main]
 // Not returning a result here, so the error could be logged properly.
 async fn main() {
     let args = Args::parse();
 
-    let _guard = init_logging();
-    let prev_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic_info| {
-        tracing_panic::panic_hook(panic_info);
-        prev_hook(panic_info);
-    }));
+    let _guard = initialize_logging();
 
     let metrics_port = args.metrics;
     let address = format!("127.0.0.1:{metrics_port}");
