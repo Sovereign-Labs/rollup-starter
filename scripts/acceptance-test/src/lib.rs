@@ -14,7 +14,9 @@ use tokio::task::JoinSet;
 use tracing::{debug, info};
 
 use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
+pub mod accessory_state;
 pub mod fetch_and_compare;
+pub mod module_state;
 mod state_consistency;
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
@@ -333,6 +335,16 @@ pub async fn run_soak(
     worker_set.spawn(state_validation_worker(
         state_validator_client,
         state_validator_rx,
+    ));
+
+    // Start accessory state worker
+    let accessory_client = get_rollup_client()?;
+    let accessory_rx = tx.subscribe();
+    worker_set.spawn(accessory_state::accessory_state_worker(
+        accessory_client,
+        accessory_rx,
+        directories.clone(),
+        save_slot_snapshots,
     ));
 
     use tokio::signal::unix::SignalKind;

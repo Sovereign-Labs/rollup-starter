@@ -173,6 +173,19 @@ async fn run_test() -> Result<(), anyhow::Error> {
                 &format!("slot_{}", slot_number),
                 false,
             )?;
+
+            // Verify module state (if snapshot exists)
+            if let Ok(state_snapshot) =
+                acceptance_test::module_state::load_state_snapshot(slot_number, &directories.snapshots_dir)
+            {
+                acceptance_test::module_state::verify_module_state(slot_number, &client, &state_snapshot)
+                    .await?;
+            } else {
+                tracing::debug!(
+                    "No state snapshot for slot {}, skipping module state verification",
+                    slot_number
+                );
+            }
         }
         checked = slot.number;
     }
