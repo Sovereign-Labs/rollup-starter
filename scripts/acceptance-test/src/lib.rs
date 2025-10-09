@@ -7,7 +7,9 @@ use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
 use state_consistency::state_validation_worker;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use std::process::Child;
 use std::{env, fs, process::Command, thread, time::Duration};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
@@ -29,10 +31,61 @@ pub const NUM_SOAK_BATCHES: u64 = 10;
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
 
+/// Wrapper around std::process::Child that automatically kills the rollup process
+/// when dropped.
+pub struct RollupProcess {
+    child: Child,
+}
+
+impl RollupProcess {
+    pub fn new(child: Child) -> Self {
+        Self { child }
+    }
+}
+
+impl Drop for RollupProcess {
+    fn drop(&mut self) {
+        kill_rollup(self.child.id());
+    }
+}
+
+impl Deref for RollupProcess {
+    type Target = Child;
+
+    fn deref(&self) -> &Self::Target {
+        &self.child
+    }
+}
+
+impl DerefMut for RollupProcess {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.child
+    }
+}
+
+/// Wrapper around a postgres container that automatically cleans up when dropped.
+pub struct PostgresContainerGuard {
+    name: String,
+}
+
+impl PostgresContainerGuard {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl Drop for PostgresContainerGuard {
+    fn drop(&mut self) {
+        if let Err(e) = cleanup_postgres_container(&self.name) {
+            tracing::error!("Failed to cleanup postgres container: {}", e);
+        }
+    }
+}
+
 pub fn start_and_wait_for_postgres_ready(
     container_name: &str,
     password: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<PostgresContainerGuard, anyhow::Error> {
     info!("Starting postgres container");
     let postgres_env = format!("POSTGRES_PASSWORD={}", password);
     let start_postgres = Command::new("docker")
@@ -63,7 +116,9 @@ pub fn start_and_wait_for_postgres_ready(
 
         if ready_check.status.success() {
             info!("Postgres is ready");
-            return Ok(());
+            return Ok(PostgresContainerGuard {
+                name: container_name.to_string(),
+            });
         }
 
         debug!(
@@ -262,7 +317,7 @@ pub struct ThroughputReport {
 
 /// Send SIGINT to the rollup process to gracefully shut it down.
 /// If the process doesn't respond within 10 seconds, send SIGKILL.
-fn kill_rollup(rollup_id: u32) {
+pub fn kill_rollup(rollup_id: u32) {
     tracing::info!("Sending SIGINT to rollup process {}", rollup_id);
 
     // Send SIGINT
@@ -313,7 +368,7 @@ fn kill_rollup(rollup_id: u32) {
 
 pub async fn run_soak(
     directories: Directories,
-    mut rollup: std::process::Child,
+    mut rollup: RollupProcess,
     num_previous_batches: u64,
     save_slot_snapshots: bool,
 ) -> Result<ThroughputReport, anyhow::Error> {

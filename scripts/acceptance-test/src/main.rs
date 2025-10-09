@@ -1,7 +1,7 @@
 use acceptance_test::fetch_and_compare::SlotFetcher;
+use acceptance_test::RollupProcess;
 use acceptance_test::ThroughputReport;
 use acceptance_test::{
-    cleanup_postgres_container,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
     generate_postgres_password, get_rollup_client, interpolate_config, run_soak,
     start_and_wait_for_postgres_ready, Directories, API_URL, NUM_SOAK_BATCHES,
@@ -31,7 +31,6 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         info!("Acceptance test completed");
     }
-    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
 
     result
 }
@@ -89,7 +88,7 @@ async fn run_test() -> Result<(), anyhow::Error> {
     copy_persistent_mock_data(&directories)?;
 
     // Start the sequencer postgres and wait for it to be ready
-    start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
+    let _guard = start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
 
     // Start the rollup. Run for 10 seconds
     info!(
@@ -97,30 +96,32 @@ async fn run_test() -> Result<(), anyhow::Error> {
         directories.rollup_root.display()
     );
 
-    let rollup = Command::new("cargo")
-        .args([
-            "run",
-            "--release",
-            "--",
-            "--rollup-config-path",
-            &directories
-                .output_dir
-                .join("config.toml")
-                .display()
-                .to_string(),
-            "--genesis-path",
-            &directories
-                .acceptance_test_dir
-                .join("genesis.json")
-                .display()
-                .to_string(),
-            "--stop-at-rollup-height",
-            &((NUM_SOAK_BATCHES * 2).to_string()),
-        ])
-        .current_dir(directories.rollup_root.clone())
-        .env("RUST_LOG", "info")
-        .spawn()
-        .expect("Failed to start rollup");
+    let rollup = RollupProcess::new(
+        Command::new("cargo")
+            .args([
+                "run",
+                "--release",
+                "--",
+                "--rollup-config-path",
+                &directories
+                    .output_dir
+                    .join("config.toml")
+                    .display()
+                    .to_string(),
+                "--genesis-path",
+                &directories
+                    .acceptance_test_dir
+                    .join("genesis.json")
+                    .display()
+                    .to_string(),
+                "--stop-at-rollup-height",
+                &((NUM_SOAK_BATCHES * 2).to_string()),
+            ])
+            .current_dir(directories.rollup_root.clone())
+            .env("RUST_LOG", "info")
+            .spawn()
+            .expect("Failed to start rollup"),
+    );
 
     for _ in 0..120 {
         if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
