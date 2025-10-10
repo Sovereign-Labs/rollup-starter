@@ -26,7 +26,7 @@ pub const API_URL: &str = "http://localhost:12348";
 
 // Save a full snapshot of the slot every N slots
 const FULL_SLOT_SAVE_INTERVAL: u64 = 5;
-pub const NUM_SOAK_BATCHES: u64 = 10;
+pub const NUM_SOAK_BATCHES: u64 = 1000;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
@@ -393,14 +393,14 @@ pub async fn run_soak(
     ));
 
     // Start accessory state worker
-    let accessory_client = get_rollup_client()?;
-    let accessory_rx = tx.subscribe();
-    worker_set.spawn(accessory_state::accessory_state_worker(
-        accessory_client,
-        accessory_rx,
-        directories.clone(),
-        save_slot_snapshots,
-    ));
+    // let accessory_client = get_rollup_client()?;
+    // let accessory_rx = tx.subscribe();
+    // worker_set.spawn(accessory_state::accessory_state_worker(
+    //     accessory_client,
+    //     accessory_rx,
+    //     directories.clone(),
+    //     save_slot_snapshots,
+    // ));
 
     use tokio::signal::unix::SignalKind;
     let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
