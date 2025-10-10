@@ -31,7 +31,7 @@ pub async fn state_validation_worker(
 
     tracing::info!("State validation worker started");
 
-    while !*rx.borrow() {
+    'outer: while !*rx.borrow() {
         // Wait for next slot notification (blocking)
         let mut latest_slot = match slot_stream.next().await {
             Some(Ok(slot)) => slot,
@@ -75,7 +75,7 @@ pub async fn state_validation_worker(
         // First, poll only visible_slot until the API state catches up (to handle race condition
         // between slot notification and checkpoint update)
         let visible_slot = {
-            let max_attempts = 300; // 300 * 10ms = 3s = one full slot at the default config
+            let max_attempts = 300; // 300 * 20ms = 3s = two full slots at the default config
             let mut attempt = 0;
 
             loop {
@@ -91,18 +91,32 @@ pub async fn state_validation_worker(
                 if visible_slot.value == latest_slot.number {
                     tracing::debug!("State consistency: waited {} ms for API state to be updated...", attempt * 10);
                     break visible_slot;
+                } else if visible_slot.value > latest_slot.number {
+                    // We skipped over the current slot - probably because the visible slot number
+                    // got fast-forwarded. Just try to get the next slot
+                    continue 'outer;
+                } else if visible_slot.value < latest_slot.number {
+                    // If the sequencer is recovering, or otherwise resyncing, let it run freely
+                    // and don't increment the attempts.
+                    // Only increment this once we know we're close to the tip, i.e. we're
+                    // expecting both the latest slot and visible slot to increment in tandem.
+                    if visible_slot.value > latest_slot.number - 3 {
+                        attempt += 1;
+                    } else {
+                        continue 'outer;
+                    }
                 }
 
-                attempt += 1;
                 if attempt >= max_attempts {
                     tracing::error!(
                         "State validation worker timed out waiting for API state to update. Slot notification: {}, API visible_slot: {}. This is either an error in the sequencer, or the acceptance test has a bug.",
                         latest_slot.number,
                         visible_slot.value
                     );
+                    continue 'outer;
                 }
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
             }
         };
 

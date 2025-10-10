@@ -18,7 +18,7 @@ async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,hyper=info")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
         .init();
 
@@ -123,7 +123,7 @@ async fn run_test() -> Result<(), anyhow::Error> {
             .expect("Failed to start rollup"),
     );
 
-    for _ in 0..120 {
+    for _ in 0..1200 {
         if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
             .await
             .is_ok_and(|response| response.status().is_success())

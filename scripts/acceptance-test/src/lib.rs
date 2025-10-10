@@ -393,14 +393,14 @@ pub async fn run_soak(
     ));
 
     // Start accessory state worker
-    // let accessory_client = get_rollup_client()?;
-    // let accessory_rx = tx.subscribe();
-    // worker_set.spawn(accessory_state::accessory_state_worker(
-    //     accessory_client,
-    //     accessory_rx,
-    //     directories.clone(),
-    //     save_slot_snapshots,
-    // ));
+    let accessory_client = get_rollup_client()?;
+    let accessory_rx = tx.subscribe();
+    worker_set.spawn(accessory_state::accessory_state_worker(
+        accessory_client,
+        accessory_rx,
+        directories.clone(),
+        save_slot_snapshots,
+    ));
 
     use tokio::signal::unix::SignalKind;
     let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
