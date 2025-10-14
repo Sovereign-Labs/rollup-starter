@@ -1,11 +1,11 @@
+use super::{Runtime, Spec, API_URL};
 use sov_modules_api::capabilities::config_chain_id;
-use sov_modules_api::{DispatchCall, PrivateKey, Runtime as RuntimeTrait};
 use sov_modules_api::transaction::{Transaction, TxDetails};
+use sov_modules_api::{DispatchCall, PrivateKey, Runtime as RuntimeTrait};
 use sov_test_utils::{TransactionType, TEST_DEFAULT_MAX_FEE, TEST_DEFAULT_MAX_PRIORITY_FEE};
 use std::collections::HashMap;
-use tokio_stream::StreamExt;
 use tokio::sync::watch;
-use super::{Runtime, Spec, API_URL};
+use tokio_stream::StreamExt;
 
 #[derive(serde::Deserialize, Debug)]
 struct StateRootResponse {
@@ -41,7 +41,10 @@ pub async fn state_validation_worker(
             }
             None => break,
         };
-        tracing::info!("State validation: got new slot notification, number = {}", latest_slot.number);
+        tracing::debug!(
+            "State validation: got new slot notification, number = {}",
+            latest_slot.number
+        );
 
         // Check if there are any additional slots already queued (non-blocking)
         // If so, we're falling behind and should fail
@@ -89,7 +92,10 @@ pub async fn state_validation_worker(
 
                 // Check if the API state has caught up to the slot notification
                 if visible_slot.value == latest_slot.number {
-                    tracing::debug!("State consistency: waited {} ms for API state to be updated...", attempt * 10);
+                    tracing::debug!(
+                        "State consistency: waited {} ms for API state to be updated...",
+                        attempt * 10
+                    );
                     break visible_slot;
                 } else if visible_slot.value > latest_slot.number {
                     // We skipped over the current slot - probably because the visible slot number
@@ -160,9 +166,13 @@ pub async fn state_validation_worker(
         )?;
 
         if let Err(e) = client.send_tx_to_sequencer(&assert_tx).await {
-            if e.to_string().contains("The preferred sequencer has reached the stop height") {
-                tracing::info!("State validation worker detected sequencer stop height, shutting down");
-                return Ok(())
+            if e.to_string()
+                .contains("The preferred sequencer has reached the stop height")
+            {
+                tracing::info!(
+                    "State validation worker detected sequencer stop height, shutting down"
+                );
+                return Ok(());
             }
 
             // Check if this is a "too late" error (actual rollup height > expected)

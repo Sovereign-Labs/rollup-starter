@@ -6,15 +6,13 @@ pub struct ModuleStateSnapshot {
     pub accessory_value: u64,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct ValueResponse<T> {
     value: T,
 }
 
 /// Query accessory value at tip (no ?slot parameter)
-pub async fn query_accessory_value_immediate(
-    client: &sov_api_spec::Client,
-) -> anyhow::Result<u64> {
+pub async fn query_accessory_value_immediate(client: &sov_api_spec::Client) -> anyhow::Result<u64> {
     let url = format!(
         "{}/modules/state-consistency/state/accessory-value/",
         crate::API_URL
@@ -29,11 +27,15 @@ pub async fn query_accessory_value_at_slot(
     slot: u64,
 ) -> anyhow::Result<u64> {
     let url = format!(
-        "{}/modules/state-consistency/state/accessory-value/?slot={}",
+        "{}/modules/state-consistency/state/accessory-value/?slot_number={}",
         crate::API_URL,
         slot
     );
-    let response: ValueResponse<u64> = client.client().get(&url).send().await?.json().await?;
+    tracing::info!("ACESSORY QUERY: querying value at slot {slot}...");
+    let response = client.client().get(&url).send().await?;
+    tracing::info!("ACESSORY QUERY: raw response: {response:?}");
+    let response: ValueResponse<u64> = response.json().await?;
+    tracing::info!("ACESSORY QUERY: json parsed response {response:?}");
     Ok(response.value)
 }
 
