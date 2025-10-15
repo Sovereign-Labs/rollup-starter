@@ -25,8 +25,6 @@ sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev =
 sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "189f7c9df035f7549cdf6623e45f0bc9b516bf22" }
 sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "189f7c9df035f7549cdf6623e45f0bc9b516bf22" }
 sov-metrics = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "189f7c9df035f7549cdf6623e45f0bc9b516bf22", optional = true }
-
-
 stf-starter = { path = "../../../stf", default-features = false, features = ["mock_da"] }
 
 [patch.crates-io]

@@ -24,6 +24,7 @@ sov-hyperlane-integration = { workspace = true }
 sov-bank = { workspace = true }
 sov-evm = { workspace = true }
 jsonrpsee = { workspace = true }
+serde_json = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
