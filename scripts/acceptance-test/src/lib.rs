@@ -5,7 +5,7 @@ use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
-use sov_soak_testing_lib::{run_generator_task_for_bank, ValidityProfile};
+use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
 use tokio::sync::watch;
@@ -198,21 +198,15 @@ async fn worker_task(
     num_workers: u32,
 ) -> anyhow::Result<()> {
     // TODO: Add synthetic load txs
-    let result = run_generator_task_for_bank::<Runtime, Spec>(
+    let runner = SoakTestRunner::<Runtime, Spec>::new().with_bank();
+    runner.run(
         client,
         rx,
         worker_id,
         num_workers,
         ValidityProfile::Clean.get_validity(),
-        // TxType::Mixed,
     )
-    .await;
-
-    if let Err(e) = result {
-        tracing::error!("Worker task {worker_id} failed: {}", e);
-        std::process::exit(1);
-    }
-    Ok(())
+    .await
 }
 
 fn start_workers(
