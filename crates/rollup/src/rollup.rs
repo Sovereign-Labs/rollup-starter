@@ -2,23 +2,34 @@
 //! StarterRollup provides a minimal self-contained rollup implementation
 
 use async_trait::async_trait;
+use axum::extract::State;
+use axum::response::IntoResponse;
+use axum::routing::post;
+use axum::Json;
 use sov_address::{EthereumAddress, EvmCryptoSpec};
 use sov_db::ledger_db::LedgerDb;
 use sov_db::storage_manager::NomtStorageManager;
+use sov_evm::Eip712AuthenticatorTrait;
 use sov_hyperlane_integration::HyperlaneAddress;
 use sov_mock_zkvm::MockCodeCommitment;
+use sov_modules_api::capabilities::TransactionAuthenticator;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
 use sov_modules_api::rest::StateUpdateReceiver;
-use sov_modules_api::Spec;
 use sov_modules_api::ZkVerifier;
+use sov_modules_api::{RawTx, Spec};
 use sov_modules_rollup_blueprint::pluggable_traits::PluggableSpec;
 use sov_modules_rollup_blueprint::proof_sender::SovApiProofSender;
 use sov_modules_rollup_blueprint::{FullNodeBlueprint, RollupBlueprint, SequencerCreationReceipt};
+use sov_modules_stf_blueprint::Runtime as RuntimeTrait;
+use sov_rest_utils::ApiResult;
+use sov_rollup_interface::da::DaBlobHash;
+use sov_rollup_interface::node::da::DaService as DaServiceTrait;
+use sov_sequencer::rest_api::{AcceptTx, TxInfoWithConfirmation};
+use sov_sequencer::{ProofBlobSender, Sequencer, TxStatus};
 
 use sov_rollup_interface::execution_mode::Native;
 use sov_rollup_interface::node::SyncStatus;
 use sov_rollup_interface::zk::aggregated_proof::CodeCommitment;
-use sov_sequencer::ProofBlobSender;
 use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
 use sov_state::Storage;
@@ -150,6 +161,64 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
     ) -> anyhow::Result<Self::ProofSender> {
         Ok(Self::ProofSender::new(sequence_number_provider))
     }
+
+    async fn sequencer_additional_apis<Seq>(
+        &self,
+        sequencer: Arc<Seq>,
+        _rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
+    ) -> anyhow::Result<sov_modules_api::NodeEndpoints>
+    where
+        Seq: Sequencer<Spec = Self::Spec, Rt = Self::Runtime, Da = Self::DaService>,
+    {
+        let router = axum::Router::new()
+            .route("/sequencer/eip712_tx", post(accept_eip712_tx::<Seq>))
+            .with_state(sequencer);
+
+        Ok(sov_modules_api::NodeEndpoints {
+            axum_router: router,
+            jsonrpsee_module: jsonrpsee::RpcModule::new(()),
+            background_handles: Vec::new(),
+        })
+    }
 }
 
 impl sov_modules_rollup_blueprint::WalletBlueprint<Native> for StarterRollup<Native> {}
+
+/// Handler for accepting EIP712 authenticated transactions
+async fn accept_eip712_tx<Seq>(
+    State(sequencer): State<Arc<Seq>>,
+    tx: Json<AcceptTx>,
+) -> ApiResult<
+    TxInfoWithConfirmation<DaBlobHash<<Seq::Da as DaServiceTrait>::Spec>, Seq::Confirmation>,
+>
+where
+    Seq: Sequencer + 'static,
+    Seq::Rt: Eip712AuthenticatorTrait<Seq::Spec>,
+    <Seq::Rt as RuntimeTrait<Seq::Spec>>::Auth: TransactionAuthenticator<Seq::Spec>,
+{
+    let raw_tx = RawTx::new(tx.0.body.blob);
+    let encoded_tx = Seq::Rt::encode_with_eip712_auth(raw_tx);
+
+    // Submit to sequencer (similar to axum_accept_tx but with EIP712 auth)
+    let tx_with_hash = tokio::spawn(async move { sequencer.accept_tx(encoded_tx).await })
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "A panic occurred while accepting an EIP712 transaction");
+            sov_rest_utils::errors::internal_server_error_response_500(
+                "An internal error occurred while processing the transaction",
+            )
+        })?
+        .map_err(|e| {
+            if e.status.is_server_error() {
+                tracing::error!(error = ?e, "Error accepting EIP712 transaction");
+            }
+            IntoResponse::into_response(e)
+        })?;
+
+    Ok(TxInfoWithConfirmation {
+        id: tx_with_hash.tx_hash,
+        confirmation: tx_with_hash.confirmation,
+        status: TxStatus::Submitted,
+    }
+    .into())
+}

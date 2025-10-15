@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 stf-starter-declaration = { workspace = true }
 
+sov-address = { workspace = true, features = ["evm"] }
 sov-rollup-interface = { workspace = true }
 sov-modules-api = { workspace = true }
 sov-modules-stf-blueprint = { workspace = true }
@@ -21,6 +22,8 @@ sov-sequencer-registry = { workspace = true }
 sov-paymaster = { workspace = true }
 sov-hyperlane-integration = { workspace = true }
 sov-bank = { workspace = true }
+sov-evm = { workspace = true }
+jsonrpsee = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -50,6 +53,7 @@ native = [
   "sov-hyperlane-integration/native",
   "sov-sequencer-registry/native",
   "sov-bank/native",
+  "sov-evm/native",
   "sov-address/native",
   "sov-mock-da?/native",
   "sov-celestia-adapter?/native",
