@@ -41,7 +41,7 @@ mod celestia {
 
 #[cfg(feature = "mock_da")]
 mod mock {
-    pub use sov_mock_da::storable::service::StorableMockDaService as DaService;
+    pub use sov_mock_da::storable::local_service::StorableMockDaService as DaService;
     pub use sov_mock_da::MockDaSpec as DaSpec;
     use sov_mock_da::MockDaVerifier;
     use sov_modules_api::{prelude::tokio::sync::watch::Receiver, Spec};

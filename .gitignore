@@ -21,3 +21,7 @@ test-data/mock_da.sqlite*
 test-data/docker
 scripts/rollup-starter.sh
 scripts/rollup-starter-celestia.sh
+
+# Acceptance test data isn't stored in git
+scripts/acceptance-test/acceptance-test-data*
+scripts/acceptance-test/accepted_throughput_report.json
