@@ -199,14 +199,15 @@ async fn worker_task(
 ) -> anyhow::Result<()> {
     // TODO: Add synthetic load txs
     let runner = SoakTestRunner::<Runtime, Spec>::new().with_bank();
-    runner.run(
-        client,
-        rx,
-        worker_id,
-        num_workers,
-        ValidityProfile::Clean.get_validity(),
-    )
-    .await
+    runner
+        .run(
+            client,
+            rx,
+            worker_id,
+            num_workers,
+            ValidityProfile::Clean.get_validity(),
+        )
+        .await
 }
 
 fn start_workers(
