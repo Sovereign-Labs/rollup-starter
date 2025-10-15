@@ -116,7 +116,8 @@ async fn run_test() -> Result<(), anyhow::Error> {
         .spawn()
         .expect("Failed to start rollup");
 
-    for _ in 0..120 {
+    // Wait a while, because this often requires compiling the entire rollup
+    for _ in 0..2400 {
         if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
             .await
             .is_ok_and(|response| response.status().is_success())
