@@ -5,6 +5,7 @@ use sov_api_spec::types::Slot;
 use sov_modules_api::capabilities::config_chain_id;
 use sov_modules_api::transaction::TxDetails;
 use sov_modules_api::{DispatchCall, PrivateKey, Runtime as RuntimeTrait};
+use sov_rollup_interface::node::ledger_api::IncludeChildren;
 use sov_test_utils::{TransactionType, TEST_DEFAULT_MAX_FEE, TEST_DEFAULT_MAX_PRIORITY_FEE};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -23,8 +24,6 @@ pub async fn accessory_state_worker(
     directories: Directories,
     save_enabled: bool,
 ) -> Result<()> {
-    use futures::FutureExt;
-    use sov_rollup_interface::node::ledger_api::IncludeChildren;
 
     let mut slot_stream = client
         .subscribe_slots_with_children(IncludeChildren::new(true)) // Need batches for tx_range
@@ -51,157 +50,94 @@ pub async fn accessory_state_worker(
         };
         tracing::warn!("ACCESSORY STATE WORKER: got slot {}. Proceeding with loop body.", slot.number);
 
-        // Step 2: Check for buffered slots - bail if any
-        while let Some(Some(Ok(slot))) = slot_stream.next().now_or_never() {
-            tracing::error!(
-                "\nACCESSORY STATE WORKER: Websocket lag detected: multiple slots buffered at slot {}. This will be skipped!!!\n",
-                slot.number
-            );
-        }
-        // if slot_stream.next().now_or_never().is_some() {
-        //     anyhow::bail!(
-        //         "Websocket lag detected: multiple slots buffered at slot {}. \
-        //         This simplified implementation cannot handle websocket lag.",
-        //         slot.number
-        //     );
-        // }
-
-        // Step 3: Save the completed slot with correct value
-        let slot_value = if let Some(pending) = &pending_tx {
+        // If pending tx did NOT get included, save the slot with the old value (and skip sending a
+        // new tx)
+        // If it DID get included, save the slot with the updated value and send new tx
+        if let Some(pending) = &pending_tx {
             if tx_in_slot(pending.tx_number, &slot) {
-                // Tx is in this slot - slot has new value
-                tracing::debug!(
-                    "Accessory tx {} found in slot {}",
-                    pending.tx_number,
-                    slot.number
-                );
-                pending.new_value
-            } else {
-                // Tx not in this slot - slot has old value
-                tracing::debug!(
-                    "Accessory tx {} not in slot {} (expected {}), using old value",
+                // Tx is in this slot - update known current value
+                current_value = pending.new_value;
+                tracing::info!(
+                    "ACCESSORY STATE WORKER: Accessory tx {} found in slot {} (expected {}), expecting state to have new value {current_value}",
                     pending.tx_number,
                     slot.number,
                     pending.expected_slot
                 );
-                current_value
+                pending_tx = None;
+            } else {
+                // Tx not in this slot - slot has old value
+                tracing::info!(
+                    "ACCESSORY STATE WORKER: Accessory tx {} not in slot {} (expected {}), using old value {current_value}",
+                    pending.tx_number,
+                    slot.number,
+                    pending.expected_slot
+                );
             }
-        } else {
-            // No pending tx (first iteration)
-            current_value
-        };
-
-        // Save and verify
-        if save_enabled {
-            save_module_state(slot.number, slot_value, &directories.snapshots_dir)?;
         }
 
+        if save_enabled {
+            save_module_state(slot.number, current_value, &directories.snapshots_dir)?;
+        }
+
+        // TODO: clean up race condition - integrate with state_consistency worker?
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Always verify with historical API
         let historical = query_accessory_value_at_slot(&client, slot.number).await?;
         anyhow::ensure!(
-            historical == slot_value,
+            historical == current_value,
             "Historical query mismatch at slot {}: expected {}, got {}",
             slot.number,
-            slot_value,
+            current_value,
             historical
         );
 
-        // On the next slot, we always assume the current pending tx will have landed. A tx can
-        // land in the same slot or the next one depending on race conditions with websocket
-        // notifications, but being delayed by two slots should not normally be possible and will
-        // result in an error.
-        current_value = pending_tx
-            .as_ref()
-            .map(|p| p.new_value)
-            .unwrap_or(current_value);
+        // Step 4: If we're no longer waiting for inclusion, send a new tx
+        if pending_tx.is_none() {
+            let new_value = rand::thread_rng().gen::<u64>();
+            tracing::debug!(
+                "ACCESSORY: sending update tx after slot {}, value {}",
+                slot.number,
+                new_value
+            );
+            let accessory_tx = create_update_accessory_state_tx(new_value)?;
 
-        // Step 4: Always submit new transaction (may overwrite pending_tx)
-        let new_value = rand::thread_rng().gen::<u64>();
-        tracing::debug!(
-            "ACCESSORY: sending update tx after slot {}, value {}",
-            slot.number,
-            new_value
-        );
-        let accessory_tx = create_update_accessory_state_tx(new_value)?;
-
-        match client.send_tx_to_sequencer(&accessory_tx).await {
-            Ok(receipt) => {
-                // MUST match immediately
-                let immediate = query_accessory_value_immediate(&client).await?;
-                anyhow::ensure!(
-                    immediate == new_value,
-                    "Immediate assertion failed: expected {}, got {}",
-                    new_value,
-                    immediate
-                );
-
-                let expected_slot = slot.number + 1;
-                let tx_number = receipt.tx_number.unwrap_or(0);
-                pending_tx = Some(PendingTx {
-                    tx_number,
-                    new_value,
-                    expected_slot,
-                });
-
-                tracing::debug!(
-                    "Submitted accessory tx {}, value: {}, expected slot: {}",
-                    tx_number,
-                    new_value,
-                    expected_slot
-                );
-            }
-            Err(e)
-                if e.to_string()
-                    .contains("The preferred sequencer has reached the stop height") =>
-            {
-                tracing::info!("Accessory worker detected sequencer stop height");
-                break;
-            }
-            Err(e) => {
-                anyhow::bail!("Failed to submit accessory state tx: {}", e);
-            }
-        }
-    }
-
-    // Shutdown: process remaining slots (no new submissions)
-    if let Some(pending) = pending_tx {
-        tracing::info!(
-            "Accessory worker shutdown: waiting for pending tx {}",
-            pending.tx_number
-        );
-
-        // Process up to 2 remaining slots
-        for _ in 0..2 {
-            if let Some(Ok(slot)) = slot_stream.next().await {
-                // Same logic as main loop: save with correct value
-                let slot_value = if tx_in_slot(pending.tx_number, &slot) {
-                    tracing::info!(
-                        "Pending tx {} found in slot {} during shutdown",
-                        pending.tx_number,
-                        slot.number
+            match client.send_tx_to_sequencer(&accessory_tx).await {
+                Ok(receipt) => {
+                    // state must match immediately
+                    let immediate = query_accessory_value_immediate(&client).await?;
+                    anyhow::ensure!(
+                        immediate == new_value,
+                        "Immediate assertion failed: expected {}, got {}",
+                        new_value,
+                        immediate
                     );
-                    pending.new_value
-                } else {
-                    current_value
-                };
 
-                if save_enabled {
-                    save_module_state(slot.number, slot_value, &directories.snapshots_dir)?;
+                    let expected_slot = slot.number + 1;
+                    let tx_number = receipt.tx_number.unwrap_or(0);
+                    pending_tx = Some(PendingTx {
+                        tx_number,
+                        new_value,
+                        expected_slot,
+                    });
+
+                    tracing::info!(
+                        "ACCESSORY STATE WORKER: Submitted accessory tx {}, value: {}, expected slot: {}",
+                        tx_number,
+                        new_value,
+                        expected_slot
+                    );
                 }
-
-                // Verify
-                let historical = query_accessory_value_at_slot(&client, slot.number).await?;
-                anyhow::ensure!(
-                    historical == slot_value,
-                    "Historical query mismatch at slot {} during shutdown: expected {}, got {}",
-                    slot.number,
-                    slot_value,
-                    historical
-                );
-
-                current_value = slot_value;
+                Err(e)
+                    if e.to_string()
+                        .contains("The preferred sequencer has reached the stop height") =>
+                    {
+                        tracing::info!("Accessory worker detected sequencer stop height");
+                        break;
+                    }
+                Err(e) => {
+                    anyhow::bail!("Failed to submit accessory state tx: {}", e);
+                    }
             }
         }
     }

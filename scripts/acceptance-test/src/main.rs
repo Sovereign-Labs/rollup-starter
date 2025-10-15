@@ -176,17 +176,20 @@ async fn run_test() -> Result<(), anyhow::Error> {
             )?;
 
             // Verify module state (if snapshot exists)
-            // if let Ok(state_snapshot) =
-            //     acceptance_test::module_state::load_state_snapshot(slot_number, &directories.snapshots_dir)
-            // {
-            //     acceptance_test::module_state::verify_module_state(slot_number, &client, &state_snapshot)
-            //         .await?;
-            // } else {
-            //     tracing::debug!(
-            //         "No state snapshot for slot {}, skipping module state verification",
-            //         slot_number
-            //     );
-            // }
+            if let Ok(state_snapshot) =
+                acceptance_test::module_state::load_state_snapshot(slot_number, &directories.snapshots_dir)
+            {
+                acceptance_test::module_state::verify_module_state(slot_number, &client, &state_snapshot)
+                    .await?;
+            } else if slot_number < 10 {
+                continue;
+            }else if latest_batch_num < NUM_SOAK_BATCHES {
+                panic!("Missing state snapshot for slot {slot_number}");
+            } else {
+                tracing::debug!(
+                    "No state snapshot for slot {slot_number} past the expected end of resync, skipping module state verification"
+                );
+            }
         }
         checked = slot.number;
     }

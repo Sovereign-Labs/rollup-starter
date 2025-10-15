@@ -31,11 +31,8 @@ pub async fn query_accessory_value_at_slot(
         crate::API_URL,
         slot
     );
-    tracing::info!("ACESSORY QUERY: querying value at slot {slot}...");
     let response = client.client().get(&url).send().await?;
-    tracing::info!("ACESSORY QUERY: raw response: {response:?}");
     let response: ValueResponse<u64> = response.json().await?;
-    tracing::info!("ACESSORY QUERY: json parsed response {response:?}");
     Ok(response.value)
 }
 
