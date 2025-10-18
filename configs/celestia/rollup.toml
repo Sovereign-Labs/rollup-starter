@@ -15,22 +15,23 @@ signer_addres = "celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s"
 
 [storage]
 # The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
-path = "./test-data/rollup-starter-data-celestia"
+path = "./rollup-state/rollup-starter-data-celestia"
 
 user_commit_concurrency = 6
 # The number of 4kb buckets to allocate for the state DB
 # The state DB will not exceed this size, and you'll get a warning when it fills up to 90% capacity.
-user_hashtable_buckets = 1_000_000 # 4 GB. You will need much more for production deployments
+user_hashtable_buckets = 64_000_000 # 256 GB. You will need much more for production deployments
 kernel_commit_concurrency = 2
 # Run pruning once every 100_000 blocks. Prune any keys more than 100 versions old
 pruner_block_interval = 100_000
 pruner_versions_to_keep = 100
+state_cache_size = 10000000000 # 10GB
 
 # We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
 # any blocks before this height
 [runner]
-genesis_height = 3
-da_polling_interval_ms = 1000
+genesis_height = 3 # Probably need to change this before deployment to set a live Celestia height
+da_polling_interval_ms = 300
 
 [runner.http_config]
 bind_host = "0.0.0.0"
@@ -60,7 +61,7 @@ max_number_of_transitions_in_memory = 20
 
 
 [sequencer]
-max_batch_size_bytes = 1048576
+max_batch_size_bytes = 2048576
 max_concurrent_blobs = 128
 max_allowed_node_distance_behind = 10
 rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
@@ -72,4 +73,13 @@ disable_state_root_consistency_checks = true
 # "None" - Shutdown the sequencer instead of attempting recovery (default)
 # "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
 recovery_strategy = "TryToSave"
-batch_execution_time_limit_millis = 18000
+batch_execution_time_limit_millis = 6000
+# If you have one available, uncomment the line below to use a postgres database for the sequencer's soft confirmations. This gives much better performance and durability.
+# postgres_connection_string="postgres://postgres:sequencerdb@localhost:5432/rollup" 
+ideal_lag_behind_finalized_slot = 1
+# The sequencer optimistically pre-executes transactions across multiple worker threads.
+# This warms up caches so the main transaction executor can run with ready-to-use data.
+# This variable determines the number of worker threads.
+num_cache_warmup_workers = 5
+[sequencer.extension]
+max_log_limit = 20000

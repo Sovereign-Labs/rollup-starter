@@ -62,6 +62,9 @@ sov-rollup-apis = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git",
 sov-universal-wallet = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
 sov-zkvm-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
 sov-build = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
+sov-ethereum = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
+sov-evm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
+sov-soak-testing = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
 stf-starter = { path = "./crates/stf", default-features = false }
 stf-starter-declaration = { path = "./crates/stf/stf-declaration", default-features = false }
 value-setter = { path = "./examples/value-setter" }

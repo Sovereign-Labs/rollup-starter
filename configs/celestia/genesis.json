@@ -101,5 +101,20 @@
   "interchain_gas_paymaster": null,
   "merkle_tree_hook": null,
   "warp": null,
-  "value_setter": null
+  "value_setter": null,
+  "evm": {
+    "accounts": [],
+    "initial_base_fee": 7,
+    "genesis_timestamp": 0,
+    "chain_spec": {
+      "limit_contract_code_size": 524288,
+      "coinbase": "0x0000000000000000000000000000000000000000",
+      "block_gas_limit": 30000000,
+      "base_fee_params": {
+        "max_change_denominator": 8,
+        "elasticity_multiplier": 2
+      },
+      "hardforks": [[0, "SHANGHAI"]]
+    }
+  }
 }

@@ -28,6 +28,8 @@ sov-capabilities = { workspace = true }
 sov-kernels = { workspace = true }
 sov-rollup-apis = { workspace = true, optional = true }
 sov-hyperlane-integration = { workspace = true }
+sov-evm = { workspace = true }
+sov-address = { workspace = true }
 
 tracing = { workspace = true }
 value-setter = { workspace = true }
@@ -65,7 +67,9 @@ native = [
 	"sov-paymaster/native",
 	"sov-hyperlane-integration/native",
 	"sov-operator-incentives/native",
-	"sov-revenue-share/native"
+	"sov-revenue-share/native",
+	"sov-address/native",
+	"sov-evm/native"
 ]
 bench = [
     "sov-modules-api/bench",

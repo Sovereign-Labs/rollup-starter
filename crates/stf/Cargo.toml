@@ -21,6 +21,8 @@ sov-sequencer-registry = { workspace = true }
 sov-paymaster = { workspace = true }
 sov-hyperlane-integration = { workspace = true }
 sov-bank = { workspace = true }
+sov-address = { workspace = true }
+sov-evm = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -39,21 +41,22 @@ default = []
 mock_da = ["sov-mock-da"]
 celestia_da = ["sov-celestia-adapter"]
 native = [
-  "stf-starter-declaration/native",
-  "sov-modules-api/native",
-  "sov-modules-stf-blueprint/native",
-  "sov-rollup-interface/native",
-  "sov-capabilities/native",
-  "sov-rollup-apis",
-  "sov-kernels/native",
-  "sov-paymaster/native",
-  "sov-hyperlane-integration/native",
-  "sov-sequencer-registry/native",
-  "sov-bank/native",
-  "sov-address/native",
-  "sov-mock-da?/native",
-  "sov-celestia-adapter?/native",
-  "sov-mock-zkvm/native",
+	"stf-starter-declaration/native",
+	"sov-modules-api/native",
+	"sov-modules-stf-blueprint/native",
+	"sov-rollup-interface/native",
+	"sov-capabilities/native",
+	"sov-rollup-apis",
+	"sov-kernels/native",
+	"sov-paymaster/native",
+	"sov-hyperlane-integration/native",
+	"sov-sequencer-registry/native",
+	"sov-bank/native",
+	"sov-address/native",
+	"sov-mock-da?/native",
+	"sov-celestia-adapter?/native",
+	"sov-mock-zkvm/native",
+	"sov-evm/native"
 ]
 
 bench = [

@@ -1,11 +1,14 @@
 //! This is a technical only module to forward all necessary implementations to inner, non-authenticated Runtime
+use sov_address::{EthereumAddress, FromVmAddress};
 use sov_capabilities::StandardProvenRollupCapabilities as StandardCapabilities;
+use sov_evm::{EthereumAuthenticator, EvmAuthenticatorInput};
 use sov_hyperlane_integration::HyperlaneAddress;
 use sov_kernels::soft_confirmations::SoftConfirmationsKernel;
 #[cfg(feature = "native")]
 use sov_modules_api::capabilities::KernelWithSlotMapping;
+use sov_modules_api::capabilities::TransactionAuthenticator;
 use sov_modules_api::capabilities::{Guard, HasCapabilities, HasKernel};
-use sov_modules_api::prelude::*;
+use sov_modules_api::{prelude::*, RawTx};
 use sov_modules_api::{
     AuthenticatedTransactionData, BlockHooks, DispatchCall, EncodeCall, Genesis, GenesisState,
     RuntimeEventProcessor, Spec, StateCheckpoint, Storage, TxHooks, TxState, TypeErasedEvent,
@@ -20,7 +23,7 @@ use stf_starter_declaration::RuntimeCall;
 
 impl<S: Spec> Genesis for Runtime<S>
 where
-    <S as Spec>::Address: HyperlaneAddress,
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Spec = S;
     type Config = GenesisConfig<S>;
@@ -37,7 +40,7 @@ where
 
 impl<S: Spec> DispatchCall for Runtime<S>
 where
-    <S as Spec>::Address: HyperlaneAddress,
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Spec = S;
     type Decodable = RuntimeCall<S>;
@@ -69,7 +72,7 @@ where
 
 impl<S: Spec> EncodeCall<sov_bank::Bank<S>> for Runtime<S>
 where
-    <S as Spec>::Address: HyperlaneAddress,
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     fn encode_call(data: <sov_bank::Bank<S> as sov_modules_api::Module>::CallMessage) -> Vec<u8> {
         <RuntimeInner<S> as EncodeCall<sov_bank::Bank<S>>>::encode_call(data)
@@ -84,7 +87,7 @@ where
 
 impl<S: Spec> BlockHooks for Runtime<S>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Spec = S;
 
@@ -103,7 +106,7 @@ where
 
 impl<S: Spec> TxHooks for Runtime<S>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Spec = S;
 
@@ -128,7 +131,7 @@ where
 #[cfg(feature = "native")]
 impl<S: Spec> sov_modules_api::FinalizeHook for Runtime<S>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Spec = S;
 
@@ -143,7 +146,7 @@ where
 
 impl<S: Spec> RuntimeEventProcessor for Runtime<S>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type RuntimeEvent = stf_starter_declaration::RuntimeEvent<S>;
 
@@ -155,7 +158,7 @@ where
 #[cfg(feature = "native")]
 impl<S: Spec> sov_modules_api::CliWallet for Runtime<S>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type CliStringRepr<T> = stf_starter_declaration::RuntimeMessage<T, S>;
 }
@@ -163,7 +166,7 @@ where
 #[cfg(feature = "native")]
 impl<S: Spec> sov_modules_api::rest::HasRestApi<S> for Runtime<S>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     fn rest_api(&self, state: sov_modules_api::rest::ApiState<S>) -> axum::Router<()> {
         self.0.rest_api(state)
@@ -176,7 +179,7 @@ where
 
 impl<S: Spec> HasCapabilities<S> for Runtime<S>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Capabilities<'a> = StandardCapabilities<'a, S, &'a mut sov_paymaster::Paymaster<S>>;
 
@@ -196,7 +199,7 @@ where
 
 impl<S: Spec> HasKernel<S> for Runtime<S>
 where
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Kernel<'a> = SoftConfirmationsKernel<'a, S>;
 
@@ -219,7 +222,7 @@ impl<T, S> sov_modules_api::cli::CliFrontEnd<Runtime<S>>
 where
     T: clap::Args,
     S: Spec + for<'de> serde::Deserialize<'de>,
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
     stf_starter_declaration::RuntimeSubcommand<T, S>:
         sov_modules_api::cli::CliFrontEnd<RuntimeInner<S>>,
 {
@@ -227,4 +230,13 @@ where
         <stf_starter_declaration::RuntimeSubcommand<T, S> as sov_modules_api::cli::CliFrontEnd<
             RuntimeInner<S>,
         >>::CliIntermediateRepr<U>;
+}
+
+impl<S: Spec> EthereumAuthenticator<S> for Runtime<S>
+where
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    fn add_ethereum_auth(tx: RawTx) -> <Self::Auth as TransactionAuthenticator<S>>::Input {
+        EvmAuthenticatorInput::Evm(tx)
+    }
 }

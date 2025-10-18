@@ -59,6 +59,7 @@ jobs:
     with:
       job-name: "Run README"
       env-vars: "SKIP_GUEST_BUILD=1"
+      runner-size: "16x64"
       command: |
         bashtestmd --input README.md --output scripts/rollup-starter.sh --tag=test-ci
         chmod +x scripts/rollup-starter.sh
@@ -109,6 +110,7 @@ jobs:
     with:
       job-name: "Run Celestia Tutorial"
       env-vars: "SKIP_GUEST_BUILD=1"
+      runner-size: "16x64"
       command: |
         bashtestmd --input GETTING_STARTED_WITH_CELESTIA.md --output scripts/rollup-starter-celestia.sh --tag=test-ci
         chmod +x scripts/rollup-starter-celestia.sh
@@ -121,6 +123,7 @@ jobs:
     with:
       job-name: "Run Hyperlane Tutorial"
       env-vars: "SKIP_GUEST_BUILD=1"
+      runner-size: "16x64"
       command: |
         bashtestmd --input GETTING_STARTED_WITH_HYPERLANE.md --output scripts/rollup-starter-hyperlane.sh --tag=test-ci
         chmod +x scripts/rollup-starter-hyperlane.sh

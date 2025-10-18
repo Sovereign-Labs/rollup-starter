@@ -29,12 +29,16 @@ on:
         required: false
         type: string
         default: ""
+      runner-size:
+        required: false
+        type: string
+        default: "8x32"
 
 jobs:
   run:
     name: ${{ inputs.job-name }}
     runs-on:
-      - nscloud-ubuntu-22.04-amd64-8x32-with-cache
+      - nscloud-ubuntu-22.04-amd64-${{ inputs.runner-size }}-with-cache
       - nscloud-cache-tag-rollup-starter-build
       - nscloud-cache-size-100gb
       # Privileged feature is needed for proper `io_uring` functionality needed by NOMT

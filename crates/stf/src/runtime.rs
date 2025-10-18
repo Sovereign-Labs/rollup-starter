@@ -1,7 +1,9 @@
 #![allow(unused_doc_comments)]
 //! This module implements `Runtime` trait and ensures that it uses correct `CHAIN_HASH`
+use sov_address::{EthereumAddress, FromVmAddress};
+use sov_evm::EvmAuthenticatorInput;
 use sov_hyperlane_integration::HyperlaneAddress;
-use sov_modules_api::capabilities::{RollupAuthenticator, TransactionAuthenticator};
+use sov_modules_api::capabilities::TransactionAuthenticator;
 #[cfg(feature = "native")]
 use sov_modules_api::prelude::*;
 use sov_modules_api::OperatingMode;
@@ -24,12 +26,12 @@ mod __generated {
 #[derive(Clone, Default)]
 pub struct Runtime<S: Spec>(pub(crate) RuntimeInner<S>)
 where
-    <S as Spec>::Address: HyperlaneAddress;
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>;
 
 impl<S: Spec> sov_modules_stf_blueprint::Runtime<S> for Runtime<S>
 where
     S::Da: DaSpec,
-    S::Address: HyperlaneAddress,
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     // Make runtime authenticated.
     const CHAIN_HASH: [u8; 32] = __generated::CHAIN_HASH;
@@ -39,7 +41,7 @@ where
     #[cfg(feature = "native")]
     type GenesisInput = std::path::PathBuf;
 
-    type Auth = RollupAuthenticator<S, Self>;
+    type Auth = sov_evm::EvmAuthenticator<S, Self>;
 
     #[cfg(feature = "native")]
     fn endpoints(api_state: sov_modules_api::rest::ApiState<S>) -> sov_modules_api::NodeEndpoints {
@@ -82,7 +84,10 @@ where
     fn wrap_call(
         auth_data: <Self::Auth as TransactionAuthenticator<S>>::Decodable,
     ) -> Self::Decodable {
-        auth_data
+        match auth_data {
+            EvmAuthenticatorInput::Evm(call) => Self::Decodable::Evm(call),
+            EvmAuthenticatorInput::Standard(call) => call,
+        }
     }
 
     fn allow_unregistered_tx(call: &Self::Decodable) -> bool {
