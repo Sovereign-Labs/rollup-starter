@@ -34,7 +34,6 @@ pub async fn start_rollup(
     let rollup_config = RollupConfig {
         storage: RollupDbConfig::default_in_path(temp_path.to_path_buf()),
         runner: RunnerConfig {
-            genesis_height: 0,
             da_polling_interval_ms: 200,
             http_config: HttpServerConfig::localhost_on_free_port(),
             concurrent_sync_tasks: Some(1),
