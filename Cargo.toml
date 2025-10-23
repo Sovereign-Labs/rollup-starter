@@ -58,6 +58,7 @@ sov-soak-testing-lib = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.
 sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
 sov-stf-runner = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
 sov-test-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
+sov-test-state-consistency = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
 sov-rollup-apis = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
 sov-universal-wallet = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }
 sov-zkvm-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "a972912be8de8f705a0b8be2dd90013ce04b7d6e" }

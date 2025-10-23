@@ -11,12 +11,15 @@ rust-version.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 rand = "0.8"
+hex = "0.4.3"
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-stf-starter = { path = "../../crates/stf", features = ["mock_da", "native"] }
+stf-starter = { path = "../../crates/stf", features = ["mock_da", "native", "acceptance-testing"] }
 sov-bank = { workspace = true, features = ["native"] }
 sov-modules-rollup-blueprint = { workspace = true, features = ["native"] }
 sov-soak-testing-lib.workspace = true
+sov-test-state-consistency = { workspace = true }
+sov-test-utils = { workspace = true }
 tokio = { workspace = true }
 reqwest = { version = "0.12", features = ["rustls-tls"] }
 sov-api-spec.workspace = true

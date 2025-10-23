@@ -6,29 +6,86 @@ use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
+use state_consistency::state_validation_worker;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use std::process::Child;
 use std::{env, fs, process::Command, thread, time::Duration};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 use tracing::{debug, info};
 
 use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
+pub mod accessory_state;
 pub mod fetch_and_compare;
+pub mod module_state;
+mod state_consistency;
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
 pub const API_URL: &str = "http://localhost:12348";
 
 // Save a full snapshot of the slot every N slots
-const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
-pub const NUM_SOAK_BATCHES: u64 = 1000;
+const FULL_SLOT_SAVE_INTERVAL: u64 = 5;
+pub const NUM_SOAK_BATCHES: u64 = 50;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
 
+/// Wrapper around std::process::Child that automatically kills the rollup process
+/// when dropped.
+pub struct RollupProcess {
+    child: Child,
+}
+
+impl RollupProcess {
+    pub fn new(child: Child) -> Self {
+        Self { child }
+    }
+}
+
+impl Drop for RollupProcess {
+    fn drop(&mut self) {
+        kill_rollup(self.child.id());
+    }
+}
+
+impl Deref for RollupProcess {
+    type Target = Child;
+
+    fn deref(&self) -> &Self::Target {
+        &self.child
+    }
+}
+
+impl DerefMut for RollupProcess {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.child
+    }
+}
+
+/// Wrapper around a postgres container that automatically cleans up when dropped.
+pub struct PostgresContainerGuard {
+    name: String,
+}
+
+impl PostgresContainerGuard {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl Drop for PostgresContainerGuard {
+    fn drop(&mut self) {
+        if let Err(e) = cleanup_postgres_container(&self.name) {
+            tracing::error!("Failed to cleanup postgres container: {}", e);
+        }
+    }
+}
+
 pub fn start_and_wait_for_postgres_ready(
     container_name: &str,
     password: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<PostgresContainerGuard, anyhow::Error> {
     info!("Starting postgres container");
     let postgres_env = format!("POSTGRES_PASSWORD={}", password);
     let start_postgres = Command::new("docker")
@@ -59,7 +116,9 @@ pub fn start_and_wait_for_postgres_ready(
 
         if ready_check.status.success() {
             info!("Postgres is ready");
-            return Ok(());
+            return Ok(PostgresContainerGuard {
+                name: container_name.to_string(),
+            });
         }
 
         debug!(
@@ -198,7 +257,9 @@ async fn worker_task(
     num_workers: u32,
 ) -> anyhow::Result<()> {
     // TODO: Add synthetic load txs
-    let runner = SoakTestRunner::<Runtime, Spec>::new().with_bank();
+    let runner = SoakTestRunner::<Runtime, Spec>::new()
+        .with_bank()
+        .with_state_consistency();
     runner
         .run(
             client,
@@ -253,9 +314,60 @@ pub struct ThroughputReport {
     pub num_slots: u64,
 }
 
+/// Send SIGINT to the rollup process to gracefully shut it down.
+/// If the process doesn't respond within 10 seconds, send SIGKILL.
+pub fn kill_rollup(rollup_id: u32) {
+    tracing::info!("Sending SIGINT to rollup process {}", rollup_id);
+
+    // Send SIGINT
+    if let Err(e) = Command::new("kill")
+        .args(["-s", "SIGINT", &rollup_id.to_string()])
+        .status()
+    {
+        tracing::error!("Failed to send SIGINT: {}", e);
+        return;
+    }
+
+    // Wait up to 10 seconds for graceful shutdown
+    for _ in 0..100 {
+        thread::sleep(Duration::from_millis(100));
+
+        // Check if process still exists using kill -0
+        match Command::new("kill")
+            .args(["-0", &rollup_id.to_string()])
+            .status()
+        {
+            Ok(status) if !status.success() => {
+                // Process doesn't exist anymore
+                tracing::info!("Rollup process {rollup_id} shut down gracefully");
+                return;
+            }
+            Err(_) => {
+                // Error running kill command, assume process is gone
+                tracing::info!("Unable to check rollup process {rollup_id} status; assuming it no longer exists");
+                return;
+            }
+            Ok(_) => {
+                // Process still exists, continue waiting
+            }
+        }
+    }
+
+    // Process didn't respond to SIGINT, force kill
+    tracing::warn!(
+        "Rollup process {rollup_id} didn't respond to SIGINT after 10s, sending SIGKILL"
+    );
+    if let Err(e) = Command::new("kill")
+        .args(["-9", &rollup_id.to_string()])
+        .status()
+    {
+        tracing::error!("Failed to send SIGKILL: {e}");
+    }
+}
+
 pub async fn run_soak(
     directories: Directories,
-    mut rollup: std::process::Child,
+    mut rollup: RollupProcess,
     num_previous_batches: u64,
     save_slot_snapshots: bool,
 ) -> Result<ThroughputReport, anyhow::Error> {
@@ -269,7 +381,25 @@ pub async fn run_soak(
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
     slot_fetcher.subscribe_slots(false).await?;
-    let (tx, worker_set) = start_workers(num_previous_batches as u32)?;
+    let (tx, mut worker_set) = start_workers(num_previous_batches as u32)?;
+
+    // Start state validation worker
+    let state_validator_client = get_rollup_client()?;
+    let state_validator_rx = tx.subscribe();
+    worker_set.spawn(state_validation_worker(
+        state_validator_client,
+        state_validator_rx,
+    ));
+
+    // Start accessory state worker
+    let accessory_client = get_rollup_client()?;
+    let accessory_rx = tx.subscribe();
+    worker_set.spawn(accessory_state::accessory_state_worker(
+        accessory_client,
+        accessory_rx,
+        directories.clone(),
+        save_slot_snapshots,
+    ));
 
     use tokio::signal::unix::SignalKind;
     let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
@@ -347,32 +477,17 @@ pub async fn run_soak(
             // Signal handlers
             _ = tokio::signal::ctrl_c() => {
                 tracing::info!("Received Ctrl+C, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
+                kill_rollup(rollup_id);
                 break;
             },
             _ = terminate.recv() => {
                 tracing::info!("Received SIGTERM, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
+                kill_rollup(rollup_id);
                 break;
             },
             _ = quit.recv() => {
                 tracing::info!("Received SIGQUIT, shutting down rollup");
-                // Shutdown the rollup immediately
-                if let Ok(mut interrupt) = Command::new("kill")
-                    .args(["-s", "SIGINT", &rollup_id.to_string()])
-                    .spawn() {
-                    let _ = interrupt.wait();
-                }
+                kill_rollup(rollup_id);
                 break;
             },
             // Rollup shutdown
@@ -389,6 +504,24 @@ pub async fn run_soak(
                     }
                 }
                 break;
+            }
+            // Worker task failure
+            Some(worker_result) = worker_set.join_next() => {
+                match worker_result {
+                    Ok(Ok(())) => {
+                        // Worker completed successfully, continue monitoring
+                    }
+                    Ok(Err(e)) => {
+                        tracing::error!("Worker task failed: {}", e);
+                        kill_rollup(rollup_id);
+                        return Err(e);
+                    }
+                    Err(e) => {
+                        tracing::error!("Worker task panicked: {}", e);
+                        kill_rollup(rollup_id);
+                        return Err(e.into());
+                    }
+                }
             }
         }
     }

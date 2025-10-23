@@ -84,6 +84,9 @@ where
     pub warp: Warp<S>,
     /// The ValueSetter module (recommended as a starting point for building new modules)
     pub value_setter: value_setter::ValueSetter<S>,
+    /// The StateConsistency module, used for acceptance testing
+    #[cfg(feature = "acceptance-testing")]
+    pub state_consistency: sov_test_state_consistency::StateConsistency<S>,
     #[cfg_attr(feature = "native", cli_skip)]
     /// The EVM module.
     pub evm: sov_evm::Evm<S>,

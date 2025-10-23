@@ -2,9 +2,9 @@ use std::process::Command;
 
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
-    cleanup_postgres_container, generate_postgres_password, get_rollup_client, interpolate_config,
-    run_soak, start_and_wait_for_postgres_ready, wait_for_sequencer_ready, Directories, Runtime,
-    Spec, API_URL, NUM_SOAK_BATCHES, POSTGRES_CONTAINER_NAME,
+    generate_postgres_password, get_rollup_client, interpolate_config, run_soak,
+    start_and_wait_for_postgres_ready, wait_for_sequencer_ready, Directories, RollupProcess,
+    Runtime, Spec, API_URL, NUM_SOAK_BATCHES, POSTGRES_CONTAINER_NAME,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -70,40 +70,42 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let directories = Directories::new()?;
     let password = generate_postgres_password()?;
-    start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
+    let _guard = start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
     interpolate_config(&password, &directories)?;
 
     info!(
         "Starting rollup from rollup workspace root: {}",
         directories.rollup_root.display()
     );
-    let rollup = Command::new("cargo")
-        .args([
-            "run",
-            "--release",
-            "--",
-            "--rollup-config-path",
-            &directories
-                .output_dir
-                .join("config.toml")
-                .display()
-                .to_string(),
-            "--genesis-path",
-            &directories
-                .acceptance_test_dir
-                .join("genesis.json")
-                .display()
-                .to_string(),
-            "--stop-at-rollup-height",
-            &(NUM_SOAK_BATCHES + 10).to_string(),
-        ])
-        .current_dir(directories.rollup_root.clone())
-        .env("RUST_LOG", "info")
-        .stdout(std::fs::File::create(
-            directories.output_dir.join("rollup.log"),
-        )?)
-        .spawn()
-        .expect("Failed to start rollup");
+    let rollup = RollupProcess::new(
+        Command::new("cargo")
+            .args([
+                "run",
+                "--release",
+                "--",
+                "--rollup-config-path",
+                &directories
+                    .output_dir
+                    .join("config.toml")
+                    .display()
+                    .to_string(),
+                "--genesis-path",
+                &directories
+                    .acceptance_test_dir
+                    .join("genesis.json")
+                    .display()
+                    .to_string(),
+                "--stop-at-rollup-height",
+                &(NUM_SOAK_BATCHES + 10).to_string(),
+            ])
+            .current_dir(directories.rollup_root.clone())
+            .env("RUST_LOG", "info")
+            .stdout(std::fs::File::create(
+                directories.output_dir.join("rollup.log"),
+            )?)
+            .spawn()
+            .expect("Failed to start rollup"),
+    );
 
     // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
     do_manual_setup(directories.clone()).await?;
@@ -113,7 +115,6 @@ async fn main() -> Result<(), anyhow::Error> {
         serde_json::to_string(&throughput_report)?,
     )?;
     save_mock_data(directories.clone())?;
-    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
     Ok(())
 }
 

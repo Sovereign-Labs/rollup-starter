@@ -1,7 +1,7 @@
 use acceptance_test::fetch_and_compare::SlotFetcher;
+use acceptance_test::RollupProcess;
 use acceptance_test::ThroughputReport;
 use acceptance_test::{
-    cleanup_postgres_container,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
     generate_postgres_password, get_rollup_client, interpolate_config, run_soak,
     start_and_wait_for_postgres_ready, Directories, API_URL, NUM_SOAK_BATCHES,
@@ -18,7 +18,7 @@ async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,hyper=info")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
         .init();
 
@@ -31,7 +31,6 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         info!("Acceptance test completed");
     }
-    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
 
     result
 }
@@ -89,7 +88,7 @@ async fn run_test() -> Result<(), anyhow::Error> {
     copy_persistent_mock_data(&directories)?;
 
     // Start the sequencer postgres and wait for it to be ready
-    start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
+    let _guard = start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
 
     // Start the rollup. Run for 10 seconds
     info!(
@@ -97,34 +96,42 @@ async fn run_test() -> Result<(), anyhow::Error> {
         directories.rollup_root.display()
     );
 
-    let rollup = Command::new("cargo")
-        .args([
-            "run",
-            "--release",
-            "--",
-            "--rollup-config-path",
-            &directories
-                .output_dir
-                .join("config.toml")
-                .display()
-                .to_string(),
-            "--stop-at-rollup-height",
-            &((NUM_SOAK_BATCHES * 2).to_string()),
-        ])
-        .current_dir(directories.rollup_root.clone())
-        .env("RUST_LOG", "info")
-        .spawn()
-        .expect("Failed to start rollup");
+    let rollup = RollupProcess::new(
+        Command::new("cargo")
+            .args([
+                "run",
+                "--release",
+                "--",
+                "--rollup-config-path",
+                &directories
+                    .output_dir
+                    .join("config.toml")
+                    .display()
+                    .to_string(),
+                "--genesis-path",
+                &directories
+                    .acceptance_test_dir
+                    .join("genesis.json")
+                    .display()
+                    .to_string(),
+                "--stop-at-rollup-height",
+                &((NUM_SOAK_BATCHES * 2 + 10).to_string()),
+            ])
+            .current_dir(directories.rollup_root.clone())
+            .env("RUST_LOG", "info")
+            .spawn()
+            .expect("Failed to start rollup"),
+    );
 
-    // Wait a while, because this often requires compiling the entire rollup
-    for _ in 0..2400 {
+    // Wait a while, because this often requires compiling the entire rollup in release mode
+    for _ in 0..1200 {
         if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
             .await
             .is_ok_and(|response| response.status().is_success())
         {
             break;
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(200)).await;
     }
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
@@ -168,6 +175,27 @@ async fn run_test() -> Result<(), anyhow::Error> {
                 &format!("slot_{}", slot_number),
                 false,
             )?;
+
+            // Verify module state (if snapshot exists)
+            if let Ok(state_snapshot) = acceptance_test::module_state::load_state_snapshot(
+                slot_number,
+                &directories.snapshots_dir,
+            ) {
+                acceptance_test::module_state::verify_module_state(
+                    slot_number,
+                    &client,
+                    &state_snapshot,
+                )
+                .await?;
+            } else if slot_number < 10 {
+                continue;
+            } else if latest_batch_num < NUM_SOAK_BATCHES {
+                panic!("Missing state snapshot for slot {slot_number}");
+            } else {
+                tracing::debug!(
+                    "No state snapshot for slot {slot_number} past the expected end of resync, skipping module state verification"
+                );
+            }
         }
         checked = slot.number;
     }

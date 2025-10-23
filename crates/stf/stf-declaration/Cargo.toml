@@ -24,6 +24,7 @@ sov-paymaster = { workspace = true }
 sov-revenue-share = { workspace = true }
 sov-modules-stf-blueprint = { workspace = true }
 sov-rollup-interface = { workspace = true }
+sov-test-state-consistency = { workspace = true }
 sov-capabilities = { workspace = true }
 sov-kernels = { workspace = true }
 sov-rollup-apis = { workspace = true, optional = true }
@@ -43,6 +44,7 @@ clap = { workspace = true, features = ["derive"], optional = true }
 
 [features]
 default = []
+acceptance-testing = []
 native = [
 	"clap",
 	"jsonrpsee",
@@ -69,7 +71,8 @@ native = [
 	"sov-operator-incentives/native",
 	"sov-revenue-share/native",
 	"sov-address/native",
-	"sov-evm/native"
+	"sov-evm/native",
+	"sov-test-state-consistency/native"
 ]
 bench = [
     "sov-modules-api/bench",
