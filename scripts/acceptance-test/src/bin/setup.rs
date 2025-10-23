@@ -316,7 +316,7 @@ fn encode_and_sign_tx(msg: RuntimeCall<Spec>) -> Result<RawTx, anyhow::Error> {
     )
     .unwrap();
 
-    let tx = Transaction::new_signed_tx(
+    let tx: Transaction<Runtime, Spec> = Transaction::new_signed_tx(
         &priv_key,
         &<Runtime as sov_modules_stf_blueprint::Runtime<Spec>>::CHAIN_HASH,
         utx,
