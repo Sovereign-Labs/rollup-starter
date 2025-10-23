@@ -24,7 +24,6 @@ pub async fn accessory_state_worker(
     directories: Directories,
     save_enabled: bool,
 ) -> Result<()> {
-
     let mut slot_stream = client
         .subscribe_slots_with_children(IncludeChildren::new(true)) // Need batches for tx_range
         .await?;
@@ -48,7 +47,10 @@ pub async fn accessory_state_worker(
             }
             None => break,
         };
-        tracing::warn!("ACCESSORY STATE WORKER: got slot {}. Proceeding with loop body.", slot.number);
+        tracing::warn!(
+            "ACCESSORY STATE WORKER: got slot {}. Proceeding with loop body.",
+            slot.number
+        );
 
         // If pending tx did NOT get included, save the slot with the old value (and skip sending a
         // new tx)
@@ -131,13 +133,13 @@ pub async fn accessory_state_worker(
                 Err(e)
                     if e.to_string()
                         .contains("The preferred sequencer has reached the stop height") =>
-                    {
-                        tracing::info!("Accessory worker detected sequencer stop height");
-                        break;
-                    }
+                {
+                    tracing::info!("Accessory worker detected sequencer stop height");
+                    break;
+                }
                 Err(e) => {
                     anyhow::bail!("Failed to submit accessory state tx: {}", e);
-                    }
+                }
             }
         }
     }

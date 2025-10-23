@@ -26,6 +26,7 @@ sov-stf-runner = { workspace = true }
 sov-cli = { workspace = true }
 sov-hyperlane-integration = { workspace = true, features = ["native"] }
 sov-address = { workspace = true, features = ["evm"] }
+sov-ethereum = { workspace = true }
 
 sov-db = { workspace = true }
 sov-sequencer = { workspace = true }

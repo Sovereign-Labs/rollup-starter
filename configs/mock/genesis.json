@@ -45,6 +45,18 @@
           "1000000000"
         ],
         [
+          "0xc13b65f7c53Cd6db2EA205a4b574b4a0858720A6",
+          "10000000000000000000000000000"
+        ],
+        [
+          "0xBaEb92889696217A3A6be2175E5a95dC4cFFC9f7",
+          "10000000000000000000000000000"
+        ],
+	      [
+          "0x2b9A8bdd2fe54C75116986f2fa892210A5f22915",
+          "10000000000000000000000000000"
+        ],
+        [
           "0x267d5F5Ba12AcD07Ce5D0831B17aB5927fEBCd48",
           "1000000000"
         ]
@@ -101,5 +113,20 @@
   "interchain_gas_paymaster": null,
   "merkle_tree_hook": null,
   "warp": null,
-  "value_setter": null
+  "value_setter": null,
+  "evm": {
+    "accounts": [],
+    "initial_base_fee": 7,
+    "genesis_timestamp": 0,
+    "chain_spec": {
+      "limit_contract_code_size": 524288,
+      "coinbase": "0x0000000000000000000000000000000000000000",
+      "block_gas_limit": 30000000,
+      "base_fee_params": {
+        "max_change_denominator": 8,
+        "elasticity_multiplier": 2
+      },
+      "hardforks": [[0, "CANCUN"]]
+    }
+  }
 }

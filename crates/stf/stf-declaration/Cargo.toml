@@ -29,6 +29,8 @@ sov-capabilities = { workspace = true }
 sov-kernels = { workspace = true }
 sov-rollup-apis = { workspace = true, optional = true }
 sov-hyperlane-integration = { workspace = true }
+sov-evm = { workspace = true }
+sov-address = { workspace = true }
 
 tracing = { workspace = true }
 value-setter = { workspace = true }
@@ -42,6 +44,7 @@ clap = { workspace = true, features = ["derive"], optional = true }
 
 [features]
 default = []
+acceptance-testing = []
 native = [
 	"clap",
 	"jsonrpsee",
@@ -67,6 +70,8 @@ native = [
 	"sov-hyperlane-integration/native",
 	"sov-operator-incentives/native",
 	"sov-revenue-share/native",
+	"sov-address/native",
+	"sov-evm/native",
 	"sov-test-state-consistency/native"
 ]
 bench = [

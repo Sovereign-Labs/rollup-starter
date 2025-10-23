@@ -26,6 +26,7 @@ jobs:
     with:
       job-name: "Soak Test"
       env-vars: "SKIP_GUEST_BUILD=1"
+      runner-size: "16x64"
       command: |
         cargo build --release
         cargo build --release --bin rollup-starter-soak-test -p rollup-starter-soak-test

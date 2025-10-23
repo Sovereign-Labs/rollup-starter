@@ -123,6 +123,7 @@ async fn run_test() -> Result<(), anyhow::Error> {
             .expect("Failed to start rollup"),
     );
 
+    // Wait a while, because this often requires compiling the entire rollup in release mode
     for _ in 0..1200 {
         if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
             .await
@@ -130,7 +131,7 @@ async fn run_test() -> Result<(), anyhow::Error> {
         {
             break;
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(200)).await;
     }
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
@@ -176,14 +177,19 @@ async fn run_test() -> Result<(), anyhow::Error> {
             )?;
 
             // Verify module state (if snapshot exists)
-            if let Ok(state_snapshot) =
-                acceptance_test::module_state::load_state_snapshot(slot_number, &directories.snapshots_dir)
-            {
-                acceptance_test::module_state::verify_module_state(slot_number, &client, &state_snapshot)
-                    .await?;
+            if let Ok(state_snapshot) = acceptance_test::module_state::load_state_snapshot(
+                slot_number,
+                &directories.snapshots_dir,
+            ) {
+                acceptance_test::module_state::verify_module_state(
+                    slot_number,
+                    &client,
+                    &state_snapshot,
+                )
+                .await?;
             } else if slot_number < 10 {
                 continue;
-            }else if latest_batch_num < NUM_SOAK_BATCHES {
+            } else if latest_batch_num < NUM_SOAK_BATCHES {
                 panic!("Missing state snapshot for slot {slot_number}");
             } else {
                 tracing::debug!(

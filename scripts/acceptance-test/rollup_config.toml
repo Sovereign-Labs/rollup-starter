@@ -15,7 +15,7 @@ sender_address = "00000000000000000000000000000000000000000000000000000000000000
 finalization = 0
 # Defines how new blocks should be produced.
 [da.block_producing.periodic]
-block_time_ms = 3_000
+block_time_ms = 6_000
 
 [storage]
 # The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
@@ -23,17 +23,18 @@ path = "{rollup_data_path}"
 user_commit_concurrency = 6
 # The number of 4kb buckets to allocate for the state DB
 # The state DB will not exceed this size, and you'll get a warning when it fills up to 90% capacity.
-user_hashtable_buckets = 16_000_000 # 64 GB. You will need much more for production deployments
+user_hashtable_buckets = 64_000_000 # 256 GB. You will need much more for production deployments
 kernel_commit_concurrency = 2
 # Run pruning once every 1000 blocks. Prune any keys more than 100 versions old
-pruner_block_interval = 1000
+pruner_block_interval = 1000_000
 pruner_versions_to_keep = 100
+state_cache_size = 10000000000 # 10GB
 
 # We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
 # any blocks before this height
 [runner]
 genesis_height = 1  # Use a non-zero genesis height
-da_polling_interval_ms = 1000
+da_polling_interval_ms = 200
 
 [runner.http_config]
 bind_host = "0.0.0.0"
@@ -75,6 +76,12 @@ disable_state_root_consistency_checks = true
 # "None" - Shutdown the sequencer instead of attempting recovery (default)
 # "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
 recovery_strategy = "TryToSave"
-batch_execution_time_limit_millis = 3000 # This should be adjusted depending on the DA layer's block times
+batch_execution_time_limit_millis = 6000 # This should be adjusted depending on the DA layer's block times
 postgres_connection_string = "postgres://postgres:{password}@localhost:5432/postgres"
 ideal_lag_behind_finalized_slot = 1
+# The sequencer optimistically pre-executes transactions across multiple worker threads.
+# This warms up caches so the main transaction executor can run with ready-to-use data.
+# This variable determines the number of worker threads.
+num_cache_warmup_workers = 5
+[sequencer.extension]
+max_log_limit = 20000

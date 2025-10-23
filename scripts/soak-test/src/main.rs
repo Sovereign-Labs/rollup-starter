@@ -4,7 +4,7 @@ use clap::Parser;
 use rollup_starter::rollup::StarterRollup;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_rollup_interface::execution_mode::Native;
-use sov_soak_testing_lib::{run_generator_task_for_bank, ValidityProfile};
+use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
 use tokio::signal::unix::SignalKind;
 use tokio::sync::watch::Receiver;
 use tokio::task::JoinSet;
@@ -34,14 +34,16 @@ async fn worker_task(
     worker_id: u128,
     num_workers: u32,
 ) -> anyhow::Result<()> {
-    let result = run_generator_task_for_bank::<Runtime, Spec>(
-        client,
-        rx,
-        worker_id,
-        num_workers,
-        ValidityProfile::Clean.get_validity(),
-    )
-    .await;
+    let runner = SoakTestRunner::<Runtime, Spec>::new().with_bank();
+    let result = runner
+        .run(
+            client,
+            rx,
+            worker_id,
+            num_workers,
+            ValidityProfile::Clean.get_validity(),
+        )
+        .await;
 
     if let Err(e) = result {
         tracing::error!("Worker task {worker_id} failed: {}", e);
