@@ -9,8 +9,8 @@ freeze = [1, 1]
 [constants]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
 CHAIN_ID = 27035
-CHAIN_NAME = "Turbo"
-EVM_GAS_METERING_MODE = "turbo testnet"
+CHAIN_NAME = "turbo testnet"
+EVM_GAS_METERING_MODE = "Rollup"
 # We will keep only this many blocks in the EVM module.
 EVM_BLOCK_PRUNING_THRESHOLD = 1000000 # 1 million blocks
 
