@@ -53,9 +53,9 @@ console.log("Subscribed.");
 
 // Send the transaction
 console.log("Sending create token transaction...");
-let tx_respones = await rollup.call(callMessage, { signer }); // Send our transaction
+let tx_response = await rollup.call(callMessage, { signer }); // Send our transaction
 console.log("Tx sent successfully. Response:");
-console.dir(tx_respones.response, { depth: null, colors: true });
+console.dir(tx_response.response, { depth: null, colors: true });
 
 /*
 // SUBSCRIPTION BLOCK -- REMOVE COMMENT BLOCK TO SUBSCRIBE TO EVENTS USING A WEBSOCKET
