@@ -8,18 +8,18 @@ freeze = [1, 1]
 
 [constants]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
-CHAIN_ID = 6669
-CHAIN_NAME = "TestChain"
-EVM_GAS_METERING_MODE = "Rollup"
+CHAIN_ID = 27035
+CHAIN_NAME = "Turbo"
+EVM_GAS_METERING_MODE = "turbo testnet"
 # We will keep only this many blocks in the EVM module.
-EVM_BLOCK_PRUNING_THRESHOLD = 100000
+EVM_BLOCK_PRUNING_THRESHOLD = 1000000 # 1 million blocks
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert "sov-test-b" to ASCII bytes
 # Should be 10 bytes long for Celestia
-BATCH_NAMESPACE = { byte_string = "sovstarter" }
+BATCH_NAMESPACE = { byte_string = "gteturbo-b" }
 # The namespace used by the rollup to store aggregated ZK proofs.
-PROOF_NAMESPACE = { byte_string = "sov-proofs" }
+PROOF_NAMESPACE = { byte_string = "gteturbo-p" }
 
 # How many rollup blocks to wait before terminating setup mode. While setup mode is enabled,
 # the rollup does not charge gas. This is useful when initializing the rollup with a bridged gas token.
