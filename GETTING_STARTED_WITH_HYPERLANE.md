@@ -112,8 +112,8 @@ $ cd examples/starter-js && npm install
 
 Set up the warp route on the rollup side. This script will:
 
-* Register a warp router and add a remote route on ethtest
-* Configure relayer state on the rollup
+- Register a warp router and add a remote route on ethtest
+- Configure relayer state on the rollup
 
 ```bash,test-ci,bashtestmd:compare-output
 $ npm run hyperlane-warp-setup
@@ -131,10 +131,10 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jt
 
 Verify the warp configuration. Pay attention to these important fields:
 
-* ISM configuration: `validators` should match the validator key address
-* `remote_token_id` should match the configuration on ethtest
-* `enrolled_destinations` should include the domain ID of ethtest
-* `local_token_id` will be used later to verify transfers
+- ISM configuration: `validators` should match the validator key address
+- `remote_token_id` should match the configuration on ethtest
+- `enrolled_destinations` should include the domain ID of ethtest
+- `local_token_id` will be used later to verify transfers
 
 ```bash,test-ci,bashtestmd:compare-output
 $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a | jq
@@ -163,6 +163,10 @@ $ curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/0x9c08153
     "enrolled_destinations": [
       3133790210
     ],
+```
+
+```bash,test-ci,bashtestmd
+$ sleep 5
 ```
 
 You can also check the enrolled routers specifically:
@@ -297,27 +301,27 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jt
 **Check Configuration:**
 
 1. Verify `CHAIN_ID` and `DOMAIN_ID` for both chains in all configuration files:
-   * `constants.toml`
-   * `integrations/hyperlane/configs/agent-config.json`
-   * `integrations/hyperlane/configs/chains/ethtest/metadata.yaml`
-   * `examples/starter-js/src/hyperlane/consts.ts`
+   - `constants.toml`
+   - `integrations/hyperlane/configs/agent-config.json`
+   - `integrations/hyperlane/configs/chains/ethtest/metadata.yaml`
+   - `examples/starter-js/src/hyperlane/consts.ts`
 2. Ensure mailbox addresses match across all configurations:
-    ```
-    grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
-    grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
-    ```
+   ```
+   grep -i 'mailbox' integrations/hyperlane/configs/chains/ethtest/addresses.yaml
+   grep -i 'mailbox' integrations/hyperlane/configs/agent-config.json
+   ```
 3. Verify that warp routes are enrolled on both chains:
-    - On ethtest: use `make print-hyperlane-ethtest-warp` and check that remoteRouters contains the correct DOMAIN_ID (note the route ID)
-    - On rollup: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID>/routers`
+   - On ethtest: use `make print-hyperlane-ethtest-warp` and check that remoteRouters contains the correct DOMAIN_ID (note the route ID)
+   - On rollup: `curl http://127.0.0.1:12346/modules/warp/route/<ROUTE_ID>/routers`
 4. Ensure Anvil is configured for periodic block production
 
 ### Relayer Not Processing Messages
 
-1. Verify that the validator is posting checkpoints: 
+1. Verify that the validator is posting checkpoints:
    `ls integrations/hyperlane/docker-data/validator-ethtest/signatures` should contain at least one file `0_with_id.json`
-2. Check for errors or warnings in relayer logs: 
+2. Check for errors or warnings in relayer logs:
    `docker logs hyperlane-relayer-1 | grep -i -E 'error|warn'`
-3. Verify that the relayer has sufficient balance: 
+3. Verify that the relayer has sufficient balance:
    `curl http://127.0.0.1:9091/metrics | grep hyperlane_wallet_balance`
 4. Confirm the validator key is present in the ISM `MessageIdMultisig` configuration:
    `curl -Ss http://127.0.0.1:12346/modules/warp/state/warp-routes/items/<WARP_ROUTE_ID> | jq`
@@ -343,3 +347,4 @@ curl -Ss http://127.0.0.1:9091/metrics | grep 'hyperlane_critical_error'
 hyperlane_critical_error{agent="relayer",chain="ethtest",hyperlane_baselib_version="0.1.0"} 0
 hyperlane_critical_error{agent="relayer",chain="sovstarter",hyperlane_baselib_version="0.1.0"} 0
 ```
+
