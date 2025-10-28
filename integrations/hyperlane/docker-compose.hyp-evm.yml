@@ -4,7 +4,8 @@ services:
     environment:
       - ANVIL_IP_ADDR=0.0.0.0
     healthcheck:
-      test: ["CMD", "cast", "block-number", "--rpc-url", "http://127.0.0.1:8545"]
+      test:
+        ["CMD", "cast", "block-number", "--rpc-url", "http://127.0.0.1:8545"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -49,9 +50,8 @@ services:
       --config /configs/warp-route-deployment.yaml
       --yes
 
-
   validator-ethtest:
-    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-8a
+    image: ghcr.io/ross-weir/hyperlane-agent:integration-10
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
@@ -65,7 +65,13 @@ services:
       - HYP_CHAINS_SOVSTARTER_SIGNER_KEY=0x0d87c12ea7c12024b3f70a26d735874608f17c8bce2b48e6fe87389310191264
       - NO_COLOR=1
     healthcheck:
-      test: [ "CMD", "/bin/sh", "-c", "test -f /ethtest-validator-signatures/announcement.json" ]
+      test:
+        [
+          "CMD",
+          "/bin/sh",
+          "-c",
+          "test -f /ethtest-validator-signatures/announcement.json",
+        ]
       interval: 30s
       timeout: 10s
       retries: 10
@@ -91,7 +97,7 @@ services:
   # TODO: validator-sovstarter
 
   relayer:
-    image: ghcr.io/sovereign-labs/hyperlane-agent:integration-8a
+    image: ghcr.io/ross-weir/hyperlane-agent:integration-10
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
@@ -105,7 +111,13 @@ services:
       - HYP_CHAINS_SOVSTARTER_SIGNER_KEY=0x0187c12ea7c12024b3f70ac5d73587463af17c8bce2bd9e6fe87389310196c64
       - NO_COLOR=1
     healthcheck:
-      test: ["CMD", "/bin/sh", "-c", "test -d /hyperlane_db && test -f /hyperlane_db/CURRENT"]
+      test:
+        [
+          "CMD",
+          "/bin/sh",
+          "-c",
+          "test -d /hyperlane_db && test -f /hyperlane_db/CURRENT",
+        ]
       interval: 30s
       timeout: 10s
       retries: 10
