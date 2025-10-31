@@ -12,16 +12,16 @@ anyhow = { version = "1.0.95" }
 sp1-zkvm = { version = "5.0.8" }
 stf-starter = { path = "../../../stf", default-features = false, features = ["celestia_da"] }
 
-sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e", features = ["evm"] }
-sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e" }
-sov-celestia-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e" }
-sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e" }
-sov-modules-stf-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e" }
-sov-sp1-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e" }
-sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e" }
-sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e" }
-sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e" }
-sov-metrics = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "22f1804ab326bc90cdc2f6f6f8177d0f1a1d7c3e", optional = true }
+sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c", features = ["evm"] }
+sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c" }
+sov-celestia-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c" }
+sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c" }
+sov-modules-stf-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c" }
+sov-sp1-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c" }
+sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c" }
+sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c" }
+sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c" }
+sov-metrics = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f3adfafc3613e38f85e88a417b58455eb2f8437c", optional = true }
 
 [patch.crates-io]
 sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-v0.10.8" }
