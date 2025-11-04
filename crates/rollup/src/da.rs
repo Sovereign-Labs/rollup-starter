@@ -41,7 +41,7 @@ mod celestia {
 
 #[cfg(feature = "mock_da")]
 mod mock {
-    pub use sov_mock_da::storable::local_service::StorableMockDaService as DaService;
+    pub use sov_mock_da::storable::rpc::StorableMockDaClient as DaService;
     pub use sov_mock_da::MockDaSpec as DaSpec;
     use sov_mock_da::MockDaVerifier;
     use sov_modules_api::{prelude::tokio::sync::watch::Receiver, Spec};
@@ -53,9 +53,9 @@ mod mock {
 
     pub async fn new_da_service<S: Spec>(
         rollup_config: &RollupConfig<S::Address, DaService>,
-        shutdown_receiver: Receiver<()>,
+        _shutdown_receiver: Receiver<()>,
     ) -> DaService {
-        DaService::from_config(rollup_config.da.clone(), shutdown_receiver).await
+        DaService::from_config(rollup_config.da.clone()).expect("Failed to create DA service: Invalid URLs")
     }
 }
 

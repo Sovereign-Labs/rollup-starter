@@ -1,9 +1,6 @@
 [da]
-# Connection string for SQL database to have stored blocks, for example"
-#  - "sqlite://demo_data/da.sqlite?mode=rwc"
-#  - "sqlite::memory:"
-#  - "postgresql://root:hunter2@aws.amazon.com/mock-da"
-connection_string = "sqlite://rollup-state/mock_da.sqlite?mode=rwc"
+# URL of the mock da server
+url = "http://{MOCK_DA_CONNECTION_STRING}:50051"
 # String representation of sequencer address.
 # For initial full node should match genesis of sequencer-registry.
 # It is going to be a DA address that blobs from this node will be associated.
