@@ -83,3 +83,7 @@ path = "src/bin/rollup.rs"
 [[bin]]
 name = "starter-cli-wallet"
 path = "src/bin/starter_cli_wallet.rs"
+
+[[bin]]
+name = "mock-da-server"
+path = "src/bin/mock_da.rs"

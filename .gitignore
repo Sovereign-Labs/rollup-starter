@@ -1,6 +1,7 @@
 .idea
 **/target/*
 rollup-starter-data/
+rollup-starter-data-mock/
 /crates/provers/risc0/guest-mock/target
 /crates/provers/sp1/guest-celestia/elf/riscv32im-succinct-zkvm-elf
 /crates/provers/sp1/guest-mock/elf/riscv32im-succinct-zkvm-elf
