@@ -17,10 +17,27 @@ use std::str::FromStr;
 use sov_address::EthereumAddress;
 use sov_modules_api::capabilities::RollupHeight;
 
+#[cfg(all(
+    feature = "mock_da",
+    feature = "mock_da_external",
+    feature = "celestia_da"
+))]
+compile_error!("mock_da,mock_da_external and celestia_da are enabled, but only one should be.");
+
 #[cfg(all(feature = "mock_da", feature = "celestia_da"))]
 compile_error!("Both mock_da and celestia_da are enabled, but only one should be.");
 
-#[cfg(all(not(feature = "mock_da"), not(feature = "celestia_da")))]
+#[cfg(all(feature = "mock_da", feature = "mock_da_external"))]
+compile_error!("Both mock_da and mock_da_external are enabled, but only one should be.");
+
+#[cfg(all(feature = "mock_da_external", feature = "celestia_da"))]
+compile_error!("Both mock_da_external and celestia_da are enabled, but only one should be.");
+
+#[cfg(all(
+    not(feature = "mock_da"),
+    not(feature = "celestia_da"),
+    not(feature = "mock_da_external")
+))]
 compile_error!("Neither mock_da and celestia_da are enabled, but only one should be.");
 
 // Ensure exactly one zkvm feature is enabled
@@ -36,9 +53,11 @@ const _: () = {
     );
 };
 
-#[cfg(all(feature = "mock_da", not(feature = "celestia_da")))]
+#[cfg(all(feature = "mock_da"))]
 const DA_STR: &str = "mock";
-#[cfg(all(feature = "celestia_da", not(feature = "mock_da")))]
+#[cfg(all(feature = "mock_da_external"))]
+const DA_STR: &str = "mock_external";
+#[cfg(all(feature = "celestia_da"))]
 const DA_STR: &str = "celestia";
 
 fn default_genesis_path() -> PathBuf {

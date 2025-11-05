@@ -70,6 +70,7 @@ sov-address = { workspace = true, features = ["evm"] }
 [features]
 default = ["mock_da", "mock_zkvm"]
 mock_da = ["sov-mock-da", "stf-starter/mock_da"]
+mock_da_external = ["sov-mock-da", "stf-starter/mock_da_external"]
 celestia_da = ["sov-celestia-adapter", "stf-starter/celestia_da"]
 sp1 = ["sov-sp1-adapter", "sp1-starter"]
 risc0 = ["sov-risc0-adapter", "risc0-starter"]

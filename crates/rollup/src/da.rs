@@ -60,8 +60,32 @@ mod mock {
     }
 }
 
+#[cfg(feature = "mock_da_external")]
+mod mock_external {
+    pub use sov_mock_da::storable::rpc::StorableMockDaClient as DaService;
+    pub use sov_mock_da::MockDaSpec as DaSpec;
+    use sov_mock_da::MockDaVerifier;
+    use sov_modules_api::{prelude::tokio::sync::watch::Receiver, Spec};
+    use sov_stf_runner::RollupConfig;
+
+    pub fn new_verifier() -> MockDaVerifier {
+        MockDaVerifier::default()
+    }
+
+    pub async fn new_da_service<S: Spec>(
+        rollup_config: &RollupConfig<S::Address, DaService>,
+        _shutdown_receiver: Receiver<()>,
+    ) -> DaService {
+        DaService::from_config(rollup_config.da.clone())
+            .expect("Failed to create DA service: Invalid URLs")
+    }
+}
+
 #[cfg(feature = "celestia_da")]
 pub use celestia::{new_da_service, new_verifier, DaService, DaSpec};
 
 #[cfg(feature = "mock_da")]
 pub use mock::{new_da_service, new_verifier, DaService, DaSpec};
+
+#[cfg(feature = "mock_da_external")]
+pub use mock_external::{new_da_service, new_verifier, DaService, DaSpec};

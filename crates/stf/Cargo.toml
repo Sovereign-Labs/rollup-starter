@@ -45,6 +45,7 @@ sov-build = { workspace = true }
 [features]
 default = []
 mock_da = ["sov-mock-da"]
+mock_da_external = ["sov-mock-da"]
 celestia_da = ["sov-celestia-adapter"]
 native = [
     "stf-starter-declaration/native",
