@@ -53,11 +53,11 @@ const _: () = {
     );
 };
 
-#[cfg(all(feature = "mock_da"))]
+#[cfg(feature = "mock_da")]
 const DA_STR: &str = "mock";
-#[cfg(all(feature = "mock_da_external"))]
+#[cfg(feature = "mock_da_external")]
 const DA_STR: &str = "mock_external";
-#[cfg(all(feature = "celestia_da"))]
+#[cfg(feature = "celestia_da")]
 const DA_STR: &str = "celestia";
 
 fn default_genesis_path() -> PathBuf {
