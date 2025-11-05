@@ -8,18 +8,18 @@ freeze = [1, 1]
 
 [constants]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
-CHAIN_ID = 6669
-CHAIN_NAME = "TestChain"
+CHAIN_ID = 27035
+CHAIN_NAME = "turbo testnet"
 EVM_GAS_METERING_MODE = "Rollup"
 # We will keep only this many blocks in the EVM module.
-EVM_BLOCK_PRUNING_THRESHOLD = 100000
+EVM_BLOCK_PRUNING_THRESHOLD = 1000000 # 1 million blocks
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert "sov-test-b" to ASCII bytes
 # Should be 10 bytes long for Celestia
-BATCH_NAMESPACE = { byte_string = "sovstarter" }
+BATCH_NAMESPACE = { byte_string = "gteturbo-b" }
 # The namespace used by the rollup to store aggregated ZK proofs.
-PROOF_NAMESPACE = { byte_string = "sov-proofs" }
+PROOF_NAMESPACE = { byte_string = "gteturbo-p" }
 
 # How many rollup blocks to wait before terminating setup mode. While setup mode is enabled,
 # the rollup does not charge gas. This is useful when initializing the rollup with a bridged gas token.
@@ -30,7 +30,7 @@ SETUP_MODE_TERMINATION_HEIGHT = 0 # Disable setup mode entirely by default.
 # will be invalidated due to congestion on the DA layer. (Note that with an honest sequencer, this parameter has no effect
 # on the speed of inclusion for forced transactions, since they will always be included ASAP.)
 # Setting this parameter to 0 disables soft-confirmations entirely.
-DEFERRED_SLOTS_COUNT = 5000
+DEFERRED_SLOTS_COUNT = 25920
 # The maximum number of visible slots that the sequencer can advance the rollup in a single slot.
 # Larger values of this parameter mean that the soft-confirmations are less vulnerable to congestion on the DA layer,
 # but make it correspondingly easier for a malicious sequencer to grief other sequencers.
@@ -135,7 +135,7 @@ FIXED_GAS_TO_CHARGE_PER_PROOF = [100, 100]
 
 # --- Gas fee adjustment parameters: See https://eips.ethereum.org/EIPS/eip-1559 for a detailed description ---
 # The initial gas limit of the rollup.
-INITIAL_GAS_LIMIT = [10_000_000_000, 10_000_000_000]
+INITIAL_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
 # The initial "base fee" that every transaction emits when executed.
 INITIAL_BASE_FEE_PER_GAS = [10, 10]
 # The maximum change denominator of the base fee.
