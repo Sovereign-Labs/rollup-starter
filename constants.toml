@@ -17,9 +17,9 @@ EVM_BLOCK_PRUNING_THRESHOLD = 1000000 # 1 million blocks
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert "sov-test-b" to ASCII bytes
 # Should be 10 bytes long for Celestia
-BATCH_NAMESPACE = { byte_string = "gteturbo-b" }
+BATCH_NAMESPACE = { byte_string = "test_1xx-b" }
 # The namespace used by the rollup to store aggregated ZK proofs.
-PROOF_NAMESPACE = { byte_string = "gteturbo-p" }
+PROOF_NAMESPACE = { byte_string = "test_1xx-p" }
 
 # How many rollup blocks to wait before terminating setup mode. While setup mode is enabled,
 # the rollup does not charge gas. This is useful when initializing the rollup with a bridged gas token.
