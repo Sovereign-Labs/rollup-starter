@@ -148,6 +148,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         let eth_rpc_config = sov_ethereum::EthRpcConfig {
             extension: SeqConfigExtension {
                 max_log_limit: 20_000,
+                response_size_limit: 1024,
             },
             buffer_raw_txs: true,
         };

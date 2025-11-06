@@ -34,6 +34,8 @@ impl<S: Spec> Module for ValueSetter<S> {
 
     type Config = ();
 
+    type Error = anyhow::Error;
+
     type CallMessage = CallMessage;
 
     type Event = ();
