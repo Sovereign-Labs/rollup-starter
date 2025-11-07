@@ -11,6 +11,7 @@ use sov_modules_api::Spec;
 use sov_rollup_interface::da::DaSpec;
 
 pub use stf_starter_declaration::GenesisConfig;
+use sov_modules_api::TxState;
 pub use stf_starter_declaration::Mailbox;
 use stf_starter_declaration::Runtime as RuntimeInner;
 pub use stf_starter_declaration::RuntimeCall;
@@ -97,5 +98,30 @@ where
                 sov_sequencer_registry::CallMessage::Register { .. }
             )
         )
+    }
+
+    fn is_unauthorized_system_tx(&self, call: &Self::Decodable, context: &Context<S>, state: &mut impl TxState<S>) -> bool {
+        match call {
+            Self::Decodable::ChainState(
+               sov_chain_state::CallMessage::SetOracleTime { .. }
+            ) => {
+                // Reject tx conservatively if a preferred sequencer is not registered
+                let Ok(Some((_, preferred_sequencer_address))) = self.0.sequencer_registry.get_preferred_sequencer(state) else {
+                    return true;
+                };
+                // The tx is unauthorized if it's not from the preferred sequencer
+                context.sequencer() != &preferred_sequencer_address
+            }
+            // All non oracle calls are allowed
+            _ => false,
+        }
+    }
+
+    fn maybe_set_oracle_timestamp(&self, millis_since_epoch: i64) -> Option<<Self as sov_modules_api::DispatchCall>::Decodable> {
+        Some(Self::Decodable::ChainState(
+            sov_chain_state::CallMessage::SetOracleTime {
+                milliseconds_since_epoch: millis_since_epoch,
+            }
+        ))
     }
 }
