@@ -23,6 +23,7 @@ sov-hyperlane-integration = { workspace = true }
 sov-bank = { workspace = true }
 sov-address = { workspace = true }
 sov-evm = { workspace = true }
+sov-chain-state = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -56,6 +57,7 @@ native = [
 	"sov-mock-da?/native",
 	"sov-celestia-adapter?/native",
 	"sov-mock-zkvm/native",
+	"sov-chain-state/native",
 	"sov-evm/native"
 ]
 
