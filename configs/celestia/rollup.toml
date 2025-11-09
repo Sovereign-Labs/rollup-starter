@@ -11,6 +11,7 @@ celestia_rpc_timeout_seconds = 60
 # It will be pulled from node it connects to, but if it is pecified, it is going to verified.
 # This way we make sure node from docker container uses same address as specified in genesis
 signer_addres = "celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s"
+tx_priority = "High"
 
 
 [storage]
