@@ -1,5 +1,6 @@
 #[cfg(feature = "celestia_da")]
 mod celestia {
+    use sov_modules_api::macros::config_value;
     pub use sov_celestia_adapter::verifier::CelestiaSpec as DaSpec;
     pub use sov_celestia_adapter::CelestiaService as DaService;
     use sov_celestia_adapter::{
