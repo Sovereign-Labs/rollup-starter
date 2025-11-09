@@ -19,8 +19,8 @@ use stf_starter::runtime::Runtime;
 use stf_starter::StfVerifier;
 
 /// The namespace for the rollup on Celestia. Must be kept in sync with the "rollup/src/lib.rs"
-const ROLLUP_BATCH_NAMESPACE: Namespace = Namespace::const_v0(*b"sov-test-b");
-const ROLLUP_PROOF_NAMESPACE: Namespace = Namespace::const_v0(*b"sov-test-p");
+const ROLLUP_BATCH_NAMESPACE: Namespace = Namespace::const_v0(config_value!("BATCH_NAMESPACE"));
+const ROLLUP_PROOF_NAMESPACE: Namespace = Namespace::const_v0(config_value!("PROOF_NAMESPACE"));
 
 sp1_zkvm::entrypoint!(main);
 

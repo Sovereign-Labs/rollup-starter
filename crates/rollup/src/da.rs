@@ -12,10 +12,10 @@ mod celestia {
 
     /// The rollup stores its data in the namespace "sov-test-b" on Celestia.
     /// You can change this constant to point your rollup at a different namespace.
-    const ROLLUP_BATCH_NAMESPACE: Namespace = Namespace::const_v0(*b"sov-test-b");
-
+    const ROLLUP_BATCH_NAMESPACE: Namespace = Namespace::const_v0(config_value!("BATCH_NAMESPACE"));
+ 
     /// The rollup stores the zk proofs in the namespace "sov-test-p" on Celestia.
-    const ROLLUP_PROOF_NAMESPACE: Namespace = Namespace::const_v0(*b"sov-test-p");
+    const ROLLUP_PROOF_NAMESPACE: Namespace = Namespace::const_v0(config_value!("PROOF_NAMESPACE"));
 
     pub fn new_verifier() -> CelestiaVerifier {
         CelestiaVerifier::new(RollupParams {
