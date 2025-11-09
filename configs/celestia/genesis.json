@@ -61,6 +61,10 @@
           "10000000000000000000000000000"
         ],
         [
+          "0x74bb92E136628E7028e2290fF60A8EC83Eea904f",
+          "10000000000000000000000000000"
+        ],
+        [
           "0x267d5F5Ba12AcD07Ce5D0831B17aB5927fEBCd48",
           "1000000000"
         ]
@@ -74,7 +78,7 @@
     "operating_mode": "operator",
     "inner_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
     "outer_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
-    "genesis_da_height": 8552814
+    "genesis_da_height": 8746493
   },
   "paymaster": {
     "payers": [
