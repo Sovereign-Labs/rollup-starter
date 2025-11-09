@@ -30,7 +30,7 @@ state_cache_size = 10000000000 # 10GB
 # We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
 # any blocks before this height
 [runner]
-da_polling_interval_ms = 300
+da_polling_interval_ms = 1500
 
 [runner.http_config]
 bind_host = "0.0.0.0"
