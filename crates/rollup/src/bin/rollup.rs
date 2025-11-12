@@ -103,8 +103,8 @@ async fn main() {
 
     let metrics_port = args.metrics;
     let address = format!("127.0.0.1:{metrics_port}");
-    prometheus_exporter::start(address.parse().unwrap())
-        .expect("Could not start prometheus server");
+    //prometheus_exporter::start(address.parse().unwrap())
+    //    .expect("Could not start prometheus server");
 
     let prover_config_disc = parse_prover_config().expect("Malformed prover_config");
     tracing::info!(
