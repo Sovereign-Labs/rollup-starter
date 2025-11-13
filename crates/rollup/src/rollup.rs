@@ -141,6 +141,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         &self,
         sequencer: Arc<Seq>,
         _rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
+        shutdown_receiver: watch::Receiver<()>,
     ) -> anyhow::Result<NodeEndpoints>
     where
         Seq: Sequencer<Spec = Self::Spec, Rt = Self::Runtime, Da = Self::DaService>,
@@ -150,6 +151,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
                 max_log_limit: 20_000,
             },
             buffer_raw_txs: true,
+            shutdown_receiver: shutdown_receiver,
         };
 
         Ok(NodeEndpoints {
