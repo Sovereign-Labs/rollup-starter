@@ -32,11 +32,11 @@ da_polling_interval_ms = 200
 
 [runner.http_config]
 bind_host = "0.0.0.0"
-bind_port = 12346
-public_address = "http://127.0.0.1:12346"
+bind_port = 12348
+public_address = "http://127.0.0.1:12348"
 
 [monitoring]
-telegraf_address = "127.0.0.1:8094"
+telegraf_address = "127.0.0.1:9096"
 # Defines how many measurements a rollup node will accumulate before sending it to the Telegraf.
 # It is expected from the rollup node to produce metrics all the time,
 # so measurements are buffered by size and not sent by time.
@@ -72,12 +72,12 @@ disable_state_root_consistency_checks = true
 recovery_strategy = "TryToSave"
 batch_execution_time_limit_millis = 6000 # This should be adjusted depending on the DA layer's block times
 # If you have one available, uncomment the line below to use a postgres database for the sequencer's soft confirmations. This gives much better performance and durability.
-# postgres_connection_string="postgres://postgres:sequencerdb@localhost:5432/rollup" 
+postgres_connection_string="postgres://postgres:sequencerdb@localhost:5432/rollup" 
 ideal_lag_behind_finalized_slot = 1
 # The sequencer optimistically pre-executes transactions across multiple worker threads.
 # This warms up caches so the main transaction executor can run with ready-to-use data.
 # This variable determines the number of worker threads.
-num_cache_warmup_workers = 5
-is_replica = true
+num_cache_warmup_workers = 0
+is_replica = false 
 [sequencer.extension]
 max_log_limit = 20000
