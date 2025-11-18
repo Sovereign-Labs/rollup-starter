@@ -13,7 +13,7 @@ rpc_url = "ws://127.0.0.1:26658"
 # The address of the Celestia gRPC server for submitting blobs.
 # Example: http://127.0.0.1:9090
 # Optional. Set only if DaService needs to submit blobs.
-grpc_url = "http://127.0.0.1:9091"
+# grpc_url = "http://127.0.0.1:9090"
 
 
 # The private key in hex format of Celestia wallet that has enough TIA to publish blobs.
@@ -46,7 +46,6 @@ state_cache_size = 10000000000 # 10GB
 # We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
 # any blocks before this height
 [runner]
-genesis_height = 3 # Probably need to change this before deployment to set a live Celestia height
 da_polling_interval_ms = 2_000
 
 [runner.http_config]
