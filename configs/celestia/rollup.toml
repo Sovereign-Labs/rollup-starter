@@ -23,7 +23,7 @@ rpc_url = "ws://127.0.0.1:26658"
 # Or from cel-key (light/bridge node):
 #   cel-key export key-name --unarmored-hex --unsafe --node.type light --p2p.network=mocha
 # This one is from ../../integrations/credentials/bridge-0.key
-signer_private_key = "aec34bb1cfae6e906594dc106af4057a9046f769e2eeed67d040f0107e15e167"
+signer_private_key = "dc2069c60780e8dad19f3af424275b0ade68dfbbf84cd510a844ec978046baee"
 
 
 [storage]
