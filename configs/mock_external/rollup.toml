@@ -71,6 +71,7 @@ ideal_lag_behind_finalized_slot = 1
 # The sequencer optimistically pre-executes transactions across multiple worker threads.
 # This warms up caches so the main transaction executor can run with ready-to-use data.
 # This variable determines the number of worker threads.
-num_cache_warmup_workers = 5
+num_cache_warmup_workers = 0
+is_replica = true
 [sequencer.extension]
 max_log_limit = 20000

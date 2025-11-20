@@ -1,29 +1,19 @@
 [da]
 # The address of the Celestia RPC server to interact with.
-# Example for local: ws://127.0.0.1:26658
-# Example for QuickNode: wss://a-b-c.celestia-mocha.quiknode.pro/YOUR_ENDPOINT_ID
-# Default value: ws://127.0.0.1:26658
-rpc_url = "ws://127.0.0.1:26658"
 
-# JWT token for RPC server.
-# If not specified in the config, will be pulled from `SOV_CELESTIA_RPC_AUTH_TOKEN` environment variable.
-# Optional.
-#rpc_auth_token = "MY.SECRET.TOKEN"
+rpc_url = ""
+grpc_url = ""
+grpc_auth_token = "MY.SECRET.TOKEN"
 
-# The address of the Celestia gRPC server for submitting blobs.
-# Example: http://127.0.0.1:9090
-# Optional. Set only if DaService needs to submit blobs.
-grpc_url = "http://127.0.0.1:9091"
+tx_priority = "High"
 
+# The largest response the rollup will accept from the Celestia node. Defaults to 100 MB
+max_celestia_response_body_size = 104_857_600
+# The maximum time to wait for a response to an RPC query against Celestia node. Defaults to 60 seconds.
+celestia_rpc_timeout_seconds = 6
 
 # The private key in hex format of Celestia wallet that has enough TIA to publish blobs.
-# If not specified in the config, will be pulled from `SOV_CELESTIA_SIGNER_KEY` environment variable.
-# Can be exported from celestia-appd:
-#   celestia-appd keys export --unsafe --unarmored-hex key-name --keyring-backend test
-# Or from cel-key (light/bridge node):
-#   cel-key export key-name --unarmored-hex --unsafe --node.type light --p2p.network=mocha
-# This one is from ../../integrations/credentials/bridge-0.key
-signer_private_key = "aec34bb1cfae6e906594dc106af4057a9046f769e2eeed67d040f0107e15e167"
+signer_private_key = ""
 
 
 [storage]
@@ -46,8 +36,9 @@ state_cache_size = 10000000000 # 10GB
 # We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
 # any blocks before this height
 [runner]
-genesis_height = 3 # Probably need to change this before deployment to set a live Celestia height
 da_polling_interval_ms = 2_000
+concurrent_sync_tasks = 2
+pre_fetched_blocks_capacity = 10
 
 [runner.http_config]
 bind_host = "0.0.0.0"
@@ -96,6 +87,7 @@ ideal_lag_behind_finalized_slot = 1
 # The sequencer optimistically pre-executes transactions across multiple worker threads.
 # This warms up caches so the main transaction executor can run with ready-to-use data.
 # This variable determines the number of worker threads.
-num_cache_warmup_workers = 5
+num_cache_warmup_workers = 0
+is_replica = true
 [sequencer.extension]
 max_log_limit = 20000
