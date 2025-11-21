@@ -22,7 +22,7 @@ user_commit_concurrency = 6
 user_hashtable_buckets = 64_000_000 # 256 GB. You will need much more for production deployments
 # This paramater introduces performance penalty and should be changed in production.
 # It allows avoiding allocating 256GB at the start
-user_preallocate_ht = false
+user_preallocate_ht = true
 kernel_commit_concurrency = 2
 # Disable pruning for now
 # pruner_block_interval = 100_000
