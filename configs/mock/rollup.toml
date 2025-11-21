@@ -26,7 +26,7 @@ user_preallocate_ht = false
 kernel_commit_concurrency = 2
 # Disable pruning for now
 # pruner_block_interval = 100_000
-# pruner_versions_to_keep = 100
+pruner_versions_to_keep = 100
 
 state_cache_size = 10000000000 # 10GB
 
