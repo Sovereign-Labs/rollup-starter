@@ -67,6 +67,7 @@ clean-db: ## Clean all databases
 build-docker-mock-da: ## Build docker container for the rollup with MockDa
 	DOCKER_BUILDKIT=1 \
 	docker build \
+	--load \
 	-f ./integrations/rollup/Dockerfile.mock \
 	-t rollup-starter:debug \
 	.
