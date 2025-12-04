@@ -85,6 +85,7 @@ ideal_lag_behind_finalized_slot = 1
 # This variable determines the number of worker threads.
 num_cache_warmup_workers = 0
 is_replica = true
+allow_failed_txs = true
 
 [sequencer.preferred.timing_oracle]
 priority_fee_percentage = 0
