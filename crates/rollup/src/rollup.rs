@@ -151,16 +151,17 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
     async fn sequencer_additional_apis<Seq>(
         &self,
         sequencer: Seq,
-        _rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
+        rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
         shutdown_receiver: tokio::sync::watch::Receiver<()>,
     ) -> anyhow::Result<NodeEndpoints>
     where
         Seq: Sequencer<Spec = Self::Spec, Rt = Self::Runtime, Da = Self::DaService>,
     {
+        let config = rollup_config.sequencer.extension.as_ref().unwrap();
         let eth_rpc_config = sov_ethereum::EthRpcConfig {
             extension: SeqConfigExtension {
-                max_log_limit: 20_000,
-                response_size_limit: (1024 * 1024) - (1024 * 30), // Limit our response size to 1MB, leaving 30kb for headers, overhead, and misestimation.
+                max_log_limit: config.max_log_limit,
+                response_size_limit: config.response_size_limit, // Limit our response size to 1MB, leaving 30kb for headers, overhead, and misestimation.
             },
             shutdown_receiver,
         };
