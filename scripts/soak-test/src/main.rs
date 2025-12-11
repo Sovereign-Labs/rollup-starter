@@ -11,7 +11,7 @@ use tokio::task::JoinSet;
 
 #[derive(Parser)]
 struct Args {
-    #[arg(short, long, default_value = "http://localhost:12346")]
+    #[arg(short, long, default_value = "http://3.147.201.247:80")]
     /// The URL of the rollup node to connect to. Defaults to http://localhost:12346.
     api_url: String,
 
