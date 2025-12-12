@@ -29,7 +29,6 @@ sov-evm = { workspace = true }
 sov-eip712-auth = { workspace = true }
 
 anyhow = { workspace = true }
-alloy-consensus = { workspace = true, optional = true }
 borsh = { workspace = true }
 
 [build-dependencies]
@@ -70,7 +69,6 @@ native = [
 	"sov-test-state-consistency/native",
 	"sov-eip712-auth/native",
 	"sov-state/native",
-	"alloy-consensus",
 	"sov-chain-state/native"
 ]
 
