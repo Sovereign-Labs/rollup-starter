@@ -86,6 +86,20 @@ where
         }
     }
 
+    fn resolve_address<ST: ::sov_modules_api::StateAccessor>(
+        &mut self,
+        default_address: &S::Address,
+        credential_id: &::sov_modules_api::CredentialId,
+        state: &mut ST,
+    ) -> ::std::result::Result<
+        S::Address,
+        <ST as ::sov_modules_api::StateWriter<::sov_modules_api::User>>::Error,
+    > {
+        self.0
+            .accounts
+            .resolve_sender_address(default_address, credential_id, state)
+    }
+
     #[cfg(feature = "native")]
     fn genesis_config(input: &Self::GenesisInput) -> Result<Self::GenesisConfig, anyhow::Error> {
         let contents = std::fs::read(input)?;
