@@ -86,6 +86,7 @@ where
         }
     }
 
+    #[cfg(feature = "native")]
     fn resolve_address<ST: ::sov_modules_api::StateAccessor>(
         &mut self,
         default_address: &S::Address,
