@@ -53,7 +53,7 @@ async fn drain_slot_stream(
         }
     };
 
-    tracing::trace!(
+    tracing::debug!(
         "State validation: got new slot notification, number = {}",
         latest_slot.number
     );
@@ -89,12 +89,19 @@ async fn query_state_value<T: DeserializeOwned>(
         .map(|resp| resp.value)
 }
 
-async fn query_visible_slot(client: &sov_api_spec::Client) -> reqwest::Result<u64> {
-    let visible_slot_url = format!(
-        "{}/modules/state-consistency/state/latest-visible-slot-number/",
-        API_URL
-    );
-    query_state_value::<u64>(&client, &visible_slot_url).await
+/// Query the true slot number from ChainState module.
+/// This is updated in `synchronize_chain()` at the START of slot processing.
+async fn query_true_slot_number(client: &sov_api_spec::Client) -> reqwest::Result<u64> {
+    let true_slot_url = format!("{}/modules/chain-state/state/true-slot-number/", API_URL);
+    query_state_value::<u64>(&client, &true_slot_url).await
+}
+
+/// Query current_heights (RollupHeight, VisibleSlotNumber) from ChainState module.
+/// This is updated in `increment_rollup_height()` AFTER the block hooks run,
+/// so if this has the new values, the hooks have definitely executed.
+async fn query_current_heights(client: &sov_api_spec::Client) -> reqwest::Result<(u64, u64)> {
+    let current_heights_url = format!("{}/modules/chain-state/state/current-heights/", API_URL);
+    query_state_value::<(u64, u64)>(&client, &current_heights_url).await
 }
 
 async fn query_state_root(client: &sov_api_spec::Client) -> reqwest::Result<StateRootResponse> {
@@ -105,41 +112,80 @@ async fn query_state_root(client: &sov_api_spec::Client) -> reqwest::Result<Stat
     query_state_value::<StateRootResponse>(&client, &state_root_url).await
 }
 
-async fn query_rollup_height(client: &sov_api_spec::Client) -> reqwest::Result<u64> {
-    let rollup_height_url = format!(
-        "{}/modules/state-consistency/state/latest-rollup-height/",
-        API_URL
-    );
-    query_state_value::<u64>(&client, &rollup_height_url).await
-}
-
-async fn poll_for_visible_slot_update(
+/// Polls until the new slot's begin_block_hook has ran and the API state has been updated.
+///
+/// The problem is that it takes non-zero time for the new values from the begin hook to show up
+/// after the previous slot's notification arrives. At the same time we can't know the precise
+/// value of the visible_slot_number to poll for, because on resync it will lag behind the true
+/// slot number and will be unpredictable.
+///
+/// As a result, to reliably determine when the state is ready, we
+///  a) First wait for the ChainState's `true_slot_number` to match the slot number from the
+///  notification - this way we know the sequencer has started processing the new block; we store
+///  the `current_heights` at this point, and then
+///  b) Wait for the `current_heights` to increment above the value observed in a), which indicates
+///  the block start logic has finished running in the sequencer.
+///
+/// It's possible that the block start logic could complete so fast that we see the updated value
+/// in step a) already, so we time out step b) after 200ms to avoid getting stuck. In the worst
+/// case this will rarely return a stale value for the current height if it really was taking over
+/// 200ms to start the block, but this is extremely rare so the state assertion transaction should
+/// be able to use correct values the overwhelming majority of the time.
+async fn poll_for_api_state_update(
     client: &sov_api_spec::Client,
-    slot_number: u64,
-    last_visible_slot_number: u64,
-) -> anyhow::Result<u64> {
-    let max_attempts = 600; // 600 * 10ms = 6s = two full slots at the default config
+    notification_slot: u64,
+) -> anyhow::Result<(u64, u64)> {
+    // First we wait for true_slot_number to match the slot we just received a notification for
+    let max_phase1_attempts = 600; // 600 * 10ms = 6s
     let mut attempt = 0;
 
-    loop {
-        let visible_slot = query_visible_slot(&client).await?;
+    let heights_at_block_start = loop {
+        let (true_slot, heights) =
+            tokio::join!(async { query_true_slot_number(&client).await }, async {
+                query_current_heights(&client).await
+            });
+        let true_slot = true_slot?;
+        let heights = heights?;
 
-        // Check if the API state has caught up to the slot notification
-        if visible_slot > last_visible_slot_number {
-            tracing::debug!(
-                "State consistency: waited {} ms for API state to be updated after receiving new slot...",
-                attempt * 10
-            );
-            return Ok(visible_slot);
+        if true_slot >= notification_slot {
+            break heights;
         }
 
         attempt += 1;
-        if attempt >= max_attempts {
+        if attempt >= max_phase1_attempts {
             anyhow::bail!(
-                "State validation worker timed out waiting for API state to update. Slot notification: {slot_number}, expected visible slot: {last_visible_slot_number}, API visible_slot: {visible_slot}. This is either an error in the sequencer, or the acceptance test has a bug."
+                "State validation worker timed out waiting for true_slot_number to update. Notification slot: {notification_slot}, true_slot: {true_slot}, heights: ({}, {}). This is either an error in the sequencer, or the acceptance test has a bug.",
+                heights.0,
+                heights.1
             );
         }
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    };
 
+    // Then we wait for the rollup height to increment above the value observed earlier
+    let max_phase2_attempts = 20; // 20 * 10ms = 200ms
+    attempt = 0;
+
+    loop {
+        let heights = query_current_heights(&client).await?;
+
+        if heights.0 > heights_at_block_start.0 {
+            return Ok(heights);
+        }
+
+        attempt += 1;
+        if attempt >= max_phase2_attempts {
+            // Timeout reached - the sequencer was likely fast enough that heights were
+            // already updated by the time phase 1 completed. Use the current values.
+            tracing::debug!(
+                "Phase 2 timeout after {} ms: heights didn't increment from {}, using current ({}, {}). This is expected if the sequencer updated state quickly, otherwise the state assertion might fail for this block.",
+                attempt * 10,
+                heights_at_block_start.0,
+                heights.0,
+                heights.1
+            );
+            return Ok(heights);
+        }
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
 }
@@ -266,7 +312,6 @@ pub async fn state_validation_worker(
 
     tracing::info!("State validation worker started");
 
-    let mut last_visible_slot = query_visible_slot(&client).await?;
     while !*rx.borrow() {
         let Some(latest_slot) = drain_slot_stream(&mut slot_stream).await? else {
             break; // Stream closed
@@ -280,27 +325,20 @@ pub async fn state_validation_worker(
             break;
         }
 
-        // There's a race condition between slot notification and API state update, so poll until
-        // the new visible slot is actually visible in the API
-        let visible_slot =
-            poll_for_visible_slot_update(&client, latest_slot.number, last_visible_slot).await?;
+        // Wait for the begin_block_hook to finish running and the API state to be updated.
+        let (rollup_height, visible_slot) =
+            poll_for_api_state_update(&client, latest_slot.number).await?;
 
-        // Get the other two kernel values
-        let (state_root_result, rollup_height_result) =
-            tokio::join!(async { query_state_root(&client).await }, async {
-                query_rollup_height(&client).await
-            });
+        // Also get state root
+        let state_root_result = query_state_root(&client).await;
         let state_root = state_root_result?;
-        let rollup_height = rollup_height_result?;
 
         // Now we can submit the assertion transaction
         tracing::debug!(
-            "Visible_slot: {visible_slot}, rollup_height: {rollup_height}, state_root: {}",
+            "Sending assertion: visible_slot={visible_slot}, rollup_height={rollup_height}, state_root={}",
             hex::encode(&state_root.root_hashes)
         );
         send_assert_block_tx(&client, visible_slot, rollup_height, state_root.root_hashes).await?;
-
-        last_visible_slot = visible_slot;
     }
 
     tracing::info!("State validation worker shutting down");
