@@ -9,13 +9,11 @@
   - [Running the Rollup](#running-the-rollup)
 - [Stage 2: Celestia Testnet](#stage-2-celestia-testnet)
   - [Stopping the Devnet](#stopping-the-devnet)
-  - [Setting Up a Celestia Light Node](#setting-up-a-celestia-light-node)
-    - [Installation and Setup](#installation-and-setup)
-    - [Optimizing Initial Sync](#optimizing-initial-sync)
-  - [Preparing Your Node](#preparing-your-node)
-    - [Getting Your Node Address](#getting-your-node-address)
-    - [Funding Your Node](#funding-your-node)
-  - [Verifying Your Light Node](#verifying-your-light-node)
+  - [Setting Up RPC Access](#setting-up-rpc-access)
+    - [Option A: QuickNode (Recommended)](#option-a-quicknode-recommended)
+    - [Option B: Other RPC Providers](#option-b-other-rpc-providers)
+  - [Creating a Celestia Wallet](#creating-a-celestia-wallet)
+  - [Funding Your Wallet](#funding-your-wallet)
   - [Configuring Your Rollup](#configuring-your-rollup)
   - [Running on Testnet](#running-on-testnet)
   - [Testing Transactions](#testing-transactions)
@@ -23,10 +21,8 @@
 - [Next Steps](#next-steps)
 - [Stage 3: Celestia Mainnet](#stage-3-celestia-mainnet)
   - [Overview](#overview-1)
-  - [Prepare Celestia Node](#prepare-celestia-node)
-    - [Key Management](#key-management)
-    - [Fund Your Node](#fund-your-node)
-    - [Node Configuration](#node-configuration)
+  - [RPC Provider Setup](#rpc-provider-setup)
+  - [Key Management](#key-management)
   - [Review Configuration](#review-configuration)
   - [Security Hardening Checklist](#security-hardening-checklist)
   - [Start and Monitor](#start-and-monitor)
@@ -49,10 +45,10 @@ Before starting this tutorial, ensure that:
 It is recommended to proceed through three stages:
 
 1. **Local Devnet**: Test your rollup with a local Celestia instance to verify basic functionality
-2. **Testnet**: Deploy to a public testnet with proper configuration
-3. **Mainnet**: Production deployment with secure key management (not covered in this tutorial)
+2. **Testnet**: Deploy to a public testnet using an RPC provider
+3. **Mainnet**: Production deployment with secure key management
 
-This tutorial covers stages 1 and 2.
+This tutorial covers all three stages.
 
 ## Stage 1: Celestia Local Devnet
 
@@ -81,7 +77,7 @@ waiting for container 'celestia-node-0' to become operational...
 Clean the database to avoid conflicts if you previously ran the rollup with MockDa
 
 ```bash,test-ci,bashtestmd:exit-code=0
-$ make clean-db 
+$ make clean-db
 ```
 
 Now run your rollup with the `celestia_da` feature enabled:
@@ -108,121 +104,111 @@ $ make stop-celestia
 $ make clean-db
 ```
 
-### Setting Up a Celestia Light Node
+### Setting Up RPC Access
 
-For this tutorial, we'll use the [Mocha testnet](https://docs.celestia.org/how-to-guides/mocha-testnet). 
-You'll need to run a Celestia light node to connect your rollup to the network.
+The rollup connects directly to Celestia consensus nodes via RPC and gRPC. You don't need to run your own Celestia node — instead, use an RPC provider.
 
-**Note**: For production deployments, it's recommended to connect your light node to a reliable RPC provider or use a bridge node for enhanced reliability and performance.
+For this tutorial, we'll use the [Mocha testnet](https://docs.celestia.org/how-to-guides/mocha-testnet).
 
-#### Installation and Setup
+#### Option A: QuickNode (Recommended)
 
-Follow the Celestia documentation for detailed instructions:
-- [Install celestia-node](https://docs.celestia.org/how-to-guides/celestia-node)
-- [Setting up a Celestia light node](https://docs.celestia.org/how-to-guides/light-node)
+[QuickNode](https://www.quicknode.com/) provides Celestia RPC endpoints with built-in authentication.
 
-#### Optimizing Initial Sync
+1. Create a QuickNode account and add a Celestia Mocha testnet endpoint
+2. Note your endpoint details:
+   - **Endpoint hostname**: e.g., `your-endpoint.celestia-mocha.quiknode.pro`
+   - **API token**: The alphanumeric string in your endpoint URL
 
-To speed up the initial synchronization, you can configure your light node to start from a recent block:
-
-1. Visit the block explorer: https://mocha.celenium.io/
-2. Select a recent block and note its hash and height. Remember this number, as it is going to be used in SDK rollup configuration.
-3. Update your light node configuration in `~/.celestia-light-mocha-4/config.toml` so the celestia node can be operational sooner because it won't need to start from genesis
-   - `Header.TrustedHash`: Use the block hash from step 2
-   - `DASer.SampleFrom`: Use the block height from step 2
-
-**Important**: This optimization means you won't be able to start your rollup from blocks prior to the selected height.
-
-### Preparing Your Node
-
-#### Getting Your Node Address
-
-Use the `cel-key` utility to list your node's address (assuming you're running it from the repo folder after building):
-
-```bash
-$ ./cel-key list --keyring-backend test \
-    --node.type light --p2p.network mocha
-using directory:  /Users/developer/.celestia-light-mocha-4/keys
-- address: celestia1qd73x7lzh97uxm9lxe49qdfmuup25kp4khaxdd
-  name: my_celes_key
-  pubkey: '{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"A2hgY3ckADmUQRO01L4J54tZhhZrfE2oGGjGV+63DJcB"}'
-  type: local
+Your configuration will look like:
+```toml
+[da]
+rpc_url = "wss://your-endpoint.celestia-mocha.quiknode.pro/your-api-token/"
+grpc_url = "https://your-endpoint.celestia-mocha.quiknode.pro:9090"
+grpc_auth_token = "your-api-token"
 ```
 
-#### Funding Your Node
+#### Option B: Other RPC Providers
 
-Your Celestia node address needs `TIA` tokens to submit data. For the Mocha testnet, request tokens from the [faucet](https://docs.celestia.org/how-to-guides/mocha-testnet#mocha-testnet-faucet).
+You can use any Celestia RPC provider that exposes:
+- **WebSocket RPC endpoint** (port 26658 by default)
+- **gRPC endpoint** (port 9090 by default)
 
-### Verifying Your Light Node
+Configure the endpoints in your `rollup.toml` accordingly.
 
-Ensure your light node is running and fully synced by checking the sampling statistics:
+### Creating a Celestia Wallet
 
+Your rollup needs a Celestia wallet to sign and submit blobs. Generate a private key or use an existing one.
+
+To generate a new key, you can use any secp256k1 key generation tool. The key should be in hexadecimal format (64 characters).
+
+To derive the Celestia address from a private key, you can use tools like:
+- [Celestia's cel-key tool](https://docs.celestia.org/tutorials/celestia-app#create-a-wallet-with-cel-key)
+- Any Cosmos SDK compatible wallet
+
+Example using `cel-key`:
 ```bash
-$ celestia header sync-state
-{
-  "result": {
-    "id": 1,
-    "height": 7439832,
-    "from_height": 7428057,
-    "to_height": 7481444,
-    "from_hash": "6738B417621AD529A42CE31DC2181B69F5C2A482E2D4B0A2728A07C59D21382C",
-    "to_hash": "6316B4692AA1474394BB68E804F151A266792CB6F5B73B444F0D033B0D77BD1D",
-    "start": "2025-08-04T16:33:14.192732+02:00",
-    "end": "0001-01-01T00:00:00Z"
-  }
-}
+$ cel-key add my-rollup-key --keyring-backend test
 ```
 
-The key indicator is `height` which should be close to `to_height`, indicating that light node can pull all necessary data.
+Note down:
+- **Private key** (hex format) — for `signer_private_key` in config
+- **Celestia address** — for genesis configuration (e.g., `celestia1abc...`)
 
-Test blob submission to verify your node is working correctly:
+### Funding Your Wallet
 
-```bash
-$ export AUTH_TOKEN=$(celestia light auth admin --p2p.network mocha)
-$ celestia blob submit 0x42690c204d39600fddd3 0x676d auth $AUTH_TOKEN
-{
-  "result": {
-    "height": 7413840,
-    "commitments": [
-      "0xd0c16160a4148b6054f94d63c4fcc6ed063605557595bde4894fb300aee75226"
-    ]
-  }
-}
-```
-
-In the case of a correct submission, the result will indicate the height at which the blob has been submitted and the commitment.
+Your Celestia wallet needs TIA tokens to submit data blobs. For the Mocha testnet, request tokens from the [faucet](https://docs.celestia.org/how-to-guides/mocha-testnet#mocha-testnet-faucet).
 
 ### Configuring Your Rollup
 
-You'll need to update several configuration files:
+Update the following configuration files:
 
 #### 1. Namespaces
 
-Your rollup requires two namespaces: one for batches and one for proofs. 
+Your rollup requires two namespaces: one for batches and one for proofs.
 
-Update these in [`crates/rollup/src/da.rs`](crates/rollup/src/da.rs#L15). 
-They are specified in rust source files as they're part of the cryptographic commitment for the prover, and need to be compiled into a binary.
+Update these in [`constants.toml`](constants.toml):
 
-#### 2. Genesis Configuration
+```toml
+# Should be 10 bytes long for Celestia
+BATCH_NAMESPACE = { byte_string = "your-batch" }
+PROOF_NAMESPACE = { byte_string = "your-proof" }
+```
 
-Update your Celestia node address in [`configs/celestia/genesis.json`](configs/celestia/genesis.json):
+These values are compiled into the binary as they're part of the cryptographic commitment for the prover.
 
-- `sequencer_registry.sequencer_config.seq_da_address`
-- `paymaster.payers[].sequencers_to_register` (if using paymaster)
-
-#### 3. Rollup Configuration
+#### 2. Rollup Configuration
 
 Update `configs/celestia/rollup.toml`:
 
-- **`da.celestia_rpc_auth_token`**: Get this using:
-  ```bash
-  $ celestia light auth admin --p2p.network mocha
-  ```
-- **`da.celestia_rpc_address`**: Default value should work for standard setups. Ensure this matches the port your light node is listening on.
-- **`da.signer_address`**: Your node address (for verification purposes)
-- **`runner.genesis_height`**: Set to a block that is higher than or equal to the block selected in the Celestia light node configuration.
+```toml
+[da]
+# WebSocket RPC endpoint (use wss:// for secure connections)
+rpc_url = "wss://your-endpoint.celestia-mocha.quiknode.pro/your-api-token/"
+
+# gRPC endpoint for blob submission
+grpc_url = "https://your-endpoint.celestia-mocha.quiknode.pro:9090"
+
+# Authentication token (required for most providers)
+grpc_auth_token = "your-api-token"
+
+# Your Celestia wallet private key (hex format, 64 characters)
+signer_private_key = "your-private-key-hex"
+```
+
+#### 3. Genesis Configuration
+
+Update your Celestia address in [`configs/celestia/genesis.json`](configs/celestia/genesis.json):
+
+- `sequencer_registry.sequencer_config.seq_da_address` — your Celestia address
+- `paymaster.payers[].sequencers_to_register` — your Celestia address (if using paymaster)
 
 ### Running on Testnet
+
+Rebuild with updated namespaces (if you changed them):
+
+```bash
+$ cargo build --no-default-features --features=celestia_da,mock_zkvm
+```
 
 Start your rollup:
 
@@ -233,8 +219,7 @@ $ cargo run --no-default-features \
   --genesis-path=configs/celestia/genesis.json
 ```
 
-Your node will begin posting empty batches to maintain rollup liveness.
-You can open the Celestia block explorer, find your namespace and see that blobs are posted from the address of your light node.
+Your node will begin posting batches to Celestia. You can monitor activity in the [Celestia block explorer](https://mocha.celenium.io/) by searching for your namespace.
 
 ### Testing Transactions
 
@@ -280,7 +265,7 @@ Tx sent successfully. Response:
 }
 ```
 
-You can track the `tx_hash` in your rollup logs. Once posted to the DA layer, check your rollup's namespace page to see the published batch (it will be slightly larger than empty batches).
+You can track the `tx_hash` in your rollup logs. Once posted to the DA layer, check your rollup's namespace page to see the published batch.
 
 ## Success!
 
@@ -297,128 +282,131 @@ Congratulations! Your rollup is now running on Celestia testnet. You can monitor
 
 ## Stage 3: Celestia Mainnet
 
-After successfully testing your rollup on Celestia Testnet, you're ready to deploy to the mainnet. 
-While the technical setup is similar to testnet, mainnet deployment requires enhanced security measures and careful management of keys and secrets.
+After successfully testing your rollup on Celestia Testnet, you're ready to deploy to mainnet. Mainnet deployment requires enhanced security measures and careful management of keys and secrets.
 
 **Important**: Mainnet deployment involves real assets and cannot be easily reversed. Take extra care with key management, backup procedures, and security hardening.
 
 ### Overview
 
-The mainnet deployment process involves three critical steps:
+The mainnet deployment process involves:
 
-1. **Secure Celestia node setup** - Configure a production-ready Celestia light node with proper key management
-2. **Configuration review and hardening** - Audit all configurations with mainnet-specific values and security considerations
-3. **Deployment and monitoring** - Launch with comprehensive monitoring and alerting
+1. **RPC provider setup** — Configure reliable Celestia mainnet RPC access
+2. **Secure key management** — Protect your signing keys
+3. **Configuration review** — Audit all configurations for production
+4. **Deployment and monitoring** — Launch with comprehensive monitoring
 
-### Prepare Celestia Node
+### RPC Provider Setup
 
-#### Key Management
+For mainnet, use a reliable RPC provider with:
+- High availability and redundancy
+- Low latency connections
+- Appropriate rate limits for your transaction volume
 
-For mainnet, use the OS keyring backend instead of the test backend for enhanced security:
+Update your configuration with mainnet endpoints:
 
-```bash
-./cel-key add sov-mainnet --keyring-backend os --node.type light
-using directory:  /home/ubuntu/.celestia-light/keys
-Enter keyring passphrase:
-Re-enter keyring passphrase:
-
-- address: celestia1v3mugr5g37mth6k67wxyx8j4lhqkap7me8lhfr
-  name: sov-mainnet
-  pubkey: '{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"A6h6NdmFLwxNqRdklOWb3ugNe8C4oR3A2ij52819P9jS"}'
-  type: local
+```toml
+[da]
+rpc_url = "wss://your-mainnet-endpoint.quiknode.pro/your-api-token/"
+grpc_url = "https://your-mainnet-endpoint.quiknode.pro:9090"
+grpc_auth_token = "your-api-token"
+signer_private_key = "${CELESTIA_SIGNER_KEY}"  # Use environment variable
 ```
 
-#### Fund Your Node
+### Key Management
 
-Fund your Celestia address with sufficient TIA tokens based on your expected data usage. Consider:
-- Current TIA price and network fees
-- Your rollup's expected transaction volume
-- Buffer for fee spikes during network congestion
-- Set up monitoring alerts for low balance thresholds
+For mainnet, never store private keys in configuration files:
 
-#### Node Configuration
+1. **Use environment variables**:
+   ```bash
+   export CELESTIA_SIGNER_KEY="your-private-key-hex"
+   ```
 
-Follow the [Celestia light node setup guide](https://docs.celestia.org/how-to-guides/light-node) for the mainnet. 
+2. **Or use a secrets manager** (AWS Secrets Manager, HashiCorp Vault, etc.)
 
-Key differences from testnet:
+3. **Secure your key**:
+   - Generate keys on an air-gapped machine
+   - Store backups in secure, geographically distributed locations
+   - Consider using HSM for high-security deployments
 
-1. **Run as a system service**: Configure your node to [run as a SystemD service](https://docs.celestia.org/how-to-guides/systemd#celestia-light-node) for automatic restarts and better stability
-2. **Configure secure key storage**: Update `~/.celestia-light/config.toml` to use the OS keyring:
-    ```toml
-    [State]
-    DefaultKeyName = "sov-mainnet"
-    DefaultBackendName = "os"
-    ```
-3. **Start and verify synchronization**: Launch your Celestia light node and ensure it's fully synced before proceeding
+Fund your Celestia address with sufficient TIA tokens:
+- Estimate based on expected transaction volume
+- Add buffer for fee spikes during network congestion
+- Set up monitoring alerts for low balance
 
 ### Review Configuration
 
-Carefully audit all configuration files for mainnet deployment:
+Carefully audit all configuration files:
 
 #### 1. Chain Constants (`constants.toml`)
-- Verify `CHAIN_ID` and `CHAIN_NAME` are set to production values
-- Ensure these cannot be confused with testnet values
+- Set production `CHAIN_ID` and `CHAIN_NAME`
+- Configure unique namespaces for mainnet
+- Ensure values cannot be confused with testnet
 
 #### 2. Genesis Configuration (`configs/genesis.json`)
-- **Address rotation**: Replace all testnet addresses with production addresses
-- **State migration**: Determine which data (if any) to migrate from testnet:
-  - Bank balances
-  - Module-specific state
-  - User accounts
-- **Sequencer configuration**: Update with your new mainnet Celestia address
-- **Paymaster settings**: Review and configure production paymaster parameters
-- **Chain state**: Finalize all genesis parameters
+- Replace all testnet addresses with production addresses
+- Update sequencer configuration with mainnet Celestia address
+- Review paymaster settings for production use
+- Set appropriate `genesis_da_height`
 
 #### 3. Rollup Configuration (`configs/rollup.toml`)
-- **DA settings**: Update with mainnet Celestia node details:
-  - New authentication token (get with `celestia light auth admin`)
-  - Correct RPC address
-  - Mainnet signer address
-- **Runner configuration**: 
-  - Set appropriate `genesis_height` for mainnet
-  - Configure production public endpoints
-- **Performance tuning**: Adjust batch sizes and intervals for mainnet load
-
-#### 4. Revenue Share Module
-Verify that the revenue share module is properly configured in your rollup's STF for mainnet economics.
-
-#### 5. Nginx proxy
-
-Nginx can be placed in front of the rollup node to handle DDoS separately, terminate TLS and other standard web deployment practices.
+- Configure mainnet RPC endpoints
+- Set production `bind_host` and `bind_port`
+- Tune `max_batch_size_bytes` and other performance parameters
+- Configure monitoring endpoints
 
 ### Security Hardening Checklist
 
-Before mainnet launch, ensure:
+Before mainnet launch:
 
-- [ ] All private keys are stored securely (never in code or configuration files)
-- [ ] Authentication tokens are managed through environment variables or secure vaults
-- [ ] Backup procedures are documented and tested
-- [ ] Monitoring and alerting systems are configured
-- [ ] Rate limiting and DDoS protection are in place
-- [ ] Access controls are configured for all endpoints
-- [ ] Audit logs are enabled and stored securely
-- [ ] Disaster recovery plan is documented
+- [ ] Private keys stored securely (never in code or config files)
+- [ ] Authentication tokens managed via environment variables or secrets manager
+- [ ] Backup procedures documented and tested
+- [ ] Monitoring and alerting configured
+- [ ] Rate limiting and DDoS protection in place
+- [ ] TLS configured for all public endpoints
+- [ ] Access controls configured for admin endpoints
+- [ ] Audit logs enabled and stored securely
+- [ ] Disaster recovery plan documented
 
 ### Start and Monitor
 
-1. **Pre-launch verification**: Double-check all configurations and ensure your Celestia node is healthy
-2. **Launch your rollup**: Start with your production configuration and closely monitor initial behavior
-3. **Post-launch monitoring**: Track:
+1. **Pre-launch verification**:
+   - Verify RPC connectivity
+   - Confirm wallet has sufficient TIA
+   - Test blob submission manually if needed
+
+2. **Launch your rollup** with production configuration
+
+3. **Monitor**:
    - Transaction throughput and latency
    - DA layer submission success rate
-   - Node resource usage
+   - Node resource usage (CPU, memory, disk)
    - Error rates and patterns
+
 4. **Set up alerts** for:
    - Low TIA balance
    - Failed DA submissions
+   - RPC connection failures
    - Abnormal transaction patterns
    - System resource thresholds
 
 ## Troubleshooting
 
-If you encounter issues:
-1. Ensure your Celestia light node is fully synced
-2. Verify your node has sufficient TIA tokens
-3. Check that all configuration files have been updated correctly
-4. Review logs for specific error messages
-5. Consult the [Sovereign SDK GitHub repository](https://github.com/Sovereign-Labs/sovereign-sdk) for known issues
+**Connection errors to RPC provider**:
+- Verify endpoint URLs are correct (use `wss://` for WebSocket, `https://` for gRPC)
+- Check authentication token is valid
+- Ensure your IP is allowlisted if the provider requires it
+
+**Blob submission failures**:
+- Verify your wallet has sufficient TIA tokens
+- Check that the private key format is correct (64-character hex)
+- Ensure the Celestia address in genesis matches the signing key
+
+**Namespace issues**:
+- Namespaces must be exactly 10 bytes for Celestia
+- Rebuild the binary if you change namespace values in `constants.toml`
+
+**General debugging**:
+- Check rollup logs for specific error messages
+- Verify all configuration files have been updated correctly
+- Consult the [Sovereign SDK GitHub repository](https://github.com/Sovereign-Labs/sovereign-sdk) for known issues
