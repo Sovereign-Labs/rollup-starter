@@ -5,6 +5,7 @@ grpc_url = "http://127.0.0.1:9091"
 grpc_auth_token = "MY.SECRET.TOKEN"
 
 # The private key in hex format of Celestia wallet that has enough TIA to publish blobs.
+# Matches celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s
 signer_private_key = "aec34bb1cfae6e906594dc106af4057a9046f769e2eeed67d040f0107e15e167"
 
 

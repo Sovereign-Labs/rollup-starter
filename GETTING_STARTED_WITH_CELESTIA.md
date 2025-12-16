@@ -38,7 +38,7 @@ Before starting this tutorial, ensure that:
 - You have Rust and Cargo installed
 - You have Docker installed (for local devnet)
 - Your rollup is working with MockDa
-- You have basic familiarity with Celestia concepts
+- You have basic familiarity with [Celestia concepts](https://docs.celestia.org/learn/how-celestia-works/overview)
 
 ## Overview
 
@@ -53,6 +53,8 @@ This tutorial covers all three stages.
 ## Stage 1: Celestia Local Devnet
 
 The starter repository includes a [Docker Compose](./integrations/docker-compose.celestia.yml) configuration for running Celestia locally, along with all necessary configurations.
+
+The default configuration uses a pre-funded Celestia wallet (`celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s`) that works out of the box with the local devnet. No additional setup is required.
 
 ### Starting Celestia Devnet
 
@@ -94,6 +96,8 @@ $ curl -s http://127.0.0.1:12346/modules/value-setter/state/value
 ```
 
 ## Stage 2: Celestia Testnet
+
+**Prerequisites**: You will need a Celestia wallet funded with TIA tokens on the Mocha testnet. TIA is required to pay for blob submissions to the DA layer.
 
 ### Stopping the Devnet
 
@@ -197,10 +201,30 @@ signer_private_key = "your-private-key-hex"
 
 #### 3. Genesis Configuration
 
+**Important**: The Celestia address in genesis must match the private key in your rollup config. The default configuration uses the devnet address `celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s` — you must update this for testnet/mainnet.
+
 Update your Celestia address in [`configs/celestia/genesis.json`](configs/celestia/genesis.json):
 
-- `sequencer_registry.sequencer_config.seq_da_address` — your Celestia address
-- `paymaster.payers[].sequencers_to_register` — your Celestia address (if using paymaster)
+```json
+{
+  "sequencer_registry": {
+    "sequencer_config": {
+      "seq_da_address": "celestia1your-address-here"
+    }
+  },
+  "paymaster": {
+    "payers": [
+      {
+        "sequencers_to_register": [
+          "celestia1your-address-here"
+        ]
+      }
+    ]
+  }
+}
+```
+
+Both values must be set to your Celestia address (the one corresponding to your `signer_private_key`).
 
 ### Running on Testnet
 
@@ -282,6 +306,8 @@ Congratulations! Your rollup is now running on Celestia testnet. You can monitor
 
 ## Stage 3: Celestia Mainnet
 
+**Prerequisites**: You will need a Celestia wallet funded with TIA tokens on mainnet. Ensure you have sufficient TIA to cover blob submission fees for your expected transaction volume.
+
 After successfully testing your rollup on Celestia Testnet, you're ready to deploy to mainnet. Mainnet deployment requires enhanced security measures and careful management of keys and secrets.
 
 **Important**: Mainnet deployment involves real assets and cannot be easily reversed. Take extra care with key management, backup procedures, and security hardening.
@@ -344,7 +370,9 @@ Carefully audit all configuration files:
 
 #### 2. Genesis Configuration (`configs/genesis.json`)
 - Replace all testnet addresses with production addresses
-- Update sequencer configuration with mainnet Celestia address
+- **Update Celestia address** to match your mainnet signing key:
+  - `sequencer_registry.sequencer_config.seq_da_address`
+  - `paymaster.payers[].sequencers_to_register`
 - Review paymaster settings for production use
 - Set appropriate `genesis_da_height`
 
