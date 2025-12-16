@@ -26,8 +26,11 @@ bind_port = 12346
 public_address = "http://127.0.0.1:12346"
 
 [monitoring]
-# This does not have effect at the moment.
-telegraf_address = "127.0.0.1:8094"
+# Uses dockers gateway ip to reach telegraf binded on host.
+# Telegraf could be running in another container with port 8094 exposed for example.
+# This config must be an ip address so we can't use "host.docker.internal", so we use the default docker bridge ip.
+# This _could_ be incorrect with some setups but should be OK for a default.
+telegraf_address = "172.17.0.1:8094"
 
 
 [proof_manager]
@@ -54,3 +57,4 @@ batch_execution_time_limit_millis = 6000 # This should be adjusted depending on 
 
 [sequencer.extension]
 max_log_limit = 20000
+
