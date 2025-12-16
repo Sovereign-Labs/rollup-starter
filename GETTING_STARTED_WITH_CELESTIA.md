@@ -130,7 +130,7 @@ grpc_auth_token = "your-api-token"
 #### Option B: Other RPC Providers
 
 You can use any Celestia RPC provider that exposes:
-- **WebSocket RPC endpoint** (port 26658 by default)
+- **Celestia RPC endpoint** (port 26658 by default) — supports both HTTP and WebSocket
 - **gRPC endpoint** (port 9090 by default)
 
 Configure the endpoints in your `rollup.toml` accordingly.
@@ -182,7 +182,7 @@ Update `configs/celestia/rollup.toml`:
 
 ```toml
 [da]
-# WebSocket RPC endpoint (use wss:// for secure connections)
+# Celestia RPC endpoint (use wss:// or https:// for secure connections)
 rpc_url = "wss://your-endpoint.celestia-mocha.quiknode.pro/your-api-token/"
 
 # gRPC endpoint for blob submission
@@ -393,7 +393,7 @@ Before mainnet launch:
 ## Troubleshooting
 
 **Connection errors to RPC provider**:
-- Verify endpoint URLs are correct (use `wss://` for WebSocket, `https://` for gRPC)
+- Verify endpoint URLs are correct (use `ws://`/`wss://` or `http://`/`https://` for RPC, `http://`/`https://` for gRPC)
 - Check authentication token is valid
 - Ensure your IP is allowlisted if the provider requires it
 
