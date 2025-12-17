@@ -27,8 +27,6 @@ user_hashtable_buckets = 1_000_000
 # It allows avoiding allocating 256GB at the start
 user_preallocate_ht = false
 
-# We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
-# any blocks before this height
 [runner]
 da_polling_interval_ms = 2_000
 concurrent_sync_tasks = 2

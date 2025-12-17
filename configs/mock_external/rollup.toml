@@ -21,10 +21,7 @@ user_hashtable_buckets = 1_000_000
 user_preallocate_ht = false
 
 
-# We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
-# any blocks before this height
 [runner]
-genesis_height = 0
 da_polling_interval_ms = 200
 
 [runner.http_config]

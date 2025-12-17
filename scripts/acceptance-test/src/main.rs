@@ -135,15 +135,15 @@ async fn run_test() -> Result<(), anyhow::Error> {
         .spawn()
         .expect("Failed to start rollup");
 
-    // Wait up to a minute for the rollup to be ready
-    for _ in 0..600 {
+    // Wait up to 60s for the rollup to be ready
+    for _ in 0..120 {
         if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
             .await
             .is_ok_and(|response| response.status().is_success())
         {
             break;
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);

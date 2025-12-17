@@ -31,10 +31,7 @@ state_cache_size = 10000000000 # 10GB
 user_hashtable_buckets = 64_000_000 # 256 GB. You will need much more for production deployments
 
 
-# We define the rollup's genesis to occur at block number `start_height`. The rollup will ignore
-# any blocks before this height
 [runner]
-genesis_height = 1  # Use a non-zero genesis height
 da_polling_interval_ms = 200
 
 [runner.http_config]
