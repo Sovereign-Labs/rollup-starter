@@ -19,6 +19,7 @@ mod state_consistency;
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
 pub const API_URL: &str = "http://localhost:12348";
+pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 
 // Save a full snapshot of the slot every N slots
 const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
@@ -112,6 +113,7 @@ pub struct Directories {
     pub output_dir: PathBuf,
     pub rollup_data_path: PathBuf,
     pub snapshots_dir: PathBuf,
+    pub throughput_dir: PathBuf,
 }
 
 impl Directories {
@@ -131,9 +133,14 @@ impl Directories {
         fs::create_dir_all(&output_dir)?;
         let rollup_data_path = output_dir.join("rollup-starter-data");
         fs::create_dir_all(&rollup_data_path)?;
-
         let snapshots_dir = output_dir.join("snapshots");
         std::fs::create_dir_all(&snapshots_dir).ok();
+
+        let throughput_dir = acceptance_test_dir.join("acceptance-throughput");
+        // Only create throughput_dir if it doesn't exist - this directory persists across runs
+        if !throughput_dir.exists() {
+            fs::create_dir_all(&throughput_dir)?;
+        }
 
         Ok(Self {
             rollup_root,
@@ -141,6 +148,7 @@ impl Directories {
             output_dir,
             rollup_data_path,
             snapshots_dir,
+            throughput_dir,
         })
     }
 }
@@ -256,6 +264,12 @@ fn save_slot_snapshot_if_needed(
 pub struct ThroughputReport {
     pub num_txs: u64,
     pub num_slots: u64,
+}
+
+impl ThroughputReport {
+    pub fn throughput(&self) -> f64 {
+        self.num_txs as f64 / self.num_slots as f64
+    }
 }
 
 pub fn build_rollup(root_dir: PathBuf) -> anyhow::Result<()> {

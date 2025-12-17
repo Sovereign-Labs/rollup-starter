@@ -4,7 +4,8 @@ use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
     build_rollup, cleanup_postgres_container, generate_postgres_password, get_rollup_client,
     interpolate_config, run_soak, start_and_wait_for_postgres_ready, wait_for_sequencer_ready,
-    Directories, Runtime, Spec, API_URL, NUM_SOAK_BATCHES, POSTGRES_CONTAINER_NAME,
+    Directories, Runtime, Spec, ThroughputReport, API_URL, NUM_SOAK_BATCHES,
+    POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -24,6 +25,43 @@ use stf_starter::RuntimeCall;
 use tokio_stream::StreamExt;
 
 use tracing::info;
+
+/// Returns true if the new throughput report should overwrite the existing one.
+/// Only overwrites if no existing file, file is invalid, or new throughput is better.
+fn should_overwrite_throughput(
+    throughput_path: &std::path::Path,
+    new_report: &ThroughputReport,
+) -> bool {
+    match std::fs::read_to_string(throughput_path) {
+        Ok(contents) => match serde_json::from_str::<ThroughputReport>(&contents) {
+            Ok(existing) => {
+                let new_throughput = new_report.throughput();
+                let existing_throughput = existing.throughput();
+                if new_throughput > existing_throughput {
+                    info!(
+                        "New throughput ({:.2} txs/slot) exceeds existing ({:.2} txs/slot), updating",
+                        new_throughput, existing_throughput
+                    );
+                    true
+                } else {
+                    info!(
+                        "Keeping existing throughput ({:.2} txs/slot) as it's >= new ({:.2} txs/slot)",
+                        existing_throughput, new_throughput
+                    );
+                    false
+                }
+            }
+            Err(_) => {
+                info!("Existing throughput file is invalid, overwriting");
+                true
+            }
+        },
+        Err(_) => {
+            info!("No existing throughput file, creating new one");
+            true
+        }
+    }
+}
 
 fn compare_tx_info_and_accepted_tx(
     tx_info: &types::TxInfoWithConfirmation,
@@ -119,10 +157,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let res = run_soak(directories.clone(), rollup, 3, stop_at_height, true).await;
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
     if let Ok(throughput_report) = res {
-        std::fs::write(
-            directories.output_dir.join("throughput_report.json"),
-            serde_json::to_string(&throughput_report)?,
-        )?;
+        let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
+        if should_overwrite_throughput(&throughput_path, &throughput_report) {
+            std::fs::write(&throughput_path, serde_json::to_string(&throughput_report)?)?;
+        }
         save_mock_data(directories.clone())?;
     }
     Ok(())

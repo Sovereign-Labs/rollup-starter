@@ -1,5 +1,7 @@
 use acceptance_test::fetch_and_compare::SlotFetcher;
-use acceptance_test::{build_rollup, wait_for_sequencer_ready, ThroughputReport};
+use acceptance_test::{
+    build_rollup, wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE,
+};
 use acceptance_test::{
     cleanup_postgres_container,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
@@ -7,6 +9,7 @@ use acceptance_test::{
     start_and_wait_for_postgres_ready, Directories, API_URL, NUM_SOAK_BATCHES,
     POSTGRES_CONTAINER_NAME,
 };
+use chrono::Utc;
 use clap::Parser;
 use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
 use std::{process::Command, time::Duration};
@@ -208,23 +211,22 @@ async fn run_test() -> Result<(), anyhow::Error> {
     )
     .await?;
     let previous_throughput_report: ThroughputReport = serde_json::from_str::<ThroughputReport>(
-        &std::fs::read_to_string(directories.output_dir.join("throughput_report.json"))?,
+        &std::fs::read_to_string(directories.throughput_dir.join(SETUP_THROUGHPUT_FILE))?,
     )?;
-    let previous_throughput =
-        previous_throughput_report.num_txs as f64 / previous_throughput_report.num_slots as f64;
-    let new_throughput =
-        new_throughput_report.num_txs as f64 / new_throughput_report.num_slots as f64;
+    let previous_throughput = previous_throughput_report.throughput();
+    let new_throughput = new_throughput_report.throughput();
     if new_throughput < (previous_throughput * 0.9) {
         anyhow::bail!("Throughput is less than 90% of the previous throughput. This is likely due to a bug in the rollup. Old throughput: {:.2} txs/slot, new throughput: {:.2} txs/slot", previous_throughput, new_throughput);
     }
 
-    // Save throughput report to acceptance test directory
+    // Save throughput report with timestamp to keep a record of test runs
+    let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
+    let throughput_filename = format!("test_throughput_{}.json", timestamp);
     std::fs::write(
-        directories
-            .acceptance_test_dir
-            .join("accepted_throughput_report.json"),
+        directories.throughput_dir.join(&throughput_filename),
         serde_json::to_string(&new_throughput_report)?,
     )?;
+    info!("Saved throughput report to {}", throughput_filename);
     Ok(())
 }
 
