@@ -163,4 +163,16 @@ where
         }
         Some(pinned_cache)
     }
+
+    #[cfg(feature = "native")]
+    fn resolve_address<ST: StateAccessor>(
+        &mut self,
+        default_address: &S::Address,
+        credential_id: & sov_rollup_interface::crypto::CredentialId,
+        state: &mut ST,
+    ) -> Result<S::Address, <ST as sov_modules_api::StateWriter<sov_state::User>>::Error> {
+        self.0
+            .accounts
+            .resolve_sender_address(default_address, credential_id, state)
+    }
 }
