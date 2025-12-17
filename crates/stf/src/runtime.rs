@@ -168,7 +168,7 @@ where
     fn resolve_address<ST: StateAccessor>(
         &mut self,
         default_address: &S::Address,
-        credential_id: & sov_rollup_interface::crypto::CredentialId,
+        credential_id: &sov_rollup_interface::crypto::CredentialId,
         state: &mut ST,
     ) -> Result<S::Address, <ST as sov_modules_api::StateWriter<sov_state::User>>::Error> {
         self.0
