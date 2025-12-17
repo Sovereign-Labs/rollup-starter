@@ -74,5 +74,6 @@ ideal_lag_behind_finalized_slot = 1
 num_cache_warmup_workers = 0
 is_replica = false
 
+
 [sequencer.extension]
 max_log_limit = 20000
