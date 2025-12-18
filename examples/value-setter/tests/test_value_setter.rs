@@ -1,6 +1,6 @@
 use sov_modules_api::Spec;
 use sov_test_utils::{generate_optimistic_runtime, TestSpec};
-use value_setter::{ValueSetter, ValueSetterConfig};
+use value_setter::ValueSetter;
 
 type S = TestSpec;
 
@@ -31,12 +31,9 @@ pub fn setup() -> (TestData<S>, TestRunner<TestRuntime<S>, S>) {
 
     let test_data = TestData { regular_user };
 
-    // Configure the genesis state for our ValueSetter module.
-    let value_setter_config = ValueSetterConfig {};
-
     // Build the final genesis config by combining
     // the core config with our module's specific config.
-    let genesis = GenesisConfig::from_minimal_config(genesis_config.into(), value_setter_config);
+    let genesis = GenesisConfig::from_minimal_config(genesis_config.into(), ());
 
     // Initialize the TestRunner with the genesis state.
     // The runner gives us a simple way to execute transactions and query state.
@@ -47,7 +44,7 @@ pub fn setup() -> (TestData<S>, TestRunner<TestRuntime<S>, S>) {
 }
 
 use sov_test_utils::{AsUser, TransactionTestCase};
-use value_setter::{CallMessage, Event};
+use value_setter::CallMessage;
 
 #[test]
 fn test_can_set_value() {
