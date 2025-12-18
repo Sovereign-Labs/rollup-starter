@@ -94,7 +94,7 @@ is_replica = false
 # max_requests_per_second = 10000 # Limit on requests per second.
 # address_custom_limits = [["0xA6edfca3AA985Dd3CC728BFFB700933a986aC085", { resources_per_bucket = 20, refill_rate = 2}]]
 # ip_custom_limits = [
-#                ["127.0.0.1", { resources_per_bucket = 1000, refill_rate = 1}],  # This IP can use the resources of the entire batch.
+#                ["127.0.0.1", { resources_per_bucket = 1000, refill_rate = 1 }],  # This IP can use the resources of the entire batch.
 #                ["157.180.34.249", { resources_per_bucket = 100, refill_rate = 2}] # This IP can use 10% the resources of the entire batch.
 #            ]
 # [sequencer.preferred.rate_limiter.default_limits]
