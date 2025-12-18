@@ -41,7 +41,7 @@ bind_port = 12346
 public_address = "http://127.0.0.1:12346"
 
 [monitoring]
-telegraf_address = "127.0.0.1:8094"
+telegraf_address = "127.0.0.1:9094"
 # Defines how many measurements a rollup node will accumulate before sending it to the Telegraf.
 # It is expected from the rollup node to produce metrics all the time,
 # so measurements are buffered by size and not sent by time.
@@ -63,7 +63,7 @@ max_number_of_transitions_in_memory = 20
 
 
 [sequencer]
-max_batch_size_bytes = 8388608 # 8 MiB
+max_batch_size_bytes = 28388608 # 8 MiB
 max_concurrent_blobs = 128
 max_allowed_node_distance_behind = 10
 rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
@@ -86,14 +86,17 @@ num_cache_warmup_workers = 0
 is_replica = false
 
 
-# [sequencer.preferred.rate_limiter] # Setting related to rate limiter.
-# max_nb_of_concurrent_users_in_rate_limiter = 100000 # Limit on how many concurrent users the rate limiter can handle.
-# max_requests_per_second = 10000 # Limit on requests per second.
-# address_custom_limits = [] 
-# ip_custom_limits = []
-# [sequencer.preferred.rate_limiter.default_limits]
-# resources_per_bucket = 5 # The resources allocated per user per rate-limiting bucket, defined in units of 1/1000th of a full batch. E.g. resources_per_bucket = 10 would mean each bucket allows the user to use 1% of a full batch capacity.
-# refill_rate = 5 # The refill rate of buckets. E.g. if refill_rate = 5, the user's rate limiting bucket will be refilled up to five times every batch.
+[sequencer.preferred.rate_limiter] # Setting related to rate limiter.
+max_nb_of_concurrent_users_in_rate_limiter = 100000 # Limit on how many concurrent users the rate limiter can handle.
+max_requests_per_second = 10000 # Limit on requests per second.
+address_custom_limits = [["0xA6edfca3AA985Dd3CC728BFFB700933a986aC085", { resources_per_bucket = 20, refill_rate = 2}]]
+ip_custom_limits = [
+                ["127.0.0.1", { resources_per_bucket = 1000, refill_rate = 2}],
+                ["157.180.34.249", { resources_per_bucket = 100, refill_rate = 2}]
+            ]
+[sequencer.preferred.rate_limiter.default_limits]
+resources_per_bucket = 5 # The resources allocated per user per rate-limiting bucket, defined in units of 1/1000th of a full batch. E.g. resources_per_bucket = 10 would mean each bucket allows the user to use 1% of a full batch capacity.
+refill_rate = 5 # The refill rate of buckets. E.g. if refill_rate = 5, the user's rate limiting bucket will be refilled up to five times every batch.
 
 [sequencer.extension]
 max_log_limit = 20000
