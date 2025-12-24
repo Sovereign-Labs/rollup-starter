@@ -52,7 +52,7 @@ fn should_overwrite_throughput(
                 }
             }
             Err(_) => {
-                info!("Existing throughput file is invalid, overwriting");
+                warn!("Existing throughput file is invalid, overwriting");
                 true
             }
         },
