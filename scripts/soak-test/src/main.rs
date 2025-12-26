@@ -34,7 +34,7 @@ async fn worker_task(
     worker_id: u128,
     num_workers: u32,
 ) -> anyhow::Result<()> {
-    let runner = SoakTestRunner::<Runtime, Spec>::new().with_bank();
+    let runner = SoakTestRunner::<Runtime, Spec>::new().without_retries().with_state_consistency();
     let result = runner
         .run(
             client,

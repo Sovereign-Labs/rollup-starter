@@ -23,7 +23,7 @@ sov-test-utils = { workspace = true, features = ["arbitrary"] }
 sov-risc0-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] } 
 sov-sp1-adapter = { workspace = true, optional = true, features = ["arbitrary", "native"] }
 
-rollup-starter = { path = "../../crates/rollup/", default-features = false }
+rollup-starter = { path = "../../crates/rollup/", default-features = false, features = ["acceptance-testing"] }
 
 [features]
 default = ["mock_da", "mock_zkvm"]
