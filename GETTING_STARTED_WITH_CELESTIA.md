@@ -141,21 +141,32 @@ Configure the endpoints in your `rollup.toml` accordingly.
 
 ### Creating a Celestia Wallet
 
-Your rollup needs a Celestia wallet to sign and submit blobs. Generate a private key or use an existing one.
+Your rollup needs a Celestia wallet to sign and submit blobs. The private key must be in unarmored hexadecimal format (64 characters).
 
-To generate a new key, you can use any secp256k1 key generation tool. The key should be in hexadecimal format (64 characters).
-
-To derive the Celestia address from a private key, you can use tools like:
-- [Celestia's cel-key tool](https://docs.celestia.org/tutorials/celestia-app#create-a-wallet-with-cel-key)
-- Any Cosmos SDK compatible wallet
-
-Example using `cel-key`:
+**Option A: Using cel-key** (if you have [celestia-node](https://docs.celestia.org/operate/keys-wallets/celestia-node-key) installed):
 ```bash
-$ cel-key add my-rollup-key --keyring-backend test
+# Create a new key
+$ cel-key add my-rollup-key --keyring-backend test --node.type light --p2p.network mocha
+
+# Export as unarmored hex
+$ cel-key export my-rollup-key --unarmored-hex --unsafe --keyring-backend test --node.type light --p2p.network mocha
 ```
 
+**Option B: Using openssl**:
+```bash
+# Generate a random 32-byte hex key
+$ openssl rand -hex 32
+```
+
+**Option C: Using cast** (from [Foundry](https://book.getfoundry.sh/)):
+```bash
+$ cast wallet new | grep "Private key" | awk '{print $3}'
+```
+
+To derive the Celestia address from a private key, use [cel-key](https://docs.celestia.org/operate/keys-wallets/celestia-node-key) or any Cosmos SDK compatible wallet, for example Keplr.
+
 Note down:
-- **Private key** (hex format) — for `signer_private_key` in config
+- **Private key** (hex format, 64 characters) — for `signer_private_key` in config
 - **Celestia address** — for genesis configuration (e.g., `celestia1abc...`)
 
 ### Funding Your Wallet
@@ -173,10 +184,12 @@ Your rollup requires two namespaces: one for batches and one for proofs.
 Update these in [`constants.toml`](constants.toml):
 
 ```toml
-# Should be 10 bytes long for Celestia
+# Must be exactly 10 ASCII characters for Celestia
 BATCH_NAMESPACE = { byte_string = "your-batch" }
 PROOF_NAMESPACE = { byte_string = "your-proof" }
 ```
+
+> **Note**: The `byte_string` format converts ASCII characters to bytes, so the string must be exactly 10 characters long (e.g., `"your-batch"` = 10 chars ✓).
 
 These values are compiled into the binary as they're part of the cryptographic commitment for the prover.
 
@@ -186,7 +199,8 @@ Update `configs/celestia/rollup.toml`:
 
 ```toml
 [da]
-# Celestia RPC endpoint (use wss:// or https:// for secure connections)
+# Celestia RPC endpoint
+# Use ws://http:// for local devnet, wss://https:// for testnet/mainnet
 rpc_url = "wss://your-endpoint.celestia-mocha.quiknode.pro/your-api-token/"
 
 # gRPC endpoint for blob submission
@@ -225,6 +239,17 @@ Update your Celestia address in [`configs/celestia/genesis.json`](configs/celest
 ```
 
 Both values must be set to your Celestia address (the one corresponding to your `signer_private_key`).
+
+Also make sure that recent address is set `chain_state` section. 
+For the new setup it should be pretty close to the latest head to avoid unnecessary processing of older blocks.
+
+```json
+{
+  "chain_state": {
+    "genesis_da_height": 9441180
+  }
+}
+```
 
 ### Running on Testnet
 
