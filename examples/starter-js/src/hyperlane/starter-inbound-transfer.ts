@@ -21,14 +21,14 @@ try {
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
     const warpRoute = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
-    const recipient = zeroPad20To32(deployerAddress);
+    const recipient = zeroPad20To32("0xA6edfca3AA985Dd3CC728BFFB700933a986aC085");
     console.log('Making inbound warp transfer...');
     console.log(`  Contract:  ${CONTRACT_ADDRESS}`);
     console.log(`  Domain:    ${DOMAIN}`);
     console.log(`  Router:    ${ROUTER_ADDRESS}`);
     console.log(`  Recipient: ${recipient}`);
 
-    const transferAmount = ethers.parseEther('0.01');
+    const transferAmount = ethers.parseEther('10.0');
     const gasPayment = await warpRoute.quoteGasPayment(DOMAIN);
     const totalValue = transferAmount + gasPayment;
     
