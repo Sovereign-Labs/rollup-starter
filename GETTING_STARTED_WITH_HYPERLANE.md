@@ -258,15 +258,12 @@ Now that we've funded the paymaster and sequencer accounts, we can terminate set
 
 ```bash,test-ci,bashtestmd:compare-output
 $ npm run hyperlane-finish-admin-setup
-[✓] Receipt result: successful
-[✓] Mailbox/DispatchId (HyperlaneId): 0x873e0bfeb9251c268fbc483b4dae63a548360dd7594a1768aeb5a1532dd16e5c
-[✓] Warp/TokenTransferredRemote:
-    Route ID: 0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
-    To Domain: 3133790210
-    Recipient: 0x000000000000000000000000d2c1be33a0bcd2007136afd8ed61cc7561ada747
-    Amount (hex): 0x0000000000000000000000000000000000000000000000000000702d54e2f800
-    Amount (decimal): 123340000000000
+# TODO: Blocked by relayer setting max fee to hard-coded value
 ```
+
+This will finish setting up the rollup by transferring funds to the paymaster (so that future transactions can go through) and
+terminating the rollup's "setup mode" so that the gas price is enforced as usual. 
+
 
 ## 6. Make Outbound Transfers
 
