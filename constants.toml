@@ -9,7 +9,7 @@ freeze = [1, 1]
 [constants]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
 CHAIN_ID = 6669
-CHAIN_NAME = "TestChain"
+CHAIN_NAME = "TestChain2"
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert to ASCII bytes
