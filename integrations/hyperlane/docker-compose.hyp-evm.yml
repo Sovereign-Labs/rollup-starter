@@ -97,7 +97,7 @@ services:
   # TODO: validator-sovstarter
 
   relayer:
-    image: ghcr.io/ross-weir/hyperlane-agent:integration-10
+    image: ghcr.io/ross-weir/hyperlane-agent:test
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully

@@ -30,6 +30,7 @@ const rollup = await createStandardRollup({
 console.log("Rollup client initialized");
 
 try {
+    console.log("Depositing sequencer funds...");
     const response = await rollup.call(depositSequencer, {signer, overrides: {
         details: {
             max_fee: 0,
@@ -57,13 +58,14 @@ try {
     const dispatchIdEvent = events.find((e: any) => e.key === "SequencerRegistry/Deposited");
     if (dispatchIdEvent) {
         // @ts-ignore
-        const sequencer = dispatchIdEvent.value.sequencer;
+        const sequencer = dispatchIdEvent.value.deposited.sequencer;
         console.log(`[✓] SequencerRegistry/Deposited: ${sequencer}`);
     }
 
+    console.log("Terminating setup mode...");
     const terminateSetupModeResponse = await rollup.call(terminateSetupMode, {signer});
     console.log("Full response:");
-    console.log(JSON.stringify(response.response));
+    console.log(JSON.stringify(terminateSetupModeResponse.response));
     console.log("\n-------");
     // Check receipt result first
     const terminateSetupModeReceipt = terminateSetupModeResponse.response.receipt;

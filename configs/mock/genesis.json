@@ -17,11 +17,7 @@
     "light_client_finalized_height": 0
   },
   "bank": {
-    "gas_token_config": {
-      "token_name": "sov-token",
-      "address_and_balances": [],
-      "admins": []
-    },
+    "gas_token_config": null,
     "tokens": []
   },
   "chain_state": {

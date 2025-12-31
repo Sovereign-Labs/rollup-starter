@@ -66,7 +66,7 @@ GAS_DIMENSIONS = { const = 2 }
 # used only when users feel they are being censored.
 GAS_FORCED_SEQUENCER_REGISTRATION_COST = [100000, 100000]
 # The ID of the "native token" of the rollup, which is used to pay gas fees.
-GAS_TOKEN_ID = { bech32 = "token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wswq8kfe5m", type = "TokenId" }
+GAS_TOKEN_ID = { bech32 = "token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf", type = "TokenId" }
 # The HRP prefix that appears in all rollup addresses.
 ADDRESS_PREFIX = { const = "sov" }
 # --- Gas parameters to charge for state accesses ---
