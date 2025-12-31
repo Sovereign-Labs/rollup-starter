@@ -9,7 +9,7 @@ import {
     maxU128, minterPrivateKey
 } from "./consts";
 import {Secp256k1Signer} from "@sovereign-sdk/signers";
-import {createStandardRollup} from "@sovereign-sdk/web3";
+import {createStandardRollup, DEFAULT_TX_DETAILS} from "@sovereign-sdk/web3";
 import {readWarpRouteConfig, testDataFile, zeroPad20To32} from "./utils";
 
 function buildCreateWarpRouteCall(domain: number, tokenId: string): RuntimeCall {
@@ -165,7 +165,11 @@ const createWarpRoute = buildCreateWarpRouteCall(ETHTEST_DOMAIN, ethtestTokenId)
 
 let deployerSigner = new Secp256k1Signer(deployerPrivateKey);
 
-const warpRegisterResponse = await rollup.call(createWarpRoute, {signer: deployerSigner});
+const warpRegisterResponse = await rollup.call(createWarpRoute, {signer: deployerSigner, overrides: {
+    details: {
+        max_fee: 0,
+    },
+}});
 console.log("Create warp router response:");
 
 const {routeId, tokenId} = parseWarpRouteResponse(warpRegisterResponse);
@@ -176,6 +180,10 @@ console.log(`  Token ID: ${tokenId}`);
 
 const minterSigner = new Secp256k1Signer(minterPrivateKey);
 
-const response = await rollup.call(setRelayerConfig, {signer: minterSigner});
+const response = await rollup.call(setRelayerConfig, {signer: minterSigner, overrides: {
+    details: {
+        max_fee: 0,
+    },
+}});
 console.log("Relayer config response");
 console.log(JSON.stringify(response.response));

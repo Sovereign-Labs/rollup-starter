@@ -232,11 +232,11 @@ Making inbound warp transfer...
   Contract:  0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
   Domain:    5555
   Router:    0x9c081539d40ef7b02d359c5d694e006f0c1130097466cd22d062e07065c6987a
-  Recipient: 0x000000000000000000000000D2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
-  Amount:    0.01 ETH
+  Recipient: 0x000000000000000000000000A6edfca3AA985Dd3CC728BFFB700933a986aC085
+  Amount:    10.0 ETH
   Gas:       0.0 ETH
-  Total:     0.01 ETH
-Transaction sent: 0xda1dbcb27ad6d12a53f3137559628ac39f09cc578be740288deb7d7bca6d452b
+  Total:     10.0 ETH
+Transaction sent: 0xc86762ee869deb67b8fd3c0e462513c6b2813ab60985f129614e4cba92e8b20c
 ```
 
 Wait a moment for the transfer to process, then verify that the total supply of the synthetic token has increased along with the recipient's balance:
@@ -247,11 +247,25 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jt
 ```
 
 ```bash,test-ci,bashtestmd:compare-output
-$ sleep 60 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747
+$ sleep 60 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xA6edfca3AA985Dd3CC728BFFB700933a986aC085
 {"amount":"10000000000000000","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
-## 5. Make Outbound Transfers
+## 5. Terminate Setup Mode
+
+Now that we've funded the paymaster and sequencer accounts, we can terminate setup mode 
+
+
+```bash,test-ci,bashtestmd:compare-output
+$ npm run hyperlane-finish-admin-setup
+# TODO: Blocked by relayer setting max fee to hard-coded value
+```
+
+This will finish setting up the rollup by transferring funds to the paymaster (so that future transactions can go through) and
+terminating the rollup's "setup mode" so that the gas price is enforced as usual. 
+
+
+## 6. Make Outbound Transfers
 
 Now we'll send funds back to `0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747` on ethtest.
 
@@ -290,7 +304,8 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jt
 {"amount":"9876660000000000","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 
-## 6. Troubleshooting
+
+## 7. Troubleshooting
 
 ### Validator Not Posting Checkpoints
 
