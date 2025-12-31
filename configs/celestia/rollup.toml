@@ -12,14 +12,11 @@ signer_private_key = "aec34bb1cfae6e906594dc106af4057a9046f769e2eeed67d040f0107e
 [storage]
 # The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
 path = "./rollup-state/rollup-starter-data-celestia"
-
 user_commit_concurrency = 6
 kernel_commit_concurrency = 2
 # Disable pruning for now
 # pruner_block_interval = 100_000
 pruner_versions_to_keep = 100
-#state_cache_size = 10000000000 # 10GB
-state_cache_size = 4294967296
 # The number of 4kb buckets to allocate for the state DB
 # The state DB will not exceed this size, and you'll get a warning when it fills up to 90% capacity.
 # user_hashtable_buckets = 64_000_000 # 256 GB. You will need much more for production deployments
@@ -61,7 +58,8 @@ max_number_of_transitions_in_memory = 20
 
 
 [sequencer]
-max_batch_size_bytes = 2048576
+# 7 MiB
+max_batch_size_bytes = 7340032
 max_concurrent_blobs = 128
 max_allowed_node_distance_behind = 10
 rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"

@@ -21,19 +21,16 @@ kernel_commit_concurrency = 2
 # Disable pruning for now
 # pruner_block_interval = 100_000
 pruner_versions_to_keep = 100
-
-#state_cache_size = 10000000000 # 10GB
-#state_cache_size = 4294967296
 # The number of 4kb buckets to allocate for the state DB
 # The state DB will not exceed this size, and you'll get a warning when it fills up to 90% capacity.
 #user_hashtable_buckets = 64_000_000 # 256 GB. You will need much more for production deployments
-# This paramater introduces performance penalty and should be changed in production.
 user_hashtable_buckets = 1_000_000
+# This paramater introduces performance penalty and should be changed in production.
 # It allows avoiding allocating 256GB at the start
 user_preallocate_ht = false 
 
 [runner]
-da_polling_interval_ms = 200
+da_polling_interval_ms = 2_000
 
 [runner.http_config]
 bind_host = "0.0.0.0"
@@ -63,7 +60,8 @@ max_number_of_transitions_in_memory = 20
 
 
 [sequencer]
-max_batch_size_bytes = 8388608 # 8 MiB
+# 7 MiB
+max_batch_size_bytes = 7340032
 max_concurrent_blobs = 128
 max_allowed_node_distance_behind = 10
 rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
