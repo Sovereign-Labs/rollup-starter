@@ -8890,6 +8890,8 @@ dependencies = [
  "reqwest",
  "rollup-starter",
  "sov-api-spec",
+ "sov-celestia-adapter",
+ "sov-mock-da",
  "sov-modules-rollup-blueprint",
  "sov-risc0-adapter",
  "sov-rollup-interface",
@@ -10189,6 +10191,7 @@ version = "0.3.0"
 source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=51c8e7bbbf1a935a967ec85839da4a17b2ddaad5#51c8e7bbbf1a935a967ec85839da4a17b2ddaad5"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "async-trait",
  "backon",
  "bech32",
@@ -10199,6 +10202,7 @@ dependencies = [
  "futures",
  "hex",
  "nmt-rs",
+ "proptest",
  "prost 0.13.5",
  "rand 0.8.5",
  "schemars 0.8.22",
