@@ -8,6 +8,7 @@ import {StorageTests} from "./StorageTests.s.sol";
 import {EventTests} from "./EventTests.s.sol";
 import {MemoryTests} from "./MemoryTests.s.sol";
 import {PrecompileTests} from "./PrecompileTests.s.sol";
+import {CalldataTests} from "./CalldataTests.s.sol";
 
 /**
  * @title AllTests
@@ -38,6 +39,10 @@ contract AllTests is Script {
         // Phase 5: Precompile Tests
         PrecompileTests precompileTests = new PrecompileTests();
         precompileTests.run();
+
+        // Phase 6: Calldata Tests
+        CalldataTests calldataTests = new CalldataTests();
+        calldataTests.run();
 
         console2.log("\n========================================");
         console2.log("All Tests Complete");
