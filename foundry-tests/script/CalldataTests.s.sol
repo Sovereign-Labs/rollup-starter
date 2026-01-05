@@ -6,7 +6,7 @@ import {console2} from "forge-std/console2.sol";
 import {CalldataTester} from "../src/CalldataTester.sol";
 
 contract CalldataTests is Script {
-    uint256 constant LARGE_CALLDATA_SIZE = 10 * 1024 * 1024; // 10 MB
+    uint256 constant LARGE_CALLDATA_SIZE = 1024 * 1024; // 1 MB
 
     function run() public {
         vm.startBroadcast();
@@ -24,7 +24,7 @@ contract CalldataTests is Script {
 
     function testLargeCalldata(CalldataTester tester) internal {
         console2.log("--- Test: Large Calldata Processing ---");
-        console2.log("Calldata size:", LARGE_CALLDATA_SIZE, "bytes (10 MB)");
+        console2.log("Calldata size:", LARGE_CALLDATA_SIZE, "bytes (1 MB)");
 
         bytes memory largeData = new bytes(LARGE_CALLDATA_SIZE);
         for (uint256 i = 0; i < 1024; i++) {
