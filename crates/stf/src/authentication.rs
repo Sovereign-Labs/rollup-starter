@@ -37,7 +37,7 @@ where
     SP: SchemaProvider,
 {
     type Decodable =
-        EvmAndEip712AuthenticatorInput<sov_evm::CallMessage, <Rt as DispatchCall>::Decodable>;
+        EvmAndEip712AuthenticatorInput<sov_evm::CallMessage<S>, <Rt as DispatchCall>::Decodable>;
     type Input = EvmAndEip712AuthenticatorInput;
 
     fn authenticate<Accessor: ProvableStateReader<User, Spec = S> + GetGasPrice<Spec = S>>(
@@ -121,9 +121,9 @@ where
         match &auth_variant {
             EvmAndEip712AuthenticatorInput::Evm(raw_tx) => {
                 let (call, _tx) = sov_evm::decode_evm_tx(&raw_tx.data)?;
-                Ok(EvmAndEip712AuthenticatorInput::Evm(sov_evm::CallMessage {
-                    rlp: call,
-                }))
+                Ok(EvmAndEip712AuthenticatorInput::Evm(sov_evm::CallMessage::<S>::Call(
+                    call
+                )))
             }
             EvmAndEip712AuthenticatorInput::Standard(raw_tx) => {
                 let call = capabilities::decode_sov_tx::<S, Rt>(&raw_tx.data)?;
