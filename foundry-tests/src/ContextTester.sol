@@ -6,12 +6,16 @@ contract ContextTester {
         uint256 blockNumber,
         uint256 blockTimestamp,
         uint256 blockGaslimit,
-        uint256 blockChainid
+        uint256 blockChainid,
+        uint256 blockBasefee,
+        uint256 blockPrevrandao
     ) {
         blockNumber = block.number;
         blockTimestamp = block.timestamp;
         blockGaslimit = block.gaslimit;
         blockChainid = block.chainid;
+        blockBasefee = block.basefee;
+        blockPrevrandao = block.prevrandao;
     }
 
     function getTxContext() public view returns (

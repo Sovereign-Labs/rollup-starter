@@ -28,13 +28,17 @@ contract ContextTests is Script {
             uint256 blockNumber,
             uint256 blockTimestamp,
             uint256 blockGaslimit,
-            uint256 blockChainid
+            uint256 blockChainid,
+            uint256 blockBasefee,
+            uint256 blockPrevrandao
         ) = tester.getBlockContext();
 
         console2.log("block.number:", blockNumber);
         console2.log("block.timestamp:", blockTimestamp);
         console2.log("block.gaslimit:", blockGaslimit);
         console2.log("block.chainid:", blockChainid);
+        console2.log("block.basefee:", blockBasefee);
+        console2.log("block.prevrandao:", blockPrevrandao);
         console2.log("");
     }
 
