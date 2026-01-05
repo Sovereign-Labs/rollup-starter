@@ -21,26 +21,13 @@ contract AllTests is Script {
         console2.log("Running All EVM Tests");
         console2.log("========================================\n");
 
-        DeploymentTests deploymentTests = new DeploymentTests();
-        deploymentTests.run();
-
-        StorageTests storageTests = new StorageTests();
-        storageTests.run();
-
-        EventTests eventTests = new EventTests();
-        eventTests.run();
-
-        MemoryTests memoryTests = new MemoryTests();
-        memoryTests.run();
-
-        PrecompileTests precompileTests = new PrecompileTests();
-        precompileTests.run();
-
-        CalldataTests calldataTests = new CalldataTests();
-        calldataTests.run();
-
-        ContextTests contextTests = new ContextTests();
-        contextTests.run();
+        new DeploymentTests().run();
+        new StorageTests().run();
+        new EventTests().run();
+        new MemoryTests().run();
+        new PrecompileTests().run();
+        new CalldataTests().run();
+        new ContextTests().run();
 
         console2.log("\n========================================");
         console2.log("All Tests Complete");
