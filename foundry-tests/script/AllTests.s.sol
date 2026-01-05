@@ -21,31 +21,24 @@ contract AllTests is Script {
         console2.log("Running All EVM Tests");
         console2.log("========================================\n");
 
-        // Phase 1: Deployment Tests
         DeploymentTests deploymentTests = new DeploymentTests();
         deploymentTests.run();
 
-        // Phase 2: Storage Tests
         StorageTests storageTests = new StorageTests();
         storageTests.run();
 
-        // Phase 3: Event Tests
         EventTests eventTests = new EventTests();
         eventTests.run();
 
-        // Phase 4: Memory Tests
         MemoryTests memoryTests = new MemoryTests();
         memoryTests.run();
 
-        // Phase 5: Precompile Tests
         PrecompileTests precompileTests = new PrecompileTests();
         precompileTests.run();
 
-        // Phase 6: Calldata Tests
         CalldataTests calldataTests = new CalldataTests();
         calldataTests.run();
 
-        // Phase 7: Context Tests
         ContextTests contextTests = new ContextTests();
         contextTests.run();
 
