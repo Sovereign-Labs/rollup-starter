@@ -29,8 +29,7 @@ contract ContextTests is Script {
             uint256 blockTimestamp,
             uint256 blockGaslimit,
             uint256 blockChainid,
-            uint256 blockBasefee,
-            uint256 blockPrevrandao
+            uint256 blockBasefee
         ) = tester.getBlockContext();
 
         console2.log("block.number:", blockNumber);
@@ -38,7 +37,10 @@ contract ContextTests is Script {
         console2.log("block.gaslimit:", blockGaslimit);
         console2.log("block.chainid:", blockChainid);
         console2.log("block.basefee:", blockBasefee);
-        console2.log("block.prevrandao:", blockPrevrandao);
+
+        require(blockGaslimit == 30000000, "Block gaslimit should be 30M");
+        require(blockChainid == 4321, "Chain ID should be 4321");
+
         console2.log("");
     }
 
@@ -54,6 +56,10 @@ contract ContextTests is Script {
         console2.log("msg.sender:", msgSender);
         console2.log("tx.origin:", txOrigin);
         console2.log("tx.gasprice:", txGasprice);
+
+        require(msgSender == address(this), "msg.sender should be this contract");
+        require(txOrigin == msgSender, "tx.origin should equal msg.sender");
+
         console2.log("");
     }
 }
