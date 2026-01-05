@@ -39,16 +39,16 @@ contract MemoryTests is Script {
 
     function testLargeAllocation(MemoryTester tester) internal {
         console2.log("--- Test 2: Large Single Memory Allocation ---");
-        console2.log("Allocation size: 100 KB");
+        console2.log("Allocation size: 1 MB");
 
-        uint256 size = 100 * 1024;
+        uint256 size = 1024 * 1024;
         uint256 gasBefore = gasleft();
         uint256 length = tester.largeMemoryAllocation(size);
         uint256 gasUsed = gasBefore - gasleft();
 
         console2.log("Allocated bytes:", length);
         console2.log("Total gas used:", gasUsed);
-        console2.log("Gas per KB:", gasUsed / (size / 1024));
+        console2.log("Gas per MB:", gasUsed / (size / 1024 / 1024));
         console2.log("");
     }
 }
