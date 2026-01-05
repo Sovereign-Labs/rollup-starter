@@ -9,6 +9,7 @@ import {EventTests} from "./EventTests.s.sol";
 import {MemoryTests} from "./MemoryTests.s.sol";
 import {PrecompileTests} from "./PrecompileTests.s.sol";
 import {CalldataTests} from "./CalldataTests.s.sol";
+import {ContextTests} from "./ContextTests.s.sol";
 
 /**
  * @title AllTests
@@ -43,6 +44,10 @@ contract AllTests is Script {
         // Phase 6: Calldata Tests
         CalldataTests calldataTests = new CalldataTests();
         calldataTests.run();
+
+        // Phase 7: Context Tests
+        ContextTests contextTests = new ContextTests();
+        contextTests.run();
 
         console2.log("\n========================================");
         console2.log("All Tests Complete");
