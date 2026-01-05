@@ -14,15 +14,11 @@ contract StorageTests is Script {
 
         console2.log("=== Phase 2: Storage Tests ===\n");
 
-        // Deploy storage tester
         StorageTester tester = new StorageTester();
         console2.log("StorageTester deployed at:", address(tester));
         console2.log("");
 
-        // Test 1: Alternating read-write
         testAlternatingReadWrite(tester);
-
-        // Test 2: Random slot writes
         testRandomSlotWrites(tester);
 
         vm.stopBroadcast();

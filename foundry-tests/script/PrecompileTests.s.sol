@@ -11,12 +11,10 @@ contract PrecompileTests is Script {
 
         console2.log("=== Phase 5: Precompile Tests ===\n");
 
-        // Deploy precompile tester
         PrecompileTester tester = new PrecompileTester();
         console2.log("PrecompileTester deployed at:", address(tester));
         console2.log("");
 
-        // Test: Identity precompile
         testIdentityPrecompile(tester);
 
         vm.stopBroadcast();

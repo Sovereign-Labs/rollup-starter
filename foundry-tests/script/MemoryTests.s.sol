@@ -11,15 +11,11 @@ contract MemoryTests is Script {
 
         console2.log("=== Phase 4: Memory Expansion Tests ===\n");
 
-        // Deploy memory tester
         MemoryTester tester = new MemoryTester();
         console2.log("MemoryTester deployed at:", address(tester));
         console2.log("");
 
-        // Test 1: Incremental memory expansion
         testIncrementalExpansion(tester);
-
-        // Test 2: Large single allocation
         testLargeAllocation(tester);
 
         vm.stopBroadcast();

@@ -14,18 +14,12 @@ contract EventTests is Script {
 
         console2.log("=== Phase 3: Event Logging Tests ===\n");
 
-        // Deploy event tester
         EventTester tester = new EventTester();
         console2.log("EventTester deployed at:", address(tester));
         console2.log("");
 
-        // Test 1: All log types
         testAllLogTypes(tester);
-
-        // Test 2: Many logs in single transaction
         testManyLogs(tester);
-
-        // Test 3: Large data in single log
         testLargeLog(tester);
 
         vm.stopBroadcast();
