@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 import {DeploymentTests} from "./DeploymentTests.s.sol";
-// import {StorageTests} from "./StorageTests.s.sol";
+import {StorageTests} from "./StorageTests.s.sol";
 
 /**
  * @title AllTests
@@ -20,9 +20,9 @@ contract AllTests is Script {
         DeploymentTests deploymentTests = new DeploymentTests();
         deploymentTests.run();
 
-        // Add more phases here as you build them
-        // StorageTests storageTests = new StorageTests();
-        // storageTests.run();
+        // Phase 2: Storage Tests
+        StorageTests storageTests = new StorageTests();
+        storageTests.run();
 
         console2.log("\n========================================");
         console2.log("All Tests Complete");
