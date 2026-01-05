@@ -7,6 +7,7 @@ import {DeploymentTests} from "./DeploymentTests.s.sol";
 import {StorageTests} from "./StorageTests.s.sol";
 import {EventTests} from "./EventTests.s.sol";
 import {MemoryTests} from "./MemoryTests.s.sol";
+import {PrecompileTests} from "./PrecompileTests.s.sol";
 
 /**
  * @title AllTests
@@ -33,6 +34,10 @@ contract AllTests is Script {
         // Phase 4: Memory Tests
         MemoryTests memoryTests = new MemoryTests();
         memoryTests.run();
+
+        // Phase 5: Precompile Tests
+        PrecompileTests precompileTests = new PrecompileTests();
+        precompileTests.run();
 
         console2.log("\n========================================");
         console2.log("All Tests Complete");
