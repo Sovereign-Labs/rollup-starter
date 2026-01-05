@@ -6,6 +6,7 @@ import {console2} from "forge-std/console2.sol";
 import {DeploymentTests} from "./DeploymentTests.s.sol";
 import {StorageTests} from "./StorageTests.s.sol";
 import {EventTests} from "./EventTests.s.sol";
+import {MemoryTests} from "./MemoryTests.s.sol";
 
 /**
  * @title AllTests
@@ -28,6 +29,10 @@ contract AllTests is Script {
         // Phase 3: Event Tests
         EventTests eventTests = new EventTests();
         eventTests.run();
+
+        // Phase 4: Memory Tests
+        MemoryTests memoryTests = new MemoryTests();
+        memoryTests.run();
 
         console2.log("\n========================================");
         console2.log("All Tests Complete");
