@@ -247,7 +247,7 @@ $ curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jt
 ```
 
 ```bash,test-ci,bashtestmd:compare-output
-$ sleep 60 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xA6edfca3AA985Dd3CC728BFFB700933a986aC085
+$ sleep 60 && curl -Ss http://127.0.0.1:12346/modules/bank/tokens/token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf/balances/0xb56Dbc4650fcaC1A54Ff5feB31916DF015C7be6F
 {"amount":"10000000000000000","token_id":"token_195zght0wmhcx9j462jtj9lypdua4xw07r6jnjfjsddsmzeh2wsfqrhddvf"}
 ```
 

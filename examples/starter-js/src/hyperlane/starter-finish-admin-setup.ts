@@ -6,13 +6,16 @@ import {createStandardRollup} from "@sovereign-sdk/web3";
 import {CallMessage7Enum, RuntimeCall} from "../types";
 import {Secp256k1Signer} from "@sovereign-sdk/signers";
 import {sequencerPrivateKey} from "./consts";
+import { TurnkeySigner } from "./turnkey-signer";
+import dotenv from 'dotenv'; 
+dotenv.config(); 
 
 
 const depositSequencer: RuntimeCall = {
     sequencer_registry: {
         deposit: {
 			amount:   100000000000000000, // .1 ETH
-			da_address: "", // TODO: Set the DA address of the sequencer
+			da_address: "0000000000000000000000000000000000000000000000000000000000000000", // DEPLOYMENT: Replace with DA address of the sequencer 
         }
     }
 };
@@ -23,7 +26,13 @@ const terminateSetupMode: RuntimeCall = {
 
 console.log("Runtime call:", depositSequencer);
 
-let signer = new Secp256k1Signer(sequencerPrivateKey);
+
+let signer = await TurnkeySigner.create({
+    organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+    keyId: process.env.TURNKEY_KEY_ID!,
+});
 const rollup = await createStandardRollup({
     url: "http://127.0.0.1:12346",
 });

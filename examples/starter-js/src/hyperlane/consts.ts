@@ -2,7 +2,7 @@ export const maxU128 = "340282366920938463463374607431768211455";
 export const defaultGas: number = 2000;
 
 export const sequencerPrivateKey = "0187c12ea7c12024b3f70ac5d73587463af17c8bce2bd9e6fe87389310196c64";
-export const sequencerAddress = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085";
+export const sequencerAddress = "0xb56Dbc4650fcaC1A54Ff5feB31916DF015C7be6F";
 export const deployerAddress = "0xD2C1bE33A0BcD2007136afD8Ed61CC7561aDa747";
 export const deployerPrivateKey = "5087c12ea7c12024b3f798c5d73587463af17c9fce04d9e6fe873893102a6c64";
 export const minterAddress = "0x9b08ce57a93751aE790698A2C9ebc76A78F23E25";

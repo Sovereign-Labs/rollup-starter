@@ -21,7 +21,7 @@ try {
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
     const warpRoute = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
-    const recipient = zeroPad20To32("0xA6edfca3AA985Dd3CC728BFFB700933a986aC085");
+    const recipient = zeroPad20To32("0xb56Dbc4650fcaC1A54Ff5feB31916DF015C7be6F"); // DEPLOYMENT: Search and replace with sequencer rollup address
     console.log('Making inbound warp transfer...');
     console.log(`  Contract:  ${CONTRACT_ADDRESS}`);
     console.log(`  Domain:    ${DOMAIN}`);
