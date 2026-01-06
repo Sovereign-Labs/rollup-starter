@@ -18,6 +18,8 @@
   "dependencies": {
     "@sovereign-sdk/signers": "0.3.0",
     "@sovereign-sdk/web3": "0.11.1",
+    "@turnkey/api-key-stamper": "^0.4.7",
+    "@turnkey/http": "^3.5.1",
     "@types/js-yaml": "^4.0.9",
     "ethers": "^6.15.0",
     "js-yaml": "^4.1.0"

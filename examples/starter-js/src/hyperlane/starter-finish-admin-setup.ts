@@ -11,8 +11,8 @@ import {sequencerPrivateKey} from "./consts";
 const depositSequencer: RuntimeCall = {
     sequencer_registry: {
         deposit: {
-			amount:  5 * 1000000000000000000, // 5 ETH
-			da_address: "0000000000000000000000000000000000000000000000000000000000000000",
+			amount:   100000000000000000, // .1 ETH
+			da_address: "", // TODO: Set the DA address of the sequencer
         }
     }
 };
