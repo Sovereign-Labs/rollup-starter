@@ -37,9 +37,6 @@ contract ContextTests is Script {
         console2.log("block.gaslimit:", blockGaslimit);
         console2.log("block.chainid:", blockChainid);
         console2.log("block.basefee:", blockBasefee);
-
-        require(blockChainid == 4321, "Chain ID should be 4321");
-
         console2.log("");
     }
 

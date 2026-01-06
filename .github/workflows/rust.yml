@@ -122,7 +122,7 @@ jobs:
           export PATH="$HOME/.foundry/bin:$PATH"
           cd foundry-tests
           forge install foundry-rs/forge-std --no-git
-          SOV_RPC_URL=http://localhost:12346/rpc forge script AllTests --rpc-url sovereign --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --unlocked --broadcast || {
+          SOV_RPC_URL=http://localhost:12346/rpc forge script AllTests --rpc-url sovereign --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast || {
             echo "=== Rollup logs ==="
             docker logs rollup-mock-da
             exit 1
