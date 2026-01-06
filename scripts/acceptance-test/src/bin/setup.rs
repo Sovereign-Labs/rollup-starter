@@ -24,7 +24,7 @@ use stf_starter::sov_modules_api::{CryptoSpec, RawTx};
 use stf_starter::RuntimeCall;
 use tokio_stream::StreamExt;
 
-use tracing::info;
+use tracing::{info, warn};
 
 /// Returns true if the new throughput report should overwrite the existing one.
 /// Only overwrites if no existing file, file is invalid, or new throughput is better.
