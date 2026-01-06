@@ -1,0 +1,9 @@
+name: 'Teardown Mock DA Rollup'
+description: 'Stops and cleans up the Mock DA rollup container'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Stop Docker container
+      shell: bash
+      run: make stop-docker-mock-da

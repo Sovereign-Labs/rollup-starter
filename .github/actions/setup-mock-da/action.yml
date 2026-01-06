@@ -1,0 +1,38 @@
+name: 'Setup Mock DA Rollup'
+description: 'Builds and starts the Mock DA rollup container'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and start rollup
+      shell: bash
+      run: |
+        make build-docker-mock-da
+        make run-docker-mock-da BACKGROUND=true
+
+    - name: Wait for rollup healthcheck
+      shell: bash
+      run: |
+        echo "Waiting for rollup to start..."
+        for i in {1..30}; do
+          if curl -f http://127.0.0.1:12346/healthcheck 2>/dev/null; then
+            echo "Rollup is ready!"
+            exit 0
+          fi
+          echo "Waiting... ($i/30)"
+          sleep 2
+          if [ $i -eq 30 ]; then
+            echo "Timeout waiting for rollup"
+            docker logs rollup-mock-da
+            exit 1
+          fi
+        done
+
+        if ! docker ps | grep -q rollup-mock-da; then
+          echo "Container failed to start. Logs:"
+          docker logs rollup-mock-da
+          exit 1
+        fi
