@@ -121,9 +121,9 @@ where
         match &auth_variant {
             EvmAndEip712AuthenticatorInput::Evm(raw_tx) => {
                 let (call, _tx) = sov_evm::decode_evm_tx(&raw_tx.data)?;
-                Ok(EvmAndEip712AuthenticatorInput::Evm(sov_evm::CallMessage::<S>::Call(
-                    call
-                )))
+                Ok(EvmAndEip712AuthenticatorInput::Evm(
+                    sov_evm::CallMessage::<S>::Call(call),
+                ))
             }
             EvmAndEip712AuthenticatorInput::Standard(raw_tx) => {
                 let call = capabilities::decode_sov_tx::<S, Rt>(&raw_tx.data)?;
