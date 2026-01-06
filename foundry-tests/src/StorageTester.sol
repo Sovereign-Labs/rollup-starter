@@ -4,6 +4,10 @@ pragma solidity ^0.8.13;
 contract StorageTester {
     uint256 public slot;
 
+    function setSlot(uint256 value) public {
+        slot = value;
+    }
+
     function alternatingReadWrite(uint256 iterations) public returns (uint256 checksum) {
         for (uint256 i = 0; i < iterations; i++) {
             slot = i;

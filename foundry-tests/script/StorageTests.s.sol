@@ -8,6 +8,7 @@ import {StorageTester} from "../src/StorageTester.sol";
 contract StorageTests is Script {
     uint256 constant ALTERNATING_ITERATIONS = 20000; // (~10M gas)
     uint256 constant RANDOM_ITERATIONS = 500; // (~10M gas)
+    uint256 constant CROSS_TX_ITERATIONS = 100;
 
     function run() public {
         vm.startBroadcast();
@@ -22,6 +23,9 @@ contract StorageTests is Script {
         testRandomSlotWrites(tester);
 
         vm.stopBroadcast();
+
+        testCrossTxStorage(tester);
+        testCrossBlockStorage(tester);
     }
 
     function testAlternatingReadWrite(StorageTester tester) internal {
@@ -48,6 +52,46 @@ contract StorageTests is Script {
 
         console2.log("Total gas used:", gasUsed);
         console2.log("Gas per write:", gasUsed / RANDOM_ITERATIONS);
+        console2.log("");
+    }
+
+    function testCrossTxStorage(StorageTester tester) internal {
+        console2.log("--- Test 3: Cross-Transaction Storage ---");
+        console2.log("Iterations:", CROSS_TX_ITERATIONS, "(alternating write/read across tx boundaries)");
+
+        for (uint256 i = 0; i < CROSS_TX_ITERATIONS; i++) {
+            vm.startBroadcast();
+            tester.setSlot(i);
+            vm.stopBroadcast();
+
+            vm.startBroadcast();
+            uint256 val = tester.slot();
+            require(val == i, "Cross-tx value mismatch");
+            vm.stopBroadcast();
+        }
+
+        console2.log("Completed", CROSS_TX_ITERATIONS, "write-read cycles across tx boundaries");
+        console2.log("");
+    }
+
+    function testCrossBlockStorage(StorageTester tester) internal {
+        console2.log("--- Test 4: Cross-Block Storage ---");
+        console2.log("Iterations:", CROSS_TX_ITERATIONS, "(alternating write/read across block boundaries)");
+
+        for (uint256 i = 0; i < CROSS_TX_ITERATIONS; i++) {
+            vm.startBroadcast();
+            tester.setSlot(i);
+            vm.stopBroadcast();
+
+            vm.roll(block.number + 1);
+
+            vm.startBroadcast();
+            uint256 val = tester.slot();
+            require(val == i, "Cross-block value mismatch");
+            vm.stopBroadcast();
+        }
+
+        console2.log("Completed", CROSS_TX_ITERATIONS, "write-read cycles across block boundaries");
         console2.log("");
     }
 }
