@@ -66,9 +66,9 @@ contract DeploymentTests is Script {
         address deployed = factory.deploy(salt, bytecode);
         uint256 gasDeployUsed = gasDeploy - gasleft();
 
+        require(predicted == deployed, "Addresses should match");
         console2.log("Deployed address:", deployed);
         console2.log("CREATE2 gas used:", gasDeployUsed);
-        console2.log("Addresses match:", predicted == deployed);
         console2.log("");
     }
 
