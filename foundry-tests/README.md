@@ -28,7 +28,7 @@ From the root of the repository:
 cargo run
 ```
 
-The rollup will expose the RPC endpoint at `http://localhost:12346`.
+The rollup will expose the RPC endpoint at `http://localhost:12346/rpc`.
 
 ### 2. Run Tests
 
@@ -36,7 +36,7 @@ In a separate terminal:
 
 ```bash
 cd foundry-tests
-export SOV_RPC_URL=http://localhost:12346
+export SOV_RPC_URL=http://localhost:12346/rpc
 ./run.sh AllTests
 ```
 
