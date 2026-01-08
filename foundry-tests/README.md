@@ -21,19 +21,7 @@ forge install
 
 ## Running the Tests
 
-### 1. Start the Rollup
-
-From the root of the repository:
-
-```bash
-cargo run
-```
-
-The rollup will expose the RPC endpoint at `http://localhost:12346/rpc`.
-
-### 2. Run Tests
-
-In a separate terminal:
+Ensure the rollup is running and the RPC endpoint is available at `http://localhost:12346/rpc`.
 
 ```bash
 cd foundry-tests
