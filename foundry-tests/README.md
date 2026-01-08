@@ -12,10 +12,10 @@ EVM acceptance tests for Sovereign SDK rollup.
 
 ## Setup
 
-Install Foundry dependencies:
+Update Foundry dependencies:
 
 ```bash
-forge install
+forge update
 ```
 
 ## Running the Tests
