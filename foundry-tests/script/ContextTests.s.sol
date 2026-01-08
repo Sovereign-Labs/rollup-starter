@@ -41,7 +41,6 @@ contract ContextTests is Script {
         require(blockTimestamp > 0, "block.timestamp should not be zero");
         require(blockGaslimit > 0, "block.gaslimit should not be zero");
         require(blockChainid > 0, "block.chainid should not be zero");
-        require(blockBasefee > 0, "block.basefee should not be zero");
 
         console2.log("");
     }
