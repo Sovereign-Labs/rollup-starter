@@ -35,6 +35,7 @@ contract CalldataTests is Script {
         uint256 length = tester.processLargeCalldata(largeData);
         uint256 gasUsed = gasBefore - gasleft();
 
+        require(length == LARGE_CALLDATA_SIZE, "Calldata length should match");
         console2.log("Processed bytes:", length);
         console2.log("Total gas used:", gasUsed);
         console2.log("Gas per KB:", gasUsed / (LARGE_CALLDATA_SIZE / 1024));
