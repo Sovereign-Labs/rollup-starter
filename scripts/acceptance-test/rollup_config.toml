@@ -82,6 +82,7 @@ num_cache_warmup_workers = 0
 
 [sequencer.preferred.postgres_config]
 postgres_connection_string = "postgres://postgres:{password}@localhost:5432/postgres"
+node_role = "Leader"
 node_id = "node0"
 
 [sequencer.extension]
