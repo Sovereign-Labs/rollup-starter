@@ -37,6 +37,7 @@ export default function App() {
   const [txResult, setTxResult] = useState<TxResponse | null>(null);
   const [txError, setTxError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [txInput, setTxInput] = useState(JSON.stringify(DEFAULT_TX, null, 2));
 
   // Connect to MetaMask
@@ -133,6 +134,7 @@ export default function App() {
     setIsLoading(true);
     setTxError("");
     setTxResult(null);
+    setIsSuccess(false);
 
     try {
       // Parse and prepare transaction
@@ -163,6 +165,7 @@ export default function App() {
       const result = await rollup.call(parsedTx, { signer });
       console.log("9. Result:", result);
       setTxResult(result.response?.data ?? null);
+      setIsSuccess(true);
     } catch (err) {
       console.error("Error at step:", err);
       setTxError(err instanceof Error ? err.message : String(err));
@@ -216,21 +219,27 @@ export default function App() {
             </div>
           )}
 
-          {txResult && (
+          {isSuccess && (
             <div className="message success">
-              <strong>Transaction Sent!</strong>
-              <div>
-                <strong>Hash:</strong>{" "}
-                <code>{txResult.id || "N/A"}</code>
-              </div>
-              <div>
-                <strong>Status:</strong> {txResult.status || "N/A"}
-              </div>
-              {txResult.events && txResult.events.length > 0 && (
-                <div>
-                  <strong>Events:</strong>
-                  <pre>{JSON.stringify(txResult.events, null, 2)}</pre>
-                </div>
+              <strong>Transaction Submitted Successfully!</strong>
+              {txResult ? (
+                <>
+                  <div>
+                    <strong>Hash:</strong>{" "}
+                    <code>{txResult.id || "N/A"}</code>
+                  </div>
+                  <div>
+                    <strong>Status:</strong> {txResult.status || "N/A"}
+                  </div>
+                  {txResult.events && txResult.events.length > 0 && (
+                    <div>
+                      <strong>Events:</strong>
+                      <pre>{JSON.stringify(txResult.events, null, 2)}</pre>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div>Transaction was sent to the rollup.</div>
               )}
             </div>
           )}
