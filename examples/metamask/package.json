@@ -1,5 +1,5 @@
 {
-  "name": "privy-example",
+  "name": "metamask-example",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@privy-io/react-auth": "^2.17.3",
+    "@metamask/providers": "^18.3.1",
     "@sovereign-sdk/signers": "^0.4.0",
     "@sovereign-sdk/web3": "^0.12.0",
     "react": "^19.1.0",

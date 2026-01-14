@@ -8,328 +8,140 @@ import type { RuntimeCall } from "./types";
 
 type TxResponse = SovereignClient.SovereignSDK.Sequencer.TxCreateResponse.Data;
 
-// Chain configuration
 const ROLLUP_URL = import.meta.env.VITE_ROLLUP_URL || "http://localhost:12346";
 
+const DEFAULT_TX = {
+  bank: {
+    create_token: {
+      token_name: "My Token",
+      token_decimals: 8,
+      initial_balance: 1000000000,
+      mint_to_address: "<wallet_address>",
+      admins: [],
+      supply_cap: 100000000000,
+    },
+  },
+};
+
 export default function App() {
-  // Privy specific hooks
   const { ready, authenticated } = usePrivy();
   const { wallets } = useWallets();
 
   const [txResult, setTxResult] = useState<TxResponse | null>(null);
   const [txError, setTxError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
-  const [txInput, setTxInput] = useState<string>(
-    JSON.stringify(
-      {
-        bank: {
-          create_token: {
-            admins: [],
-            token_decimals: 8,
-            supply_cap: 100000000000,
-            token_name: "Yo Yo Token",
-            initial_balance: 1000000000,
-            mint_to_address: "<wallet_address>",
-          },
-        },
-      },
-      null,
-      2,
-    ),
-  );
-  const [jsonError, setJsonError] = useState<string>("");
+  const [txInput, setTxInput] = useState(JSON.stringify(DEFAULT_TX, null, 2));
 
-  // Fetch the embedded (Privy‑managed) wallet when the user logs in via email
+  // Get the Privy-managed embedded wallet
   const embeddedWallet = wallets.find(
-    (wallet) => wallet.walletClientType === "privy",
+    (wallet) => wallet.walletClientType === "privy"
   );
 
-  const handleJsonFormat = () => {
-    try {
-      const parsed = JSON.parse(txInput);
-      setTxInput(JSON.stringify(parsed, null, 2));
-      setJsonError("");
-    } catch {
-      setJsonError("Invalid JSON format");
-    }
-  };
-
-  const handleSignAndSendTransaction = async () => {
+  const handleSignAndSend = async () => {
     if (!embeddedWallet) {
-      const error_msg = "No embedded wallet found. Please log in first.";
-      console.log(error_msg);
-      setTxError(error_msg);
-      setTxResult(null);
+      setTxError("No embedded wallet found. Please log in first.");
       return;
     }
 
-    // Pull the EIP‑1193 provider from the wallet
     const provider = await embeddedWallet.getEthereumProvider();
     if (!provider) {
-      const error_msg = "Provider unavailable on the embedded wallet.";
-      console.log(error_msg);
-      setTxError(error_msg);
-      setTxResult(null);
+      setTxError("Provider unavailable on the embedded wallet.");
       return;
     }
 
     setIsLoading(true);
     setTxError("");
     setTxResult(null);
-    console.log("Preparing transaction…");
 
     try {
-      // Parse transaction input
-      let parsedTx: RuntimeCall;
-      try {
-        const txData = JSON.parse(txInput);
-        // Replace placeholder with actual wallet address
-        const txString = JSON.stringify(txData).replace(
-          "<wallet_address>",
-          embeddedWallet.address,
-        );
-        parsedTx = JSON.parse(txString);
-      } catch {
-        setTxError("Invalid JSON format. Please check your transaction data.");
-        setIsLoading(false);
-        return;
-      }
+      // Parse and prepare transaction
+      const txString = txInput.replace("<wallet_address>", embeddedWallet.address);
+      const parsedTx: RuntimeCall = JSON.parse(txString);
+      console.log("1. Parsed transaction:", parsedTx);
 
-      // Instantiate Sovereign rollup client
-      const rollup = await createStandardRollup({
-        url: ROLLUP_URL,
-      });
+      // Create rollup client
+      console.log("2. Creating rollup client for:", ROLLUP_URL);
+      const rollup = await createStandardRollup({ url: ROLLUP_URL });
+      console.log("3. Rollup client created");
 
-      // Build signer with the rollup chain hash
+      // Create Privy signer
+      console.log("4. Creating PrivySigner...");
       const signer = new PrivySigner(provider);
+      console.log("5. Signer created");
 
-      // Sign + send tx
+      // Sign and send
+      console.log("6. Calling rollup.call...");
       const result = await rollup.call(parsedTx, { signer });
-      setTxResult(result.response?.data);
+      console.log("7. Result:", result);
+      setTxResult(result.response?.data ?? null);
     } catch (err) {
-      console.error(err);
-
-      // Store the full error for display
-      if (err instanceof Error) {
-        setTxError(err.message);
-      } else {
-        setTxError(String(err));
-      }
+      console.error("Error:", err);
+      setTxError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
   };
 
   if (!ready) {
-    return <div className="container">Loading Privy…</div>;
+    return <div className="container">Loading Privy...</div>;
   }
 
   return (
     <div className="container">
       <header>
-        <h1>Privy × Sovereign Demo</h1>
+        <h1>Privy Example</h1>
         <ConnectButton />
       </header>
 
-      {authenticated && (
+      {authenticated ? (
         <section className="transaction-section">
           <h3>Send Transaction</h3>
 
-          <div style={{ marginBottom: "20px" }}>
-            <label
-              htmlFor="tx-input"
-              style={{ display: "block", marginBottom: "8px" }}
-            >
-              Transaction Data (JSON):
-            </label>
-            <textarea
-              id="tx-input"
-              value={txInput}
-              onChange={(e) => {
-                setTxInput(e.target.value);
-                setJsonError("");
-              }}
-              onBlur={handleJsonFormat}
-              placeholder="Enter transaction JSON here..."
-              style={{
-                width: "100%",
-                minHeight: "200px",
-                padding: "10px",
-                fontSize: "14px",
-                fontFamily: "monospace",
-                border: jsonError ? "1px solid #dc3545" : "1px solid #ccc",
-                borderRadius: "4px",
-                backgroundColor: "#f5f5f5",
-                color: "#333",
-                lineHeight: "1.5",
-              }}
-            />
-            {jsonError && (
-              <div
-                style={{
-                  color: "#dc3545",
-                  fontSize: "14px",
-                  marginTop: "5px",
-                }}
-              >
-                {jsonError}
-              </div>
-            )}
-          </div>
+          <label htmlFor="tx-input">Transaction Data (JSON):</label>
+          <textarea
+            id="tx-input"
+            value={txInput}
+            onChange={(e) => setTxInput(e.target.value)}
+            placeholder="Enter transaction JSON..."
+          />
 
           <button
-            onClick={handleSignAndSendTransaction}
+            onClick={handleSignAndSend}
             disabled={isLoading || !embeddedWallet}
             className="primary-button"
           >
-            {isLoading ? "Processing…" : "Sign and Send Transaction"}
+            {isLoading ? "Processing..." : "Sign and Send"}
           </button>
 
           {txError && (
-            <div className="status-message error" style={{ textAlign: "left" }}>
-              <div style={{ marginBottom: "10px" }}>
-                <strong>❌ Transaction failed</strong>
-              </div>
-
-              {(() => {
-                // Try to parse as JSON for better formatting
-                const errorStr = txError;
-
-                // Check if it's a status code followed by JSON
-                const match = errorStr.match(/^(\d{3})\s+(\{.*\})$/s);
-                if (match) {
-                  const statusCode = match[1];
-                  try {
-                    const errorData = JSON.parse(match[2]);
-                    return (
-                      <>
-                        <div style={{ marginBottom: "5px" }}>
-                          <strong>Status Code:</strong> {statusCode}
-                        </div>
-                        <div>
-                          <strong>Error Details:</strong>
-                          <pre
-                            style={{
-                              backgroundColor: "#fff5f5",
-                              border: "1px solid #ffdddd",
-                              borderRadius: "4px",
-                              padding: "10px",
-                              marginTop: "5px",
-                              fontSize: "12px",
-                              overflow: "auto",
-                              maxHeight: "300px",
-                            }}
-                          >
-                            {JSON.stringify(errorData, null, 2)}
-                          </pre>
-                        </div>
-                      </>
-                    );
-                  } catch {
-                    // If JSON parsing fails, show as is
-                  }
-                }
-
-                // For non-JSON errors, try to parse as JSON anyway
-                try {
-                  const parsed = JSON.parse(errorStr);
-                  return (
-                    <pre
-                      style={{
-                        backgroundColor: "#fff5f5",
-                        border: "1px solid #ffdddd",
-                        borderRadius: "4px",
-                        padding: "10px",
-                        fontSize: "12px",
-                        overflow: "auto",
-                        maxHeight: "300px",
-                      }}
-                    >
-                      {JSON.stringify(parsed, null, 2)}
-                    </pre>
-                  );
-                } catch {
-                  // Show as plain text
-                  return (
-                    <div
-                      style={{
-                        backgroundColor: "#fff5f5",
-                        border: "1px solid #ffdddd",
-                        borderRadius: "4px",
-                        padding: "10px",
-                        fontSize: "12px",
-                        overflow: "auto",
-                        maxHeight: "300px",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {errorStr}
-                    </div>
-                  );
-                }
-              })()}
+            <div className="message error">
+              <strong>Error:</strong>
+              <pre>{txError}</pre>
             </div>
           )}
 
           {txResult && (
-            <div className="status-message" style={{ textAlign: "left" }}>
-              <div style={{ marginBottom: "10px" }}>
-                <strong>✅ Transaction sent successfully!</strong>
+            <div className="message success">
+              <strong>Transaction Sent!</strong>
+              <div>
+                <strong>Hash:</strong>{" "}
+                <code>{txResult.id || "N/A"}</code>
               </div>
-
-              <div style={{ marginBottom: "5px" }}>
-                <strong>Transaction Hash:</strong>
-                <div
-                  style={{
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    wordBreak: "break-all",
-                    marginTop: "5px",
-                  }}
-                >
-                  {txResult.id || "N/A"}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: "5px" }}>
+              <div>
                 <strong>Status:</strong> {txResult.status || "N/A"}
               </div>
-
-              {txResult.receipt && (
-                <div style={{ marginBottom: "5px" }}>
-                  <strong>Result:</strong> {txResult.receipt.result || "N/A"}
-                  {(txResult.receipt as any).data?.gas_used && (
-                    <span>
-                      {" "}
-                      | <strong>Gas:</strong>{" "}
-                      {(txResult.receipt as any).data.gas_used[0]}
-                    </span>
-                  )}
-                </div>
-              )}
-
               {txResult.events && txResult.events.length > 0 && (
-                <div style={{ marginTop: "15px" }}>
+                <div>
                   <strong>Events:</strong>
-                  <pre
-                    style={{
-                      backgroundColor: "#f5f5f5",
-                      border: "1px solid #ddd",
-                      borderRadius: "4px",
-                      padding: "10px",
-                      marginTop: "5px",
-                      fontSize: "12px",
-                      overflow: "auto",
-                      maxHeight: "300px",
-                    }}
-                  >
-                    {JSON.stringify(txResult.events, null, 2)}
-                  </pre>
+                  <pre>{JSON.stringify(txResult.events, null, 2)}</pre>
                 </div>
               )}
             </div>
           )}
+        </section>
+      ) : (
+        <section className="connect-prompt">
+          <p>Connect with Privy to send transactions</p>
         </section>
       )}
     </div>
