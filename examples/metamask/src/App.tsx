@@ -166,9 +166,12 @@ export default function App() {
       console.log("9. Result:", result);
       setTxResult(result.response?.data ?? null);
       setIsSuccess(true);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error:", err);
-      setTxError(JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const e = err as any;
+      const details = e.error?.details || e.details;
+      setTxError(e.message + (details ? "\n\n" + JSON.stringify(details, null, 2) : ""));
     } finally {
       setIsLoading(false);
     }
