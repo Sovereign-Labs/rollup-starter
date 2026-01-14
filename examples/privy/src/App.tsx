@@ -6,7 +6,7 @@ import ConnectButton from "./ConnectButton.tsx";
 import "./App.css";
 import type { RuntimeCall } from "./types";
 
-type TxResponse = SovereignClient.SovereignSDK.Sequencer.TxCreateResponse.Data;
+type TxResponse = SovereignClient.SovereignSDK.Sequencer.TxCreateResponse;
 
 const ROLLUP_URL = import.meta.env.VITE_ROLLUP_URL || "http://localhost:12346";
 
@@ -75,7 +75,7 @@ export default function App() {
       console.log("6. Calling rollup.call...");
       const result = await rollup.call(parsedTx, { signer });
       console.log("7. Result:", result);
-      setTxResult(result.response?.data ?? null);
+      setTxResult(result.response ?? null);
       setIsSuccess(true);
     } catch (err: unknown) {
       console.error("Error:", err);

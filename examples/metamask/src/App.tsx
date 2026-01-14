@@ -12,7 +12,7 @@ declare global {
   }
 }
 
-type TxResponse = SovereignClient.SovereignSDK.Sequencer.TxCreateResponse.Data;
+type TxResponse = SovereignClient.SovereignSDK.Sequencer.TxCreateResponse;
 
 const ROLLUP_URL = import.meta.env.VITE_ROLLUP_URL || "http://localhost:12346";
 const CHAIN_ID = import.meta.env.VITE_CHAIN_ID || "6669";
@@ -164,7 +164,7 @@ export default function App() {
       console.log("8. Calling rollup.call...");
       const result = await rollup.call(parsedTx, { signer });
       console.log("9. Result:", result);
-      setTxResult(result.response?.data ?? null);
+      setTxResult(result.response ?? null);
       setIsSuccess(true);
     } catch (err: unknown) {
       console.error("Error:", err);
