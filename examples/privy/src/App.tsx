@@ -79,7 +79,7 @@ export default function App() {
       setIsSuccess(true);
     } catch (err) {
       console.error("Error:", err);
-      setTxError(err instanceof Error ? err.message : String(err));
+      setTxError(JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
     } finally {
       setIsLoading(false);
     }

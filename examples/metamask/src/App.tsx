@@ -167,8 +167,8 @@ export default function App() {
       setTxResult(result.response?.data ?? null);
       setIsSuccess(true);
     } catch (err) {
-      console.error("Error at step:", err);
-      setTxError(err instanceof Error ? err.message : String(err));
+      console.error("Error:", err);
+      setTxError(JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
     } finally {
       setIsLoading(false);
     }
