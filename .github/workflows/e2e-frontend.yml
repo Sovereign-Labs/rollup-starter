@@ -61,11 +61,11 @@ jobs:
 
       - name: Build Synpress cache
         working-directory: examples/metamask
-        run: npx synpress wallet-setup
+        run: xvfb-run npx synpress e2e/wallet-setup
 
       - name: Run E2E tests
         working-directory: examples/metamask
-        run: npm run test:e2e
+        run: xvfb-run npm run test:e2e
         env:
           VITE_ROLLUP_URL: http://localhost:12346
 
@@ -74,7 +74,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: metamask-playwright-report
-          path: examples/metamask/playwright-report/
+          path: |
+            examples/metamask/playwright-report/
+            examples/metamask/test-results/
 
   e2e-privy:
     name: "Privy E2E Tests"
@@ -132,4 +134,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: privy-playwright-report
-          path: examples/privy/playwright-report/
+          path: |
+            examples/privy/playwright-report/
+            examples/privy/test-results/

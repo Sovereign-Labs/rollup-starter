@@ -9,6 +9,10 @@ const WALLET_PASSWORD = "Tester@1234";
 export default defineWalletSetup(WALLET_PASSWORD, async (context, walletPage) => {
   const metamask = new MetaMask(context, walletPage, WALLET_PASSWORD);
   await metamask.importWallet(TEST_SEED_PHRASE);
-});
 
-export { WALLET_PASSWORD };
+  // Click "Done" on the "Your wallet is ready!" screen to complete setup
+  await walletPage.getByTestId("onboarding-complete-done").click();
+
+  // Wait for home page to fully load
+  await walletPage.waitForTimeout(3000);
+});
