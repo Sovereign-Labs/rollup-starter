@@ -62,14 +62,12 @@ export default function App() {
 
   // Add rollup network to MetaMask
   const addNetwork = async () => {
-    console.log("addNetwork called");
     if (!window.ethereum) {
       alert("Please install MetaMask!");
       return;
     }
 
     const chainIdHex = `0x${parseInt(CHAIN_ID).toString(16)}`;
-    console.log("Switching to chain:", chainIdHex, "(" + CHAIN_ID + ")");
 
     try {
       // First try to switch to the network (if it already exists)
@@ -77,12 +75,9 @@ export default function App() {
         method: "wallet_switchEthereumChain",
         params: [{ chainId: chainIdHex }],
       });
-      console.log("Successfully switched to network");
     } catch (switchError: unknown) {
-      console.log("Switch error:", switchError);
       // Network doesn't exist, add it
       if ((switchError as { code?: number })?.code === 4902) {
-        console.log("Network not found, adding...");
         try {
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
@@ -99,7 +94,6 @@ export default function App() {
               },
             ],
           });
-          console.log("Network added successfully");
         } catch (addError) {
           console.error("Failed to add network:", addError);
         }
@@ -140,34 +134,21 @@ export default function App() {
       // Parse and prepare transaction
       const txString = txInput.replace("<wallet_address>", account);
       const parsedTx: RuntimeCall = JSON.parse(txString);
-      console.log("1. Parsed transaction:", parsedTx);
 
-      // Create rollup client
-      console.log("2. Creating rollup client for:", ROLLUP_URL);
+      // Create rollup client and EIP-712 signer
       const rollup = await createStandardRollup({ url: ROLLUP_URL });
-      console.log("3. Rollup client created");
-
-      // Get schema and create EIP-712 signer
-      console.log("4. Getting serializer...");
       const serializer = await rollup.serializer();
-      console.log("5. Got schema:", serializer.schema);
-
-      console.log("6. Creating Eip712Signer...");
       const signer = new Eip712Signer(
         window.ethereum,
         serializer.schema,
         account
       );
-      console.log("7. Signer created");
 
       // Sign and send (EIP-712 uses a dedicated endpoint)
-      console.log("8. Calling rollup.call...");
       const result = await rollup.call(parsedTx, { signer }, { path: "/sequencer/eip712_tx" });
-      console.log("9. Result:", result);
       setTxResult(result.response ?? null);
       setIsSuccess(true);
     } catch (err: unknown) {
-      console.error("Error:", err);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const e = err as any;
       const details = e.error?.details || e.details;

@@ -59,26 +59,16 @@ export default function App() {
       // Parse and prepare transaction
       const txString = txInput.replace("<wallet_address>", embeddedWallet.address);
       const parsedTx: RuntimeCall = JSON.parse(txString);
-      console.log("1. Parsed transaction:", parsedTx);
 
-      // Create rollup client
-      console.log("2. Creating rollup client for:", ROLLUP_URL);
+      // Create rollup client and Privy signer
       const rollup = await createStandardRollup({ url: ROLLUP_URL });
-      console.log("3. Rollup client created");
-
-      // Create Privy signer
-      console.log("4. Creating PrivySigner...");
       const signer = new PrivySigner(provider);
-      console.log("5. Signer created");
 
       // Sign and send
-      console.log("6. Calling rollup.call...");
       const result = await rollup.call(parsedTx, { signer });
-      console.log("7. Result:", result);
       setTxResult(result.response ?? null);
       setIsSuccess(true);
     } catch (err: unknown) {
-      console.error("Error:", err);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const e = err as any;
       const details = e.error?.details || e.details;
