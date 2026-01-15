@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@metamask/providers": "^18.3.1",
-    "@sovereign-sdk/signers": "^0.4.0",
-    "@sovereign-sdk/web3": "^0.12.0",
+    "@sovereign-sdk/signers": "^0.5.1",
+    "@sovereign-sdk/web3": "^0.12.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

@@ -160,9 +160,9 @@ export default function App() {
       );
       console.log("7. Signer created");
 
-      // Sign and send
+      // Sign and send (EIP-712 uses a dedicated endpoint)
       console.log("8. Calling rollup.call...");
-      const result = await rollup.call(parsedTx, { signer });
+      const result = await rollup.call(parsedTx, { signer }, { path: "/sequencer/eip712_tx" });
       console.log("9. Result:", result);
       setTxResult(result.response ?? null);
       setIsSuccess(true);
