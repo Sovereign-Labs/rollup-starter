@@ -230,13 +230,25 @@ async function sendTransaction(tx: RuntimeCall, account: string) {
 }
 ```
 
-### Step 5: Generate TypeScript Types (Optional)
+### Step 5: Generate TypeScript Types
 
-Generate TypeScript types for your rollup's transactions:
+Generate TypeScript types for your rollup's transactions. This provides type safety when constructing transactions:
 
 ```bash
 npm install -D quicktype
 npx quicktype -s schema path/to/json-schema.json -o src/types.ts --top-level RuntimeCall
+```
+
+Then use the generated types in your code:
+
+```typescript
+import type { RuntimeCall } from "./types";
+
+const tx: RuntimeCall = {
+  bank: {
+    create_token: { /* TypeScript will validate this structure */ }
+  }
+};
 ```
 
 ## WASM Requirements
