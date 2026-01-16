@@ -22,7 +22,7 @@
       "address_and_balances": [
         [
           "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
-          "10000000000000000"
+          "1000000000000000000000000000000000"
         ],
         [
           "0x23B6445f524daDee9fb576627740AaD23Afbe8b7",
@@ -102,7 +102,7 @@
     "sequencer_config": {
       "seq_rollup_address": "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
       "seq_da_address": "0000000000000000000000000000000000000000000000000000000000000000",
-      "seq_bond": "100000000000",
+      "seq_bond": "100000000000000000000000000000000",
       "is_preferred_sequencer": true
     }
   },
@@ -124,7 +124,7 @@
     "chain_spec": {
       "limit_contract_code_size": 524288,
       "coinbase": "0x0000000000000000000000000000000000000000",
-      "block_gas_limit": 30000000,
+      "block_gas_limit": 1000000000,
       "base_fee_params": {
         "max_change_denominator": 8,
         "elasticity_multiplier": 2
