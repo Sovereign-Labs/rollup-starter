@@ -59,13 +59,9 @@ jobs:
         working-directory: examples/metamask
         run: npx playwright install chromium --with-deps
 
-      - name: Build Synpress cache
-        working-directory: examples/metamask
-        run: xvfb-run npx synpress e2e/wallet-setup
-
       - name: Run E2E tests
         working-directory: examples/metamask
-        run: xvfb-run npm run test:e2e
+        run: npm run test:e2e
         env:
           VITE_ROLLUP_URL: http://localhost:12346
 
