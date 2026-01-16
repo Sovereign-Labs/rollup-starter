@@ -30,8 +30,6 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
             method: string;
             params?: unknown[];
           }) => {
-            console.log(`[MockProvider] ${method}`, params);
-
             switch (method) {
               case "eth_requestAccounts":
               case "eth_accounts":
@@ -79,7 +77,6 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
               }
 
               default:
-                console.warn(`[MockProvider] Unsupported method: ${method}`);
                 throw new Error(`Unsupported method: ${method}`);
             }
           },
@@ -118,8 +115,6 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
           writable: false,
           configurable: true,
         });
-
-        console.log("[MockProvider] Injected mock wallet provider");
       },
       { address: TEST_ACCOUNT.address, privateKey: TEST_PRIVATE_KEY }
     );
@@ -181,8 +176,6 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
       () => (window as Window & { __pendingSignRequest?: unknown }).__pendingSignRequest
     );
 
-    console.log("Received signing request:", JSON.stringify(typedData, null, 2));
-
     // Sign the typed data using viem (in Node.js context)
     const { signTypedData } = await import("viem/accounts");
 
@@ -193,8 +186,6 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
       ...(typedData as any),
     });
 
-    console.log("Generated signature:", signature);
-
     // Provide the signature back to the page
     await page.evaluate(
       (sig) => {
@@ -204,28 +195,21 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
     );
 
     // Wait for result - either success or error
-    const result = await Promise.race([
-      page
-        .locator("text=Transaction Submitted Successfully")
-        .waitFor({ timeout: 30000 })
-        .then(() => "success"),
-      page
-        .locator(".message.error")
-        .waitFor({ timeout: 30000 })
-        .then(() => "error"),
-    ]);
+    const successLocator = page.locator("text=Transaction Submitted Successfully");
+    const errorLocator = page.locator(".message.error");
+
+    await expect(successLocator.or(errorLocator)).toBeVisible({ timeout: 30000 });
 
     // Screenshot the result
     await page.screenshot({ path: "test-results/headless-4-result.png" });
 
-    if (result === "error") {
+    // Check if we got an error and fail with details
+    if (await errorLocator.isVisible()) {
       const errorText = await page.locator(".message.error pre").textContent();
-      console.log("Transaction error:", errorText);
-      // Don't fail the test on transaction errors - the signing worked
-      // The error might be from the rollup not running
+      throw new Error(`Transaction failed: ${errorText}`);
     }
 
-    // The key assertion: we got past the signing step
-    expect(result).toBeDefined();
+    // Verify success
+    await expect(successLocator).toBeVisible();
   });
 });
