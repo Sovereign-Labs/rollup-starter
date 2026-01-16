@@ -54,15 +54,16 @@ const _: () = {
 };
 
 #[cfg(feature = "mock_da")]
-const ROLLUP_CONFIG_PATH: &str = "configs/mock_da/rollup.toml";
+const ROLLUP_CONFIG_PATH: &str = "configs/mock/rollup.toml";
 #[cfg(feature = "mock_da_external")]
-const ROLLUP_CONFIG_PATH: &str = "configs/mock_da/rollup_external_mock_da.toml";
-#[cfg(any(feature = "mock_da", feature = "mock_da_external"))]
-const GENESIS_PATH: &str = "configs/mock_da/genesis.json";
+const ROLLUP_CONFIG_PATH: &str = "configs/mock/rollup_external_mock_da.toml";
 #[cfg(feature = "celestia_da")]
 const ROLLUP_CONFIG_PATH: &str = "configs/celestia/rollup.toml";
+
+#[cfg(any(feature = "mock_da", feature = "mock_da_external"))]
+const GENESIS_PATH: &str = "configs/mock/genesis.json";
 #[cfg(feature = "celestia_da")]
-const GENESIS_PATH: &str = "configs/celestia/rollup.toml";
+const GENESIS_PATH: &str = "configs/celestia/genesis.json";
 
 fn default_genesis_path() -> PathBuf {
     PathBuf::from_str(&GENESIS_PATH).expect("failed to construct default genesis path")
