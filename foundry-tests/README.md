@@ -5,10 +5,11 @@ EVM acceptance tests for Sovereign SDK rollup.
 ## Prerequisites
 
 - **Foundry**: Install via [getfoundry.sh](https://getfoundry.sh/)
-  ```bash
-  curl -L https://foundry.paradigm.xyz | bash
-  foundryup
-  ```
+
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+```
 
 ## Setup
 
