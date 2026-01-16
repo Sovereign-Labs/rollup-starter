@@ -80,6 +80,7 @@ run-docker-mock-da: ## Start docker container with MockDa
 		docker run -d \
 			--name rollup-mock-da \
 			--privileged \
+			--user $$(id -u):$$(id -g) \
 			-v $(CURDIR)/test-data/docker/da:/mnt/da \
 			-v $(CURDIR)/test-data/docker/state:/mnt/state \
 			-p 12346:12346 \
@@ -87,6 +88,7 @@ run-docker-mock-da: ## Start docker container with MockDa
 	else \
 		docker run -it \
 			--privileged \
+			--user $$(id -u):$$(id -g) \
 			-v $(CURDIR)/test-data/docker/da:/mnt/da \
 			-v $(CURDIR)/test-data/docker/state:/mnt/state \
 			-p 12346:12346 \
