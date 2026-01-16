@@ -46,6 +46,14 @@ COPY --from=builder /app/target/${BUILD_MODE}/rollup /app/rollup
 
 COPY configs/mock/genesis.json /app/genesis/genesis.json
 
+COPY configs/mock/rollup.toml /app/config/rollup.toml
+
+RUN sed -i \
+    -e 's|sqlite://rollup-state/mock_da.sqlite|sqlite:///mnt/da/mock_da.sqlite|' \
+    -e 's|path = "./rollup-state/rollup-starter-data-mock"|path = "/mnt/state"|' \
+    -e 's/telegraf_address = "127.0.0.1:8094"/telegraf_address = "172.17.0.1:8094"/' \
+    /app/config/rollup.toml
+
 EXPOSE 12346
 
 ENTRYPOINT ["/app/rollup"]
