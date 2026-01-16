@@ -16,15 +16,11 @@ on:
       - ".github/workflows/e2e-frontend.yml"
 
 jobs:
-  e2e-metamask:
-    name: "MetaMask E2E Tests"
+  build-rollup:
+    name: "Build Rollup"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -42,9 +38,34 @@ jobs:
       - name: Build rollup
         run: cargo build
 
+      - name: Upload rollup binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollup-binary
+          path: target/debug/rollup-starter
+          retention-days: 1
+
+  e2e-metamask:
+    name: "MetaMask E2E Tests"
+    runs-on: ubuntu-latest
+    needs: build-rollup
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download rollup binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rollup-binary
+          path: ./bin
+
       - name: Start rollup
         run: |
-          cargo run &
+          chmod +x ./bin/rollup-starter
+          ./bin/rollup-starter &
           for i in {1..30}; do
             curl -sf http://localhost:12346/health && break
             echo "Waiting for rollup... ($i)"
@@ -77,6 +98,7 @@ jobs:
   e2e-privy:
     name: "Privy E2E Tests"
     runs-on: ubuntu-latest
+    needs: build-rollup
     steps:
       - uses: actions/checkout@v4
 
@@ -84,25 +106,16 @@ jobs:
         with:
           node-version: "20"
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - name: Download rollup binary
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build rollup
-        run: cargo build
+          name: rollup-binary
+          path: ./bin
 
       - name: Start rollup
         run: |
-          cargo run &
+          chmod +x ./bin/rollup-starter
+          ./bin/rollup-starter &
           for i in {1..30}; do
             curl -sf http://localhost:12346/health && break
             echo "Waiting for rollup... ($i)"
