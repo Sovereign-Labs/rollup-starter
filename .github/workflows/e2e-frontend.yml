@@ -42,7 +42,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rollup-binary
-          path: target/debug/rollup-starter
+          path: target/debug/rollup
           retention-days: 1
 
   e2e-metamask:
@@ -64,8 +64,8 @@ jobs:
 
       - name: Start rollup
         run: |
-          chmod +x ./bin/rollup-starter
-          ./bin/rollup-starter &
+          chmod +x ./bin/rollup
+          ./bin/rollup &
           for i in {1..30}; do
             curl -sf http://localhost:12346/health && break
             echo "Waiting for rollup... ($i)"
@@ -114,8 +114,8 @@ jobs:
 
       - name: Start rollup
         run: |
-          chmod +x ./bin/rollup-starter
-          ./bin/rollup-starter &
+          chmod +x ./bin/rollup
+          ./bin/rollup &
           for i in {1..30}; do
             curl -sf http://localhost:12346/health && break
             echo "Waiting for rollup... ($i)"
