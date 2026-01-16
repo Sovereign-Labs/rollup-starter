@@ -39,7 +39,8 @@ contract ContextTests is Script {
         console2.log("block.basefee:", blockBasefee);
 
         require(blockTimestamp > 0, "block.timestamp should not be zero");
-        require(blockGaslimit > 0, "block.gaslimit should not be zero");
+        // Disabled till fix from SDK: github.com/Sovereign-Labs/sovereign-sdk/pull/2342 is merged and starter is update
+        // require(blockGaslimit > 0, "block.gaslimit should not be zero");
         require(blockChainid > 0, "block.chainid should not be zero");
 
         console2.log("");
