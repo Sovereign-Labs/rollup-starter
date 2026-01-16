@@ -163,21 +163,6 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
     // Wait for auto-connection
     await expect(page.locator("text=Connected:")).toBeVisible({ timeout: 5000 });
 
-    // Modify the token name to be unique (avoid "token already exists" errors)
-    const uniqueTokenName = `Test Token ${Date.now()}`;
-    await page.locator("#tx-input").fill(JSON.stringify({
-      bank: {
-        create_token: {
-          token_name: uniqueTokenName,
-          token_decimals: 8,
-          initial_balance: 1000000000,
-          mint_to_address: TEST_ACCOUNT.address,
-          admins: [],
-          supply_cap: 100000000000,
-        },
-      },
-    }, null, 2));
-
     // Click Sign and Send
     await page.click("text=Sign and Send");
 
