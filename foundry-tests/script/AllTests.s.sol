@@ -30,7 +30,7 @@ contract AllTests is Script {
         new ContextTests().run();
 
         console2.log("\n========================================");
-        console2.log("All Tests Complete");
+        console2.log("All Tests Complete\n");
         console2.log("========================================");
     }
 }
