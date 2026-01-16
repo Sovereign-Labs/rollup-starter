@@ -156,7 +156,7 @@ const transaction = {
 };
 
 const result = await rollup.call(transaction, { signer });
-console.log("Transaction hash:", result.response?.data?.id);
+console.log("Transaction hash:", result.response?.id);
 ```
 
 When `call()` is invoked:
@@ -226,7 +226,7 @@ async function sendTransaction(tx: RuntimeCall, account: string) {
 
   // 3. Send transaction
   const result = await rollup.call(tx, { signer });
-  return result.response?.data;
+  return result.response;
 }
 ```
 
