@@ -54,20 +54,22 @@ const _: () = {
 };
 
 #[cfg(feature = "mock_da")]
-const DA_STR: &str = "mock";
+const ROLLUP_CONFIG_PATH: &str = "configs/mock_da/rollup.toml";
 #[cfg(feature = "mock_da_external")]
-const DA_STR: &str = "mock_external";
+const ROLLUP_CONFIG_PATH: &str = "configs/mock_da/rollup_external_mock_da.toml";
+#[cfg(any(feature = "mock_da", feature = "mock_da_external"))]
+const GENESIS_PATH: &str = "configs/mock_da/genesis.json";
 #[cfg(feature = "celestia_da")]
-const DA_STR: &str = "celestia";
+const ROLLUP_CONFIG_PATH: &str = "configs/celestia/rollup.toml";
+#[cfg(feature = "celestia_da")]
+const GENESIS_PATH: &str = "configs/celestia/rollup.toml";
 
 fn default_genesis_path() -> PathBuf {
-    PathBuf::from_str(&format!("configs/{DA_STR}/genesis.json"))
-        .expect("failed to construct default genesis path")
+    PathBuf::from_str(&GENESIS_PATH).expect("failed to construct default genesis path")
 }
 
 fn default_rollup_config_path() -> PathBuf {
-    PathBuf::from_str(&format!("configs/{DA_STR}/rollup.toml"))
-        .expect("failed to construct default genesis path")
+    PathBuf::from_str(&ROLLUP_CONFIG_PATH).expect("failed to construct default genesis path")
 }
 
 #[derive(Parser, Debug)]
