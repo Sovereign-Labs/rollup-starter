@@ -57,19 +57,6 @@ test.describe("Privy Example", () => {
       // Click Connect button
       await page.getByRole("button", { name: "Connect" }).click();
 
-      // Wait for Privy modal to appear - try iframe first, then direct DOM
-      let privyModal: any;
-      const iframe = page.frameLocator('iframe[title*="privy" i]');
-      const directModal = page.locator('[data-privy-dialog]').or(page.locator('[role="dialog"]'));
-
-      // Check which one is available
-      try {
-        await page.locator('iframe').first().waitFor({ timeout: 3000 });
-        privyModal = iframe;
-      } catch {
-        privyModal = directModal;
-      }
-
       // Click on email login option if available
       const emailOption = page.getByText("Email", { exact: true });
       if (await emailOption.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -122,20 +109,22 @@ test.describe("Privy Example", () => {
       // Click Sign and Send
       await page.locator("text=Sign and Send").click();
 
-      // Wait for result
-      const successMessage = page.locator(".message.success");
+      // Wait for result - either success or error
+      const successMessage = page.locator("text=Transaction Submitted Successfully");
       const errorMessage = page.locator(".message.error");
 
       await expect(successMessage.or(errorMessage)).toBeVisible({
         timeout: 30000,
       });
 
-      // If successful, verify success message
-      if (await successMessage.isVisible()) {
-        await expect(
-          page.locator("text=Transaction Submitted Successfully!")
-        ).toBeVisible();
+      // Check if we got an error and fail with details
+      if (await errorMessage.isVisible()) {
+        const errorText = await page.locator(".message.error pre").textContent();
+        throw new Error(`Transaction failed: ${errorText}`);
       }
+
+      // Verify success
+      await expect(successMessage).toBeVisible();
     });
   });
 });
