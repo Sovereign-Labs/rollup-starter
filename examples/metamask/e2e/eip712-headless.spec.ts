@@ -1,7 +1,8 @@
 /**
- * Headless E2E test for EIP-712 signing using viem
+ * Headless E2E test for EIP-712 signing
  * This test injects a mock wallet provider instead of using MetaMask,
  * making it stable and independent of MetaMask UI changes.
+ * Uses viem for EIP-712 signing.
  */
 import { test, expect } from "@playwright/test";
 import { privateKeyToAccount } from "viem/accounts";
@@ -162,6 +163,21 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
     // Wait for auto-connection
     await expect(page.locator("text=Connected:")).toBeVisible({ timeout: 5000 });
 
+    // Modify the token name to be unique (avoid "token already exists" errors)
+    const uniqueTokenName = `Test Token ${Date.now()}`;
+    await page.locator("#tx-input").fill(JSON.stringify({
+      bank: {
+        create_token: {
+          token_name: uniqueTokenName,
+          token_decimals: 8,
+          initial_balance: 1000000000,
+          mint_to_address: TEST_ACCOUNT.address,
+          admins: [],
+          supply_cap: 100000000000,
+        },
+      },
+    }, null, 2));
+
     // Click Sign and Send
     await page.click("text=Sign and Send");
 
@@ -174,16 +190,31 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
     // Get the typed data from the page
     const typedData = await page.evaluate(
       () => (window as Window & { __pendingSignRequest?: unknown }).__pendingSignRequest
-    );
+    ) as {
+      domain: { name: string; chainId: string; salt: string };
+      types: Record<string, Array<{name: string; type: string}>>;
+      primaryType: string;
+      message: object
+    };
 
-    // Sign the typed data using viem (in Node.js context)
     const { signTypedData } = await import("viem/accounts");
 
-    // Sign with the test account
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Remove EIP712Domain from types as viem adds it automatically
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { EIP712Domain: _, ...typesWithoutDomain } = typedData.types;
+
+    // Convert chainId from hex string to number (required for correct EIP-712 hashing)
+    const domain = {
+      ...typedData.domain,
+      chainId: parseInt(typedData.domain.chainId, 16)
+    };
+
     const signature = await signTypedData({
       privateKey: TEST_PRIVATE_KEY,
-      ...(typedData as any),
+      domain,
+      types: typesWithoutDomain,
+      primaryType: typedData.primaryType as "UnsignedTransaction",
+      message: typedData.message as Record<string, unknown>
     });
 
     // Provide the signature back to the page

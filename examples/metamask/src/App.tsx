@@ -144,7 +144,7 @@ export default function App() {
         account
       );
 
-      // Sign and send (EIP-712 uses a dedicated endpoint)
+      // Sign and send (EIP-712 requires the dedicated endpoint)
       const result = await rollup.call(parsedTx, { signer }, { path: "/sequencer/eip712_tx" });
       setTxResult(result.response ?? null);
       setIsSuccess(true);
