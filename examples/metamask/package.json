@@ -9,7 +9,6 @@
     "build": "vite build && tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:e2e:setup": "bash scripts/download-metamask.sh",
     "test:e2e": "playwright test --project=chromium"
   },
   "dependencies": {
