@@ -176,7 +176,7 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
     const typedData = await page.evaluate(
       () => (window as Window & { __pendingSignRequest?: unknown }).__pendingSignRequest
     ) as {
-      domain: { name: string; chainId: string; salt: string };
+      domain: { name: string; chainId: string | number; salt: string };
       types: Record<string, Array<{name: string; type: string}>>;
       primaryType: string;
       message: object
@@ -188,10 +188,15 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { EIP712Domain: _, ...typesWithoutDomain } = typedData.types;
 
-    // Convert chainId from hex string to number (required for correct EIP-712 hashing)
+    // Convert chainId to number - handle both hex string and number formats
+    const rawChainId = typedData.domain.chainId;
+    const chainId = typeof rawChainId === 'string'
+      ? (rawChainId.startsWith('0x') ? parseInt(rawChainId, 16) : parseInt(rawChainId, 10))
+      : rawChainId;
+
     const domain = {
       ...typedData.domain,
-      chainId: parseInt(typedData.domain.chainId, 16)
+      chainId
     };
 
     const signature = await signTypedData({
