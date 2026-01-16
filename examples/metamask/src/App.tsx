@@ -41,10 +41,10 @@ export default function App() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [txInput, setTxInput] = useState(JSON.stringify(DEFAULT_TX, null, 2));
 
-  // Cached rollup client and signer - created once and reused
+  // Cached rollup client - created once and reused
+  // Note: We only cache the rollup client, NOT the signer
+  // The signer has internal state (cached public key) that can cause issues if reused
   const rollupRef = useRef<StandardRollup | null>(null);
-  const signerRef = useRef<Eip712Signer | null>(null);
-  const signerAccountRef = useRef<string | null>(null);
 
   // Connect to MetaMask
   const connect = async () => {
@@ -135,20 +135,6 @@ export default function App() {
     return rollupRef.current;
   };
 
-  // Get or create signer (cached, recreated if account changes)
-  const getSigner = async (rollup: StandardRollup, account: string): Promise<Eip712Signer> => {
-    if (!signerRef.current || signerAccountRef.current !== account) {
-      const serializer = await rollup.serializer();
-      signerRef.current = new Eip712Signer(
-        window.ethereum!,
-        serializer.schema,
-        account
-      );
-      signerAccountRef.current = account;
-    }
-    return signerRef.current;
-  };
-
   // Sign and send transaction
   const handleSignAndSend = async () => {
     if (!window.ethereum || !account) return;
@@ -163,9 +149,15 @@ export default function App() {
       const txString = txInput.replace("<wallet_address>", account);
       const parsedTx: RuntimeCall = JSON.parse(txString);
 
-      // Get cached rollup client and signer
+      // Get cached rollup client, but create fresh signer each time
+      // (signer has internal state that can cause issues if reused)
       const rollup = await getRollup();
-      const signer = await getSigner(rollup, account);
+      const serializer = await rollup.serializer();
+      const signer = new Eip712Signer(
+        window.ethereum,
+        serializer.schema,
+        account
+      );
 
       // Sign and send (EIP-712 requires the dedicated endpoint)
       const result = await rollup.call(parsedTx, { signer }, { path: "/sequencer/eip712_tx" });
