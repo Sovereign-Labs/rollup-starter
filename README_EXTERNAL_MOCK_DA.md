@@ -3,7 +3,8 @@
 This readme explains how to run the rollup using an external mock DA.
 Before proceeding, make sure you’ve read the main README.md, as we’ll skip explanations already covered there.
 
-### 1. Start the exernal mock-da:
+### 1. Start the external mock-da:
+
 ```bash,test-ci
 $ make clean-db
 ```
