@@ -15,6 +15,10 @@ on:
       - "examples/privy/**"
       - ".github/workflows/e2e-frontend.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-rollup:
     name: "Build Rollup"

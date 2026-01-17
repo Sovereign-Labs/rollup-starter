@@ -172,7 +172,8 @@ To add EIP-712 MetaMask support to your own Sovereign SDK application:
 ### Step 1: Install Dependencies
 
 ```bash
-npm install @sovereign-sdk/web3 @sovereign-sdk/signers @metamask/providers
+npm install @sovereign-sdk/web3 @sovereign-sdk/signers
+npm install -D @metamask/providers  # Optional: TypeScript types for window.ethereum
 ```
 
 ### Step 2: Configure Vite for WASM
