@@ -44,9 +44,12 @@ test.describe("Privy Example", () => {
   });
 
   test.describe("with test account", () => {
-    test.skip(!TEST_EMAIL || !TEST_OTP, "Privy test credentials not configured - see https://docs.privy.io/recipes/using-test-accounts");
-
     test("should authenticate and send transaction", async ({ page }) => {
+      // Fail if credentials are missing - ensures CI doesn't silently pass
+      if (!TEST_EMAIL || !TEST_OTP) {
+        throw new Error("Privy test credentials not configured - set PRIVY_TEST_EMAIL and PRIVY_TEST_OTP");
+      }
+
       await page.goto("/");
 
       // Wait for Privy to load
