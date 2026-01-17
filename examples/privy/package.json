@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "schema": "quicktype -s schema ../../crates/stf/.artifacts/json-schema.json -o src/types.ts --top-level RuntimeCall",
-    "dev": "NODE_OPTIONS=--experimental-wasm-modules vite dev",
+    "dev": "vite dev",
     "build": "vite build && tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -32,8 +32,6 @@
     "quicktype": "^23.2.6",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.3",
-    "vite-plugin-top-level-await": "^1.5.0",
-    "vite-plugin-wasm": "^3.5.0"
+    "vite": "^7.0.3"
   }
 }
