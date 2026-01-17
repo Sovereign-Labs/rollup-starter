@@ -155,7 +155,7 @@ const transaction = {
   },
 };
 
-const result = await rollup.call(transaction, { signer });
+const result = await rollup.call(transaction, { signer }, { path: "/sequencer/eip712_tx" });
 console.log("Transaction hash:", result.response?.id);
 ```
 
@@ -224,8 +224,8 @@ async function sendTransaction(tx: RuntimeCall, account: string) {
     account
   );
 
-  // 3. Send transaction
-  const result = await rollup.call(tx, { signer });
+  // 3. Send transaction (EIP-712 requires dedicated endpoint)
+  const result = await rollup.call(tx, { signer }, { path: "/sequencer/eip712_tx" });
   return result.response;
 }
 ```
