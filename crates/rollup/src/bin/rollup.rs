@@ -66,11 +66,11 @@ const GENESIS_PATH: &str = "configs/mock/genesis.json";
 const GENESIS_PATH: &str = "configs/celestia/genesis.json";
 
 fn default_genesis_path() -> PathBuf {
-    PathBuf::from_str(&GENESIS_PATH).expect("failed to construct default genesis path")
+    PathBuf::from_str(GENESIS_PATH).expect("failed to construct default genesis path")
 }
 
 fn default_rollup_config_path() -> PathBuf {
-    PathBuf::from_str(&ROLLUP_CONFIG_PATH).expect("failed to construct default genesis path")
+    PathBuf::from_str(ROLLUP_CONFIG_PATH).expect("failed to construct default genesis path")
 }
 
 #[derive(Parser, Debug)]
