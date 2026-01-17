@@ -23,6 +23,7 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
       const typedData = JSON.parse(typedDataJson);
 
       // Remove EIP712Domain from types (viem adds it automatically)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { EIP712Domain: _, ...typesWithoutDomain } = typedData.types;
 
       // Convert chainId to number
