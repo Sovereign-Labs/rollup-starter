@@ -62,7 +62,7 @@ test.describe("Privy Example", () => {
 
       // Click on email login option if available
       const emailOption = page.getByText("Email", { exact: true });
-      if (await emailOption.isVisible({ timeout: 5000 }).catch(() => false)) {
+      if ((await emailOption.count()) > 0) {
         await emailOption.click();
       }
 
@@ -82,25 +82,14 @@ test.describe("Privy Example", () => {
       // Find textboxes within the Privy dialog
       const dialog = page.getByRole('dialog');
       const otpInputs = dialog.getByRole('textbox');
-      const otpCount = await otpInputs.count();
-      console.log(`Found ${otpCount} OTP inputs in dialog`);
 
-      // Click the first input to focus, then type all digits
+      // Click the first input to focus, then type all digits at once
       await otpInputs.first().click();
-      await page.waitForTimeout(200);
+      await expect(otpInputs.first()).toBeFocused();
 
-      // Type each digit - Privy auto-advances to next input
-      for (const digit of TEST_OTP!) {
-        await page.keyboard.press(`Digit${digit}`);
-        await page.waitForTimeout(150);
-      }
+      // Type OTP - Privy auto-advances between inputs
+      await page.keyboard.type(TEST_OTP!);
       console.log(`Typed OTP: ${TEST_OTP}`);
-
-      // Press Enter to submit (in case auto-submit doesn't trigger)
-      await page.keyboard.press('Enter');
-
-      // Wait for Privy to process
-      await page.waitForTimeout(3000);
 
       // Wait for authentication to complete - check for transaction section heading
       await expect(

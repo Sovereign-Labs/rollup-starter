@@ -124,7 +124,8 @@ test.describe("EIP-712 Headless Wallet Tests", () => {
 
     await page.click("text=Add Network to MetaMask");
 
-    await page.waitForTimeout(500);
+    // Wait for the click to be processed (button should still be visible after network add)
+    await expect(page.locator("text=Add Network to MetaMask")).toBeVisible();
 
     await page.screenshot({ path: "test-results/headless-3-network-added.png" });
   });
