@@ -7,7 +7,7 @@ use sov_modules_api::capabilities::{
 };
 use sov_modules_api::runtime::capabilities::AuthenticationError;
 use sov_modules_api::{
-    DispatchCall, FullyBakedTx, GetGasPrice, ProvableStateReader, RawTx, Runtime, Spec,
+    DispatchCall, FullyBakedTx, GetGasPrice, ProvableStateReader, RawTx, Runtime, Spec, VersionReader,
 };
 use sov_state::User;
 use std::marker::PhantomData;
@@ -40,7 +40,7 @@ where
         EvmAndEip712AuthenticatorInput<sov_evm::CallMessage<S>, <Rt as DispatchCall>::Decodable>;
     type Input = EvmAndEip712AuthenticatorInput;
 
-    fn authenticate<Accessor: ProvableStateReader<User, Spec = S> + GetGasPrice<Spec = S>>(
+    fn authenticate<Accessor: ProvableStateReader<User, Spec = S> + GetGasPrice<Spec = S> + VersionReader>(
         tx: &FullyBakedTx,
         state: &mut Accessor,
     ) -> Result<
@@ -147,6 +147,7 @@ where
         capabilities::AuthenticationOutput<S, Self::Decodable>,
         capabilities::UnregisteredAuthenticationError,
     > {
+        // TODO: Fix this
         let Self::Input::Standard(input) = borsh::from_slice(&batch.tx.data)
             .map_err(|_| UnregisteredAuthenticationError::InvalidAuthenticationDiscriminant)?
         else {
