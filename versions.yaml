@@ -7,12 +7,12 @@ rollup_versions:
     ansible_commit: "theodore/external-build-rollup-role"
     vars_file: "version_vars/v0_vars.yaml"
     start_height: null
-    stop_height: 100
+    stop_height: 510
     migration_path: null
 
   - version_id: "v1"
     ansible_commit: "theodore/external-build-rollup-role"
     vars_file: "version_vars/v1_vars.yaml"
-    start_height: 101
+    start_height: 511
     stop_height: null
     migration_path: null
