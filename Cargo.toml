@@ -6,7 +6,8 @@ members = [
   "crates/rollup",
   "crates/stf",
   "crates/stf/stf-declaration",
-  "examples/value-setter", 
+  "crates/utils/proxy",
+  "examples/value-setter",
   "scripts/acceptance-test",
   "scripts/soak-test",
 ]
@@ -24,6 +25,7 @@ rust-version = "1.88"
 sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "5eaa3c8f7c83064370ba190be6118e40ae0c1f11", features = [
   "evm",
 ] }
+sov-proxy-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "5eaa3c8f7c83064370ba190be6118e40ae0c1f11" }
 sov-accounts = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "5eaa3c8f7c83064370ba190be6118e40ae0c1f11" }
 sov-api-spec = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "5eaa3c8f7c83064370ba190be6118e40ae0c1f11" }
 sov-attester-incentives = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "5eaa3c8f7c83064370ba190be6118e40ae0c1f11" }

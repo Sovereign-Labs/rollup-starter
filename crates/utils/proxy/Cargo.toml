@@ -1,0 +1,16 @@
+[package]
+name = "proxy"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "proxy"
+path = "src/main.rs"
+
+[dependencies]
+sov-proxy-utils = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
