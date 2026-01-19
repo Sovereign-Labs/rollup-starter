@@ -1,0 +1,15 @@
+{
+  "name": "foundry-tests-ts",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "deploy-storage-tester": "npx tsx deploy-storage-tester.ts"
+  },
+  "dependencies": {
+    "ethers": "^6.15.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "@types/node": "^22.14.1"
+  }
+}

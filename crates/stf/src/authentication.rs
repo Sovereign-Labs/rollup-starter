@@ -6,6 +6,7 @@ use sov_modules_api::capabilities::{
     UnregisteredAuthenticationError,
 };
 use sov_modules_api::runtime::capabilities::AuthenticationError;
+use sov_modules_api::VersionReader;
 use sov_modules_api::{
     DispatchCall, FullyBakedTx, GetGasPrice, ProvableStateReader, RawTx, Runtime, Spec,
 };
@@ -40,7 +41,9 @@ where
         EvmAndEip712AuthenticatorInput<sov_evm::CallMessage<S>, <Rt as DispatchCall>::Decodable>;
     type Input = EvmAndEip712AuthenticatorInput;
 
-    fn authenticate<Accessor: ProvableStateReader<User, Spec = S> + GetGasPrice<Spec = S>>(
+    fn authenticate<
+        Accessor: ProvableStateReader<User, Spec = S> + GetGasPrice<Spec = S> + VersionReader,
+    >(
         tx: &FullyBakedTx,
         state: &mut Accessor,
     ) -> Result<
