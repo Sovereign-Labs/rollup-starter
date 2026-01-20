@@ -40,13 +40,18 @@ where
         EvmAndEip712AuthenticatorInput<sov_evm::CallMessage<S>, <Rt as DispatchCall>::Decodable>;
     type Input = EvmAndEip712AuthenticatorInput;
 
-    fn authenticate<Accessor: ProvableStateReader<User, Spec = S> + GetGasPrice<Spec = S>>(
+    fn authenticate<Accessor>(
         tx: &FullyBakedTx,
         state: &mut Accessor,
     ) -> Result<
         capabilities::AuthenticationOutput<S, Self::Decodable>,
         capabilities::AuthenticationError,
-    > {
+    >
+    where
+        Accessor: ProvableStateReader<User, Spec = S>
+            + GetGasPrice<Spec = S>
+            + sov_modules_api::VersionReader,
+    {
         let input: EvmAndEip712AuthenticatorInput = borsh::from_slice(&tx.data).map_err(|e| {
             sov_modules_api::capabilities::fatal_deserialization_error::<_, S, _>(
                 &tx.data, e, state,
