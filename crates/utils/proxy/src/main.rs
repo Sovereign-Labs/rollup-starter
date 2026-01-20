@@ -9,6 +9,9 @@ struct Args {
     /// PostgreSQL connection string
     #[arg(long)]
     database_url: String,
+
+    #[arg(long)]
+    output_file: String,
 }
 
 #[tokio::main]
@@ -20,6 +23,6 @@ async fn main() {
         .expect("Failed to create NodeDiscovery");
 
     node_discovery
-        .write_cluster_info_loop(&"cluster_info.txt", Duration::from_millis(200))
+        .write_cluster_info_loop(&args.output_file, Duration::from_millis(200))
         .await;
 }
