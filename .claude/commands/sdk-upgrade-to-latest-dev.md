@@ -10,8 +10,9 @@ SDK repo: https://github.com/Sovereign-Labs/sovereign-sdk
 
 1. Check that the working directory is clean (no uncommitted changes). If not clean, abort and inform the user.
 2. Checkout the `main` branch.
-3. Delete the `sdk-upgrade` branch if it exists (both local and remote tracking).
-4. Create a new `sdk-upgrade` branch on top of the current `main`.
+3. Check if the existing `sdk-upgrade` branch (local OR remote) for unmerged commits ahead of main, and ask the user whether to proceed if there is.
+4. Delete the `sdk-upgrade` branch if it exists and all changes are commited (both local and remote tracking).
+5. Create a new `sdk-upgrade` branch on top of the current `main`.
 
 ### 2. Get SDK revisions
 
