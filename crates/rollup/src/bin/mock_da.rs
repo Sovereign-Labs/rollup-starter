@@ -3,7 +3,7 @@ use tracing_subscriber::EnvFilter;
 
 use sov_mock_da::storable::rpc::start_server;
 use sov_mock_da::storable::StorableMockDaService;
-use sov_mock_da::{MockAddress, MockDaConfig};
+use sov_mock_da::{FailureBehavior, MockAddress, MockDaConfig};
 
 // Run with cargo run --bin mock-da-server --no-default-features --features="mock_da_external,mock_zkvm"
 #[derive(Parser, Debug)]
@@ -49,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
         block_producing,
         da_layer: None,
         randomization: None,
+        failure_behavior: FailureBehavior::None,
     };
 
     tracing::info!("Starting mock-da server with configuration:");
