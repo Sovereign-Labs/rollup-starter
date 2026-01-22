@@ -18,7 +18,6 @@ use sov_stf_runner::processes::RollupProverConfig;
 use sov_stf_runner::{HttpServerConfig, MonitoringConfig, ProofManagerConfig};
 use sov_stf_runner::{RollupConfig, RunnerConfig};
 use std::str::FromStr;
-use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
 const PROVER_ADDRESS: &str = "0x4fD62a0D0c35e1Fdcd97231A4586E65e7Eb454a5";
@@ -40,7 +39,6 @@ pub async fn start_rollup(
             concurrent_sync_tasks: 1,
             save_tx_bodies: false,
             pre_fetched_blocks_capacity: NonZero::new(3).unwrap(),
-            da_total_timeout_secs: 3_600,
         },
         da: da_config,
         proof_manager: ProofManagerConfig {

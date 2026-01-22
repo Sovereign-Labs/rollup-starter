@@ -3,7 +3,7 @@ use anyhow::Context;
 use futures::StreamExt;
 use sov_address::{EthereumAddress, EvmCryptoSpec};
 use sov_cli::NodeClient;
-use sov_mock_da::{BlockProducingConfig, MockAddress, MockDaConfig, MockDaSpec};
+use sov_mock_da::{BlockProducingConfig, FailureBehavior, MockAddress, MockDaConfig, MockDaSpec};
 use sov_mock_zkvm::MockZkvm;
 use sov_modules_api::capabilities::UniquenessData;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
@@ -64,6 +64,7 @@ async fn bank_tx_tests() -> Result<(), anyhow::Error> {
                 block_producing: BlockProducingConfig::Periodic { block_time_ms: 300 },
                 da_layer: None,
                 randomization: None,
+                failure_behavior: FailureBehavior::None,
             },
         )
         .await;
