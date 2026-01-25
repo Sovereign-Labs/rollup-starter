@@ -106,15 +106,6 @@ where
         }
     }
 
-    fn allow_unregistered_tx(call: &Self::Decodable) -> bool {
-        matches!(
-            call,
-            Self::Decodable::SequencerRegistry(
-                sov_sequencer_registry::CallMessage::Register { .. }
-            )
-        )
-    }
-
     fn is_unauthorized_system_tx(
         &self,
         call: &Self::Decodable,

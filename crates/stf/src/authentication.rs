@@ -2,8 +2,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use sov_address::{EthereumAddress, FromVmAddress};
 use sov_eip712_auth::{SchemaProvider, Secp256k1CryptoSpec};
 use sov_modules_api::capabilities::{
-    self, BatchFromUnregisteredSequencer, FatalError, TransactionAuthenticator,
-    UnregisteredAuthenticationError,
+    self, BatchFromUnregisteredSequencer, TransactionAuthenticator, UnregisteredAuthenticationError,
 };
 use sov_modules_api::runtime::capabilities::AuthenticationError;
 use sov_modules_api::{
@@ -145,7 +144,9 @@ where
         }
     }
 
-    fn authenticate_unregistered<Accessor: ProvableStateReader<User, Spec = S>>(
+    fn authenticate_unregistered<
+        Accessor: ProvableStateReader<User, Spec = S> + sov_modules_api::VersionReader,
+    >(
         batch: &BatchFromUnregisteredSequencer,
         state: &mut Accessor,
     ) -> Result<
@@ -173,20 +174,11 @@ where
                 }
             })?;
 
-        if Rt::allow_unregistered_tx(&runtime_call) {
-            Ok((
-                tx_and_raw_hash,
-                auth_data,
-                EvmAndEip712AuthenticatorInput::Standard(runtime_call),
-            ))
-        } else {
-            Err(UnregisteredAuthenticationError::FatalError(
-                FatalError::Other(
-                    "The runtime call included in the transaction was invalid.".to_string(),
-                ),
-                tx_and_raw_hash.raw_tx_hash,
-            ))?
-        }
+        Ok((
+            tx_and_raw_hash,
+            auth_data,
+            EvmAndEip712AuthenticatorInput::Standard(runtime_call),
+        ))
     }
 
     fn add_standard_auth(tx: RawTx) -> Self::Input {
