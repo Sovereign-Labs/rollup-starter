@@ -7,6 +7,7 @@ use acceptance_test::{
     Directories, Runtime, Spec, ThroughputReport, API_URL, NUM_SOAK_BATCHES,
     POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
 };
+use acceptance_test::evm_soak::setup_state_consistency_contract;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use sov_api_spec::types::{self, AcceptTxBody};
@@ -156,6 +157,7 @@ async fn main() -> Result<(), anyhow::Error> {
     do_manual_setup(directories.clone()).await?;
     let res = run_soak(directories.clone(), rollup, 3, stop_at_height, true).await;
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
+    println!("\n\nRES FROM RUNNING SOAK: {res:?}\n\n");
     if let Ok(throughput_report) = res {
         let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
         if should_overwrite_throughput(&throughput_path, &throughput_report) {
@@ -317,6 +319,12 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
             );
         }
     }
+
+    let evm_contract_address = setup_state_consistency_contract(&directories).await?;
+    info!(
+        "Deployed EVM state consistency contract at {}",
+        format!("{:#x}", evm_contract_address)
+    );
     info!("Manual setup complete");
 
     Ok(())

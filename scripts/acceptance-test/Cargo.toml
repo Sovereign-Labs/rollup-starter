@@ -13,6 +13,11 @@ chrono = "0.4"
 clap.workspace = true
 rand = "0.8"
 hex = "0.4.3"
+alloy.workspace = true
+alloy-consensus.workspace = true
+alloy-eips.workspace = true
+alloy-primitives.workspace = true
+alloy-signer.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 stf-starter = { path = "../../crates/stf", features = ["mock_da", "native", "acceptance-testing"] }

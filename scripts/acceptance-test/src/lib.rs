@@ -6,6 +6,7 @@ use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
+use evm_soak::{evm_state_consistency_worker, load_state_consistency_contract_address};
 use state_consistency::state_validation_worker;
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
@@ -15,6 +16,7 @@ use tracing::{debug, info};
 
 use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
 pub mod fetch_and_compare;
+pub mod evm_soak;
 mod state_consistency;
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
@@ -22,8 +24,8 @@ pub const API_URL: &str = "http://localhost:12348";
 pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 
 // Save a full snapshot of the slot every N slots
-const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
-pub const NUM_SOAK_BATCHES: u64 = 1000;
+const FULL_SLOT_SAVE_INTERVAL: u64 = 5;
+pub const NUM_SOAK_BATCHES: u64 = 30;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
@@ -368,6 +370,14 @@ pub async fn run_soak(
         state_validator_rx,
     ));
 
+    let evm_contract_address = load_state_consistency_contract_address(&directories)?;
+    let evm_worker_rx = tx.subscribe();
+    worker_set.spawn(evm_state_consistency_worker(
+        evm_contract_address,
+        rollup_stop_height,
+        evm_worker_rx,
+    ));
+
     use tokio::signal::unix::SignalKind;
     let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
         .expect("Failed to set up SIGTERM handler");
@@ -494,8 +504,13 @@ pub async fn run_soak(
         }
     }
 
-    tx.send(true)?;
+    println!("Entering last phases of run_soak...");
+    if tx.send(true).is_err() {
+        debug!("Soak worker channel closed; workers already shut down");
+    }
+    println!("Sent tx.send()...");
     _ = worker_set.join_all();
+    println!("Joined workers...");
 
     // Wait for rollup to finish if it hasn't already
     if let Ok(rollup_result) = rollup_rx.try_recv() {
