@@ -27,8 +27,8 @@ pub const API_URL: &str = "http://localhost:12348";
 pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 
 // Save a full snapshot of the slot every N slots
-const FULL_SLOT_SAVE_INTERVAL: u64 = 5;
-pub const NUM_SOAK_BATCHES: u64 = 30;
+const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
+pub const NUM_SOAK_BATCHES: u64 = 1000;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
