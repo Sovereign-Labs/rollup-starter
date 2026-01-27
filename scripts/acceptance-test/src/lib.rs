@@ -6,7 +6,10 @@ use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
-use evm_soak::{evm_state_consistency_worker, load_state_consistency_contract_address};
+use evm_soak::{
+    evm_state_consistency_worker, load_state_consistency_contracts,
+    privileged_deployer_key, unprivileged_deployer_key,
+};
 use state_consistency::state_validation_worker;
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
@@ -370,11 +373,21 @@ pub async fn run_soak(
         state_validator_rx,
     ));
 
-    let evm_contract_address = load_state_consistency_contract_address(&directories)?;
+    let evm_contracts = load_state_consistency_contracts(&directories)?;
     let evm_worker_rx = tx.subscribe();
     worker_set.spawn(evm_state_consistency_worker(
-        evm_contract_address,
-        rollup_stop_height,
+        evm_contracts.pinned,
+        privileged_deployer_key().to_string(),
+        "pinned",
+        evm_worker_rx,
+    ));
+
+    let unprivileged_key = unprivileged_deployer_key()?;
+    let evm_worker_rx = tx.subscribe();
+    worker_set.spawn(evm_state_consistency_worker(
+        evm_contracts.unpinned,
+        unprivileged_key,
+        "unpinned",
         evm_worker_rx,
     ));
 

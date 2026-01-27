@@ -7,7 +7,7 @@ use acceptance_test::{
     Directories, Runtime, Spec, ThroughputReport, API_URL, NUM_SOAK_BATCHES,
     POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
 };
-use acceptance_test::evm_soak::setup_state_consistency_contract;
+use acceptance_test::evm_soak::{ensure_evm_pinned_cache_config, setup_state_consistency_contracts};
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use sov_api_spec::types::{self, AcceptTxBody};
@@ -111,6 +111,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let password = generate_postgres_password()?;
     start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
     interpolate_config(&password, &directories)?;
+    ensure_evm_pinned_cache_config(&directories)?;
     info!("Building rollup...");
     if let Err(e) = build_rollup(directories.rollup_root.clone()) {
         cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
@@ -320,10 +321,14 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
         }
     }
 
-    let evm_contract_address = setup_state_consistency_contract(&directories).await?;
+    let evm_contracts = setup_state_consistency_contracts(&directories).await?;
     info!(
-        "Deployed EVM state consistency contract at {}",
-        format!("{:#x}", evm_contract_address)
+        "Deployed pinned EVM state consistency contract at {}",
+        format!("{:#x}", evm_contracts.pinned)
+    );
+    info!(
+        "Deployed unpinned EVM state consistency contract at {}",
+        format!("{:#x}", evm_contracts.unpinned)
     );
     info!("Manual setup complete");
 
