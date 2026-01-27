@@ -7,8 +7,8 @@ use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
 use evm_soak::{
-    evm_state_consistency_worker, load_state_consistency_contracts,
-    privileged_deployer_key, unprivileged_deployer_key,
+    evm_state_consistency_worker, load_state_consistency_contracts, pinned_worker_key,
+    unpinned_worker_key,
 };
 use state_consistency::state_validation_worker;
 use std::path::PathBuf;
@@ -374,22 +374,27 @@ pub async fn run_soak(
     ));
 
     let evm_contracts = load_state_consistency_contracts(&directories)?;
-    let evm_worker_rx = tx.subscribe();
-    worker_set.spawn(evm_state_consistency_worker(
-        evm_contracts.pinned,
-        privileged_deployer_key().to_string(),
-        "pinned",
-        evm_worker_rx,
-    ));
+    for (idx, address) in evm_contracts.pinned.into_iter().enumerate() {
+        let evm_worker_rx = tx.subscribe();
+        let worker_key = pinned_worker_key(idx)?;
+        worker_set.spawn(evm_state_consistency_worker(
+            address,
+            worker_key,
+            "pinned",
+            evm_worker_rx,
+        ));
+    }
 
-    let unprivileged_key = unprivileged_deployer_key()?;
-    let evm_worker_rx = tx.subscribe();
-    worker_set.spawn(evm_state_consistency_worker(
-        evm_contracts.unpinned,
-        unprivileged_key,
-        "unpinned",
-        evm_worker_rx,
-    ));
+    for (idx, address) in evm_contracts.unpinned.into_iter().enumerate() {
+        let evm_worker_rx = tx.subscribe();
+        let worker_key = unpinned_worker_key(idx)?;
+        worker_set.spawn(evm_state_consistency_worker(
+            address,
+            worker_key,
+            "unpinned",
+            evm_worker_rx,
+        ));
+    }
 
     use tokio::signal::unix::SignalKind;
     let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
@@ -517,13 +522,10 @@ pub async fn run_soak(
         }
     }
 
-    println!("Entering last phases of run_soak...");
     if tx.send(true).is_err() {
         debug!("Soak worker channel closed; workers already shut down");
     }
-    println!("Sent tx.send()...");
     _ = worker_set.join_all();
-    println!("Joined workers...");
 
     // Wait for rollup to finish if it hasn't already
     if let Ok(rollup_result) = rollup_rx.try_recv() {

@@ -158,7 +158,6 @@ async fn main() -> Result<(), anyhow::Error> {
     do_manual_setup(directories.clone()).await?;
     let res = run_soak(directories.clone(), rollup, 3, stop_at_height, true).await;
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
-    println!("\n\nRES FROM RUNNING SOAK: {res:?}\n\n");
     if let Ok(throughput_report) = res {
         let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
         if should_overwrite_throughput(&throughput_path, &throughput_report) {
@@ -322,14 +321,23 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
     }
 
     let evm_contracts = setup_state_consistency_contracts(&directories).await?;
+    info!("Deployed {} pinned EVM state consistency contracts", evm_contracts.pinned.len());
+    for (idx, address) in evm_contracts.pinned.iter().enumerate() {
+        info!(
+            "Pinned contract {idx}: {}",
+            format!("{:#x}", address)
+        );
+    }
     info!(
-        "Deployed pinned EVM state consistency contract at {}",
-        format!("{:#x}", evm_contracts.pinned)
+        "Deployed {} unpinned EVM state consistency contracts",
+        evm_contracts.unpinned.len()
     );
-    info!(
-        "Deployed unpinned EVM state consistency contract at {}",
-        format!("{:#x}", evm_contracts.unpinned)
-    );
+    for (idx, address) in evm_contracts.unpinned.iter().enumerate() {
+        info!(
+            "Unpinned contract {idx}: {}",
+            format!("{:#x}", address)
+        );
+    }
     info!("Manual setup complete");
 
     Ok(())

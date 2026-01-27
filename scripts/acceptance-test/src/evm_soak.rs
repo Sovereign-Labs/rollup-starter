@@ -19,6 +19,8 @@ const STATE_CONSISTENCY_CONTRACT_PATH: &str = "evm-contracts/StateConsistencyTes
 const STATE_CONSISTENCY_BIN: &str = "StateConsistencyTester.bin";
 const STATE_CONSISTENCY_ABI: &str = "StateConsistencyTester.abi.json";
 const STATE_CONSISTENCY_METADATA: &str = "state_consistency_contracts.json";
+pub const NUM_PINNED_CONTRACTS: usize = 5;
+pub const NUM_UNPINNED_CONTRACTS: usize = 5;
 
 const UPDATE_SELECTOR: [u8; 4] = [0x2f, 0xb5, 0x65, 0xe8];
 const VALUE_SELECTOR: [u8; 4] = [0x3f, 0xa4, 0xf2, 0x45];
@@ -33,12 +35,14 @@ const STOP_HEIGHT_ERROR_MARKER: &str = "The preferred sequencer has reached the 
 const PRIVILEGED_DEPLOYER_KEY: &str =
     "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const UNPRIVILEGED_DEPLOYER_OFFSET: u8 = 1;
+const PINNED_WORKER_KEY_OFFSET: u8 = 10;
+const UNPINNED_WORKER_KEY_OFFSET: u8 = 60;
 const DEFAULT_BUCKET_SIZE_LIMIT: usize = 100 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct StateConsistencyMetadata {
-    pinned_address: String,
-    unpinned_address: String,
+    pinned_addresses: Vec<String>,
+    unpinned_addresses: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -246,6 +250,20 @@ pub fn unprivileged_deployer_key() -> anyhow::Result<String> {
     derive_worker_key(PRIVILEGED_DEPLOYER_KEY, UNPRIVILEGED_DEPLOYER_OFFSET)
 }
 
+fn worker_key_for_index(offset: u8, idx: usize) -> anyhow::Result<String> {
+    let idx_u8 =
+        u8::try_from(idx).map_err(|_| anyhow!("worker index {idx} exceeds u8 range"))?;
+    derive_worker_key(PRIVILEGED_DEPLOYER_KEY, offset.wrapping_add(idx_u8))
+}
+
+pub fn pinned_worker_key(idx: usize) -> anyhow::Result<String> {
+    worker_key_for_index(PINNED_WORKER_KEY_OFFSET, idx)
+}
+
+pub fn unpinned_worker_key(idx: usize) -> anyhow::Result<String> {
+    worker_key_for_index(UNPINNED_WORKER_KEY_OFFSET, idx)
+}
+
 fn extract_rpc_error_message(value: &serde_json::Value) -> Option<String> {
     match value {
         serde_json::Value::String(message) => Some(message.clone()),
@@ -339,12 +357,18 @@ fn load_state_consistency_bytecode(directories: &Directories) -> anyhow::Result<
 
 fn write_state_consistency_metadata(
     directories: &Directories,
-    pinned_address: Address,
-    unpinned_address: Address,
+    pinned_addresses: &[Address],
+    unpinned_addresses: &[Address],
 ) -> anyhow::Result<()> {
     let metadata = StateConsistencyMetadata {
-        pinned_address: format!("{:#x}", pinned_address),
-        unpinned_address: format!("{:#x}", unpinned_address),
+        pinned_addresses: pinned_addresses
+            .iter()
+            .map(|address| format!("{:#x}", address))
+            .collect(),
+        unpinned_addresses: unpinned_addresses
+            .iter()
+            .map(|address| format!("{:#x}", address))
+            .collect(),
     };
     let metadata_path = state_consistency_metadata_path(directories);
     fs::create_dir_all(
@@ -357,8 +381,8 @@ fn write_state_consistency_metadata(
 }
 
 pub struct StateConsistencyContracts {
-    pub pinned: Address,
-    pub unpinned: Address,
+    pub pinned: Vec<Address>,
+    pub unpinned: Vec<Address>,
 }
 
 pub fn load_state_consistency_contracts(
@@ -368,16 +392,25 @@ pub fn load_state_consistency_contracts(
     let raw = fs::read_to_string(&metadata_path)
         .with_context(|| format!("Missing {}", metadata_path.display()))?;
     let metadata: StateConsistencyMetadata = serde_json::from_str(&raw)?;
-    Ok(StateConsistencyContracts {
-        pinned: metadata
-            .pinned_address
-            .parse::<Address>()
-            .context("Failed to parse pinned EVM contract address")?,
-        unpinned: metadata
-            .unpinned_address
-            .parse::<Address>()
-            .context("Failed to parse unpinned EVM contract address")?,
-    })
+    let pinned = metadata
+        .pinned_addresses
+        .iter()
+        .map(|address| {
+            address
+                .parse::<Address>()
+                .context("Failed to parse pinned EVM contract address")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let unpinned = metadata
+        .unpinned_addresses
+        .iter()
+        .map(|address| {
+            address
+                .parse::<Address>()
+                .context("Failed to parse unpinned EVM contract address")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(StateConsistencyContracts { pinned, unpinned })
 }
 
 pub fn ensure_evm_pinned_cache_config(directories: &Directories) -> anyhow::Result<()> {
@@ -520,17 +553,27 @@ pub async fn setup_state_consistency_contracts(
     let unprivileged_key = unprivileged_deployer_key()?;
     let unprivileged_signer: PrivateKeySigner = unprivileged_key.parse()?;
 
-    let pinned_address =
-        deploy_state_consistency_contract(bytecode.clone(), &rpc, &privileged_signer, chain_id)
-            .await?;
-    let unpinned_address =
-        deploy_state_consistency_contract(bytecode, &rpc, &unprivileged_signer, chain_id).await?;
+    let mut pinned_addresses = Vec::with_capacity(NUM_PINNED_CONTRACTS);
+    for _ in 0..NUM_PINNED_CONTRACTS {
+        let address =
+            deploy_state_consistency_contract(bytecode.clone(), &rpc, &privileged_signer, chain_id)
+                .await?;
+        pinned_addresses.push(address);
+    }
 
-    write_state_consistency_metadata(directories, pinned_address, unpinned_address)?;
+    let mut unpinned_addresses = Vec::with_capacity(NUM_UNPINNED_CONTRACTS);
+    for _ in 0..NUM_UNPINNED_CONTRACTS {
+        let address =
+            deploy_state_consistency_contract(bytecode.clone(), &rpc, &unprivileged_signer, chain_id)
+                .await?;
+        unpinned_addresses.push(address);
+    }
+
+    write_state_consistency_metadata(directories, &pinned_addresses, &unpinned_addresses)?;
 
     Ok(StateConsistencyContracts {
-        pinned: pinned_address,
-        unpinned: unpinned_address,
+        pinned: pinned_addresses,
+        unpinned: unpinned_addresses,
     })
 }
 
@@ -554,7 +597,8 @@ pub async fn evm_state_consistency_worker(
     tracing::info!(
         expected_value = ?expected_value,
         contract_address = %contract_address,
-        "EVM state consistency worker started ({label})"
+        label,
+        "EVM state consistency worker started"
     );
 
     while !*rx.borrow() {
