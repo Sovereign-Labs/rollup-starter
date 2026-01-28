@@ -55,7 +55,7 @@ sov-risc0-adapter = { workspace = true, features = ["native"], optional = true }
 sov-sp1-adapter = { workspace = true, features = ["native"], optional = true }
 
 # binary dependencies
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing-subscriber = { workspace = true }
 tracing-panic = "0.1.2"
 bytes = "1.7.2"
 rand = "0.8.5"

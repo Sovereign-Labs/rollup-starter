@@ -1,0 +1,18 @@
+[package]
+name = "node-discovery"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "node-discovery"
+path = "src/main.rs"
+
+[dependencies]
+sov-proxy-utils = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
