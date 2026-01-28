@@ -20,7 +20,7 @@ struct Args {
 #[tokio::main]
 async fn main() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,debug,sqlx=info"));
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,sqlx=info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let args = Args::parse();
