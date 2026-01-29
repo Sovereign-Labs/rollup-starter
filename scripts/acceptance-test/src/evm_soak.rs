@@ -103,8 +103,7 @@ pub fn unprivileged_deployer_key() -> anyhow::Result<String> {
 }
 
 fn worker_key_for_index(offset: u8, idx: usize) -> anyhow::Result<String> {
-    let idx_u8 =
-        u8::try_from(idx).map_err(|_| anyhow!("worker index {idx} exceeds u8 range"))?;
+    let idx_u8 = u8::try_from(idx).map_err(|_| anyhow!("worker index {idx} exceeds u8 range"))?;
     derive_worker_key(PRIVILEGED_DEPLOYER_KEY, offset.wrapping_add(idx_u8))
 }
 
@@ -249,13 +248,12 @@ pub fn ensure_evm_pinned_cache_config(directories: &Directories) -> anyhow::Resu
         .iter()
         .any(|addr| addr == &privileged_address)
     {
-        config.privileged_deployer_addresses.push(privileged_address);
+        config
+            .privileged_deployer_addresses
+            .push(privileged_address);
     }
 
-    fs::write(
-        config_path,
-        serde_json::to_string_pretty(&config)?,
-    )?;
+    fs::write(config_path, serde_json::to_string_pretty(&config)?)?;
     Ok(())
 }
 
@@ -312,12 +310,9 @@ pub async fn setup_state_consistency_contracts(
         .eth_get_transaction_count(privileged_rpc.address())
         .await;
     for _ in 0..NUM_PINNED_CONTRACTS {
-        let address = deploy_state_consistency_contract(
-            bytecode.clone(),
-            &privileged_rpc,
-            privileged_nonce,
-        )
-        .await?;
+        let address =
+            deploy_state_consistency_contract(bytecode.clone(), &privileged_rpc, privileged_nonce)
+                .await?;
         privileged_nonce = privileged_nonce.saturating_add(1);
         pinned_addresses.push(address);
     }
@@ -381,13 +376,7 @@ pub async fn evm_state_consistency_worker(
         for _ in 0..tx_count {
             let new_value = expected_value + U256::from(1);
             let data = encode_update_call(expected_value, new_value);
-            let tx = tx_request(
-                from,
-                nonce,
-                Some(contract_address),
-                data,
-                UPDATE_GAS_LIMIT,
-            );
+            let tx = tx_request(from, nonce, Some(contract_address), data, UPDATE_GAS_LIMIT);
 
             match rpc.eth_send_transaction(tx).await {
                 Ok(_) => {
@@ -397,9 +386,7 @@ pub async fn evm_state_consistency_worker(
                 Err(err) => {
                     let err_msg = err.to_string();
                     if is_stop_height_error_message(&err_msg) {
-                        tracing::info!(
-                            "EVM worker detected sequencer stop height, shutting down"
-                        );
+                        tracing::info!("EVM worker detected sequencer stop height, shutting down");
                         return Ok(());
                     }
                     return Err(anyhow!(err_msg));

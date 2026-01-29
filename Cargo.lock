@@ -10633,7 +10633,7 @@ dependencies = [
 [[package]]
 name = "sov-eth-client"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=67f4e58e77a11a6d4ae912c5b2ec1615aa989fbc#67f4e58e77a11a6d4ae912c5b2ec1615aa989fbc"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3319187722e367dca6bfa743b28f6783e6121c0a#3319187722e367dca6bfa743b28f6783e6121c0a"
 dependencies = [
  "alloy",
  "alloy-consensus",
@@ -10747,7 +10747,7 @@ dependencies = [
 [[package]]
 name = "sov-evm-test-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=67f4e58e77a11a6d4ae912c5b2ec1615aa989fbc#67f4e58e77a11a6d4ae912c5b2ec1615aa989fbc"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3319187722e367dca6bfa743b28f6783e6121c0a#3319187722e367dca6bfa743b28f6783e6121c0a"
 dependencies = [
  "alloy",
  "alloy-contract",

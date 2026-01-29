@@ -1,3 +1,7 @@
+use evm_soak::{
+    evm_state_consistency_worker, load_state_consistency_contracts, pinned_worker_key,
+    unpinned_worker_key,
+};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rollup_starter::rollup::StarterRollup;
@@ -6,10 +10,6 @@ use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
-use evm_soak::{
-    evm_state_consistency_worker, load_state_consistency_contracts, pinned_worker_key,
-    unpinned_worker_key,
-};
 use state_consistency::state_validation_worker;
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
@@ -18,9 +18,9 @@ use tokio::task::JoinSet;
 use tracing::{debug, info};
 
 use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
-pub mod fetch_and_compare;
 mod evm_contracts;
 pub mod evm_soak;
+pub mod fetch_and_compare;
 mod state_consistency;
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";

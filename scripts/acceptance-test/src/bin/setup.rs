@@ -1,5 +1,8 @@
 use std::process::Command;
 
+use acceptance_test::evm_soak::{
+    ensure_evm_pinned_cache_config, setup_state_consistency_contracts,
+};
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
     build_rollup, cleanup_postgres_container, generate_postgres_password, get_rollup_client,
@@ -7,7 +10,6 @@ use acceptance_test::{
     Directories, Runtime, Spec, ThroughputReport, API_URL, NUM_SOAK_BATCHES,
     POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
 };
-use acceptance_test::evm_soak::{ensure_evm_pinned_cache_config, setup_state_consistency_contracts};
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use sov_api_spec::types::{self, AcceptTxBody};
@@ -321,22 +323,19 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
     }
 
     let evm_contracts = setup_state_consistency_contracts(&directories).await?;
-    info!("Deployed {} pinned EVM state consistency contracts", evm_contracts.pinned.len());
+    info!(
+        "Deployed {} pinned EVM state consistency contracts",
+        evm_contracts.pinned.len()
+    );
     for (idx, address) in evm_contracts.pinned.iter().enumerate() {
-        info!(
-            "Pinned contract {idx}: {}",
-            format!("{:#x}", address)
-        );
+        info!("Pinned contract {idx}: {}", format!("{:#x}", address));
     }
     info!(
         "Deployed {} unpinned EVM state consistency contracts",
         evm_contracts.unpinned.len()
     );
     for (idx, address) in evm_contracts.unpinned.iter().enumerate() {
-        info!(
-            "Unpinned contract {idx}: {}",
-            format!("{:#x}", address)
-        );
+        info!("Unpinned contract {idx}: {}", format!("{:#x}", address));
     }
     info!("Manual setup complete");
 
