@@ -8,7 +8,7 @@ connection_string = "sqlite://rollup-state/mock_da.sqlite?mode=rwc"
 # For initial full node should match genesis of sequencer-registry.
 # It is going to be a DA address that blobs from this node will be associated.
 sender_address = "0000000000000000000000000000000000000000000000000000000000000000"
-finalization = 0
+finalization_blocks = 0
 # Defines how new blocks should be produced.
 [da.block_producing.periodic]
 block_time_ms = 6_000
