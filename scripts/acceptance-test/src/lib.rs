@@ -24,7 +24,8 @@ pub mod evm_soak;
 mod state_consistency;
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
-pub const API_URL: &str = "http://localhost:12348";
+pub const API_URL: &str = "http://127.0.0.1:12348";
+pub const API_ADDR: &str = "127.0.0.1:12348";
 pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 
 // Save a full snapshot of the slot every N slots

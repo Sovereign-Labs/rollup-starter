@@ -1,5 +1,5 @@
 use crate::evm_contracts::StateConsistencyTester;
-use crate::{Directories, API_URL};
+use crate::{Directories, API_ADDR};
 use alloy::signers::local::PrivateKeySigner;
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_types::TransactionRequest;
@@ -62,9 +62,7 @@ impl Default for EvmPinnedCacheConfig {
 }
 
 fn evm_rpc_addr() -> SocketAddr {
-    let url = reqwest::Url::parse(API_URL).expect("Invalid API_URL");
-    let port = url.port_or_known_default().unwrap_or(80);
-    SocketAddr::from(([127, 0, 0, 1], port))
+    API_ADDR.parse().expect("Invalid API_ADDR")
 }
 
 fn evm_artifacts_dir(directories: &Directories) -> PathBuf {
@@ -281,9 +279,20 @@ async fn deploy_state_consistency_contract(
             ));
         }
         if let Some(receipt) = rpc.receipt(tx_hash).await {
+            let status = receipt.status();
+            if !status {
+                return Err(anyhow!(
+                    "EVM contract deployment failed (status {status}) for tx {:#x}",
+                    tx_hash
+                ));
+            }
             if let Some(addr) = receipt.contract_address {
                 return Ok(addr);
             }
+            return Err(anyhow!(
+                "EVM contract deployment succeeded but no contract_address was returned for tx {:#x}",
+                tx_hash
+            ));
         }
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
