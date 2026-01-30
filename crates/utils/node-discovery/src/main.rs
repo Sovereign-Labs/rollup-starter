@@ -34,5 +34,5 @@ async fn main() {
     node_discovery
         .subscribe_cluster_info_loop(&args.output_file)
         .await
-        .unwrap_or_else(|e| panic!("Failed to start node discovery loop: {:?}", e));
+        .unwrap_or_else(|e| panic!("Failed to start node discovery loop: {e:?}"));
 }
