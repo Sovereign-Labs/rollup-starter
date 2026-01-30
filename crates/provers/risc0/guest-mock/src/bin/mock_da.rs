@@ -8,9 +8,11 @@ use sov_modules_api::configurable_spec::ConfigurableSpec;
 use sov_address::{EthereumAddress, EvmCryptoSpec};
 use sov_modules_api::execution_mode::Zk;
 use sov_modules_stf_blueprint::StfBlueprint;
+use sov_rollup_interface::zk::CryptoSpec as CryptoSpecTrait;
 use sov_risc0_adapter::guest::Risc0Guest;
 use sov_risc0_adapter::Risc0;
-use sov_state::ZkStorage;
+use sov_state::nomt::zk_storage::NomtVerifierStorage;
+use sov_state::DefaultStorageSpec;
 use stf_starter::runtime::Runtime;
 use stf_starter::StfVerifier;
 
@@ -34,14 +36,24 @@ fn report_bench_metrics(start_cycles: usize, end_cycles: usize) {
 
 risc0_zkvm::guest::entry!(main);
 
+type ZkStorage = NomtVerifierStorage<DefaultStorageSpec<<EvmCryptoSpec as CryptoSpecTrait>::Hasher>>;
+type RollupSpec = ConfigurableSpec<
+    MockDaSpec,
+    Risc0,
+    MockZkvm,
+    EthereumAddress,
+    Zk,
+    EvmCryptoSpec,
+    ZkStorage
+>;
+
 pub fn main() {
     let guest = Risc0Guest::new();
     let storage = ZkStorage::new();
     #[cfg(feature = "bench")]
     let start_cycles = risc0_zkvm_platform::syscall::sys_cycle_count();
 
-    let stf: StfBlueprint<ConfigurableSpec<MockDaSpec, Risc0, MockZkvm, EthereumAddress, Zk, EvmCryptoSpec>, Runtime<_>> =
-        StfBlueprint::new();
+    let stf: StfBlueprint<RollupSpec, Runtime<_>> = StfBlueprint::new();
 
     let stf_verifier = StfVerifier::<_, _, _, _, _>::new(stf, MockDaVerifier {});
 
