@@ -8,33 +8,33 @@ freeze = [1, 1]
 
 [constants]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
-CHAIN_ID = 6669
-CHAIN_NAME = "TestChain"
+CHAIN_ID = 537713
+CHAIN_NAME = "Relay"
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert to ASCII bytes
 # Should be 10 bytes long for Celestia
-BATCH_NAMESPACE = { byte_string = "test_1xx-b" }
+BATCH_NAMESPACE = { byte_string = "relay-data" }
 # The namespace used by the rollup to store aggregated ZK proofs.
 # This is "sov-test-p" encoded as ASCII bytes.
 # "hex" format is used as an example, that it is possible to define namespace as any sequence of bytes.
 # `python3 -c "import sys; print('0x' + sys.argv[1].encode().hex())" "sov-proofs"`
 # Should be 10 bytes long for Celestia
-PROOF_NAMESPACE = { byte_string = "test_1xx-p" }
+PROOF_NAMESPACE = { byte_string = "sov-p-dev8" }
 
 EVM_GAS_METERING_MODE = "Rollup"
 # We will keep only this many blocks in the EVM module.
 EVM_BLOCK_PRUNING_THRESHOLD = 1000000000
 # How many rollup blocks to wait before terminating setup mode. While setup mode is enabled,
 # the rollup does not charge gas. This is useful when initializing the rollup with a bridged gas token.
-SETUP_MODE_TERMINATION_HEIGHT = 0 # Disable setup mode entirely by default.
+SETUP_MODE_TERMINATION_HEIGHT = 100000
 # When using soft-confirmations, this parameter sets the maximum number of slots that a transaction can be deferred by the sequencer before
 # being force-executed by the rollup. Decreasing the number of slots means that "forced" transactions are processed
 # more quickly in the worst case, but increases the likelihood that some soft confirmations
 # will be invalidated due to congestion on the DA layer. (Note that with an honest sequencer, this parameter has no effect
 # on the speed of inclusion for forced transactions, since they will always be included ASAP.)
 # Setting this parameter to 0 disables soft-confirmations entirely.
-DEFERRED_SLOTS_COUNT = 100000
+DEFERRED_SLOTS_COUNT = 17280
 # The maximum number of visible slots that the sequencer can advance the rollup in a single slot.
 # Larger values of this parameter mean that the soft-confirmations are less vulnerable to congestion on the DA layer,
 # but make it correspondingly easier for a malicious sequencer to grief other sequencers.
@@ -66,7 +66,7 @@ GAS_DIMENSIONS = { const = 2 }
 # used only when users feel they are being censored.
 GAS_FORCED_SEQUENCER_REGISTRATION_COST = [100000, 100000]
 # The ID of the "native token" of the rollup, which is used to pay gas fees.
-GAS_TOKEN_ID = { bech32 = "token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7", type = "TokenId" }
+GAS_TOKEN_ID = { bech32 = "token_1g26n9g2wfhs9y4v2a8h2e73yx232m3jl95snr4ndth04ut8a2qfqd5rvh4", type = "TokenId" }
 # The HRP prefix that appears in all rollup addresses.
 ADDRESS_PREFIX = { const = "sov" }
 # --- Gas parameters to charge for state accesses ---
@@ -99,9 +99,7 @@ DEFAULT_FIXED_GAS_TO_CHARGE_PER_SIGNATURE_VERIFICATION = [100, 100]
 # The cost of EVM execution
 DEFAULT_GAS_TO_CHARGE_PER_EVM_GAS = [1, 0]
 
-# Temporarily setting it high so it is not going to break deployments
-# After deployments are updated, it needs to be set to 0. (2026-01-17)
-EVM_MAX_FEE_CHECK_HEIGHT = 1_000_000_000
+EVM_MAX_FEE_CHECK_HEIGHT = 172397
 
 # Maximum amount of gas the sequencer can pay for the tx execution ---
 MAX_SEQUENCER_EXEC_GAS_PER_TX = [1_000_000_000, 1_000_000_000]
@@ -155,7 +153,7 @@ ELASTICITY_MULTIPLIER = 2
 # --- End Gas fee adjustment parameters ---
 
 # --- Hyperlane constants ---
-HYPERLANE_BRIDGE_DOMAIN = 5555
+HYPERLANE_BRIDGE_DOMAIN = 537713
 # --- End Hyperlane constants ---
 
 BANK_DISCRIMINANT = 0
