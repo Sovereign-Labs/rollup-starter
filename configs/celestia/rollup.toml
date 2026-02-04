@@ -1,13 +1,13 @@
 [da]
 # The address of the Celestia RPC server to interact with.
-rpc_url = "ws://127.0.0.1:26658"
-grpc_url = "http://127.0.0.1:9091"
-grpc_auth_token = "MY.SECRET.TOKEN"
+rpc_url = "https://my-celestia-node.celestia-mainnet.quiknode.pro/MY_API_TOKEN"
+grpc_url = "https://my-celestia-node.celestia-mainnet.quiknode.pro:9090"
+grpc_auth_token = "MY_API_TOKEN"
 
-# The private key in hex format of Celestia wallet that has enough TIA to publish blobs.
-# Matches celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s
+# The private key of a Celestia wallet in hex format. This well known key matches celestia1a68m2l85zn5xh0l07clk4rfvnezhywc53g8x7s
+# Note that this address is not funded, so any attempt to submit transactions on chain will fail; if you wish to publish blobs, 
+# swap this key for your own and ensure that it is funded on Celestia.
 signer_private_key = "aec34bb1cfae6e906594dc106af4057a9046f769e2eeed67d040f0107e15e167"
-
 
 [storage]
 # The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
@@ -29,7 +29,7 @@ user_preallocate_ht = false
 [runner]
 da_polling_interval_ms = 2_000
 concurrent_sync_tasks = 2
-pre_fetched_blocks_capacity = 10
+pre_fetched_blocks_capacity = 50
 
 [runner.http_config]
 bind_host = "0.0.0.0"
