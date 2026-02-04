@@ -18,7 +18,7 @@ struct Args {
 
     /// Maximum age (in milliseconds) for cached cluster information.
     #[arg(long, default_value = "1000")]
-    max_age_ms: u64,
+    max_age_millis: u64,
 }
 
 #[tokio::main]
@@ -31,7 +31,7 @@ async fn main() {
 
     tracing::info!("Starting node discovery.");
 
-    let max_age = std::time::Duration::from_millis(args.max_age_ms);
+    let max_age = std::time::Duration::from_millis(args.max_age_millis);
     let (node_discovery, _) = NodeDiscovery::new_with_max_age(&args.database_url, max_age)
         .await
         .expect("Failed to create NodeDiscovery");
