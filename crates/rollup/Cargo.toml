@@ -68,7 +68,7 @@ futures = { version = "0.3", default-features = false }
 sov-address = { workspace = true, features = ["evm"] }
 
 [features]
-default = ["mock_da", "mock_zkvm"]
+default = ["celestia_da", "mock_zkvm"]
 mock_da = ["sov-mock-da", "stf-starter/mock_da"]
 mock_da_external = ["sov-mock-da", "stf-starter/mock_da_external"]
 celestia_da = ["sov-celestia-adapter", "stf-starter/celestia_da"]

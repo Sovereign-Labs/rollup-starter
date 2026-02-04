@@ -44,7 +44,7 @@ grpc_auth_token = "MY_API_TOKEN"
 ### 3. Start the rollup node and wait for sync
 
 ```bash,test-ci,bashtestmd:long-running,bashtestmd:wait-until=rest_address
-$ cargo run --release --features celestia_da,mock_zkvm --no-default-features
+$ cargo run --release
 ```
 You can monitor the rollup's sync status via API.
 ```bash
