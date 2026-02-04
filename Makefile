@@ -1,4 +1,4 @@
-.PHONY: help check lint install-risc0-toolchain install-sp1-toolchain clean clean-db build-docker-mock-da run-docker-mock-da stop-docker-mock-da start-obs stop-obs start-celestia stop-celestia print-hyperlane-ethtest-warp
+.PHONY: help check lint clean clean-db start-obs stop-obs
 
 # Should remain at the top, otherwise `make` won't print help
 help: ## Display this help message
@@ -6,49 +6,17 @@ help: ## Display this help message
 
 check: ## Run cargo check here and in for all ZKVM Provers. Useful for updating Cargo.lock
 	SKIP_GUEST_BUILD=1 cargo check
-	SKIP_GUEST_BUILD=1 cargo check --manifest-path crates/provers/risc0/guest-celestia/Cargo.toml
-	SKIP_GUEST_BUILD=1 cargo check --manifest-path crates/provers/risc0/guest-mock/Cargo.toml
-	SKIP_GUEST_BUILD=1 cargo check --manifest-path crates/provers/sp1/guest-celestia/Cargo.toml
-	SKIP_GUEST_BUILD=1 cargo check --manifest-path crates/provers/sp1/guest-mock/Cargo.toml
 
 lint: ## Run fmt, check and clippy with the most important feature combinations
 	SKIP_GUEST_BUILD=1 cargo fmt --all -- --check
 	SKIP_GUEST_BUILD=1 cargo check
-	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features risc0 --no-default-features
-	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features sp1 --no-default-features
-	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features mock_zkvm --no-default-features
 	SKIP_GUEST_BUILD=1 cargo clippy
-	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features risc0 --no-default-features
-	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features sp1 --no-default-features
-	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features mock_zkvm --no-default-features
 	zepter  # Run it several times, as fix from the first run can uncover other issues
 	zepter
-	zepter
-
-install-risc0-toolchain: ## Install correct version of RISC0 toolchain
-	curl -L https://risczero.com/install | bash
-	~/.risc0/bin/rzup install cargo-risczero 2.0.2
-	~/.risc0/bin/rzup install rust 1.88.0
-	~/.risc0/bin/rzup install cpp 2024.1.5
-	@echo "Risc0 toolchain version:"
-	cargo +risc0 --version
-
-
-install-sp1-toolchain: ## Install correct version of SP1 toolchain
-	curl -L https://raw.githubusercontent.com/succinctlabs/sp1/main/sp1up/install | bash
-	~/.sp1/bin/sp1up $${GITHUB_TOKEN:+--token "$$GITHUB_TOKEN"} --version 5.0.8 --c-toolchain
-	~/.sp1/bin/cargo-prove prove --version
-	~/.sp1/bin/cargo-prove prove install-toolchain
-	@echo "SP1 toolchain version:"
-	rustc +succinct --version
 
 clean: clean-db
 clean: ## Clean all builds and artifacts and databases
 	@cargo clean
-	@cargo clean --manifest-path crates/provers/risc0/guest-celestia/Cargo.toml
-	@cargo clean --manifest-path crates/provers/risc0/guest-mock/Cargo.toml
-	@cargo clean --manifest-path crates/provers/sp1/guest-celestia/Cargo.toml
-	@cargo clean --manifest-path crates/provers/sp1/guest-mock/Cargo.toml
 	rm -rf examples/starter-js/node_modules
 	rm -rf examples/privy/node_modules
 	rm -f crates/stf/runtime_call.json
@@ -57,68 +25,10 @@ clean: ## Clean all builds and artifacts and databases
 	$(MAKE) -C integrations clean
 
 clean-db: ## Clean all databases
-	rm -rf rollup-state/rollup-starter-data-mock
 	rm -rf rollup-state/rollup-starter-data-celestia
-	rm -rf rollup-state/rollup-starter-data-external
-	rm -rf rollup-state/mock_da.sqlite
-	rm -rf test-data/docker
-
-# Add `--build-arg BUILD_MODE=release` for release builds
-build-docker-mock-da: ## Build docker container for the rollup with MockDa
-	DOCKER_BUILDKIT=1 \
-	docker build \
-	--load \
-	-f ./integrations/rollup/Dockerfile.mock \
-	-t rollup-starter:debug \
-	.
-
-run-docker-mock-da: ## Start docker container with MockDa
-	mkdir -p test-data/docker
-	mkdir -p test-data/docker/da
-	mkdir -p test-data/docker/state
-	@if [ "$(BACKGROUND)" = "true" ]; then \
-		docker run -d \
-			--name rollup-mock-da \
-			--privileged \
-			-v $(CURDIR)/test-data/docker/da:/mnt/da \
-			-v $(CURDIR)/test-data/docker/state:/mnt/state \
-			-p 12346:12346 \
-			rollup-starter:debug; \
-	else \
-		docker run -it \
-			--privileged \
-			-v $(CURDIR)/test-data/docker/da:/mnt/da \
-			-v $(CURDIR)/test-data/docker/state:/mnt/state \
-			-p 12346:12346 \
-			rollup-starter:debug; \
-	fi
-
-stop-docker-mock-da: ## Stop docker container with MockDa
-	@docker stop rollup-mock-da 2>/dev/null || true
-	@docker rm rollup-mock-da 2>/dev/null || true
 
 start-obs:  ## Start observability stack
 	./scripts/start_observability.sh
 
 stop-obs:  ## Stop observability stack
 	./scripts/stop_observability.sh
-
-start-celestia: ## Start Celestia docker compose
-	$(MAKE) -C integrations start-celestia
-
-stop-celestia: ## Stop Celestia docker compose
-	$(MAKE) -C integrations stop-celestia
-
-start-hyperlane-ethtest: ## Start Hyperlane ethtest docker compose
-	$(MAKE) -C integrations start-hyperlane-ethtest
-
-stop-hyperlane-ethtest: ## Stop Hyperlane ethtest docker compose
-	$(MAKE) -C integrations stop-hyperlane-ethtest
-
-print-hyperlane-ethtest-warp:
-	@cd integrations/hyperlane && docker compose -f docker-compose.hyp-evm.yml run --rm \
-		hyperlane-cli \
-		warp read \
-		--registry /configs \
-		--chain ethtest \
-		--address $(shell grep "addressOrDenom:" integrations/hyperlane/configs/deployments/warp_routes/ETH/warp-route-deployment-config.yaml | cut -d'"' -f2)

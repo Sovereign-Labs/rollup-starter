@@ -6,9 +6,7 @@ members = [
   "crates/rollup",
   "crates/stf",
   "crates/stf/stf-declaration",
-  "examples/value-setter", 
-  "scripts/acceptance-test",
-  "scripts/soak-test",
+  "crates/stf/value-setter", 
 ]
 default-members = ["crates/rollup"]
 
@@ -41,7 +39,6 @@ sov-hyperlane-integration = { git = "https://github.com/Sovereign-Labs/sovereign
 sov-test-state-consistency = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-ledger-apis = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
-sov-mock-da = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-modules-rollup-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
@@ -50,8 +47,6 @@ sov-uniqueness = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", 
 sov-operator-incentives = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-prover-incentives = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-revenue-share = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
-sov-risc0-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
-sov-sp1-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-sequencer = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 sov-sequencer-registry = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
@@ -70,7 +65,7 @@ sov-eip712-auth = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git",
 sov-rest-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "fb274d6a31cbb0fddc0876b61f8ba90eee6f269f" }
 stf-starter = { path = "./crates/stf", default-features = false }
 stf-starter-declaration = { path = "./crates/stf/stf-declaration", default-features = false }
-value-setter = { path = "./examples/value-setter" }
+value-setter = { path = "./crates/stf/value-setter" }
 strum = { version = "0.26.3", features = ["derive"] }
 
 alloy-consensus = { version = "1.0.37", default-features = false }
@@ -92,7 +87,6 @@ tokio = { version = "1", features = ["full"] }
 lazy_static = "1.5.0"
 tempfile = "3.20"
 jsonrpsee = { version = "0.26", features = ["jsonrpsee-types"] }
-risc0-build = "2.1"
 
 # [patch."https://github.com/paradigmxyz/reth"]
 # reth-rpc-eth-types = { path = "/home/gentoo/work/sovereign/reth/crates/rpc/rpc-eth-types" }
