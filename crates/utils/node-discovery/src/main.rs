@@ -23,7 +23,7 @@ struct Args {
     max_age_millis: u64,
 }
 
-struct ReloadOpenResty {}
+struct ReloadOpenResty;
 
 #[async_trait]
 impl ClusterUpdateNotifier for ReloadOpenResty {
@@ -41,6 +41,7 @@ impl ClusterUpdateNotifier for ReloadOpenResty {
                     tracing::error!(
                         exit_code = ?output.status.code(),
                         stderr = ?String::from_utf8_lossy(&output.stderr),
+                        stdout = ?String::from_utf8_lossy(&output.stdout),
                         "Failed to reload openresty"
                     );
                 }
@@ -64,11 +65,10 @@ async fn main() {
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
 
-    let notifier = ReloadOpenResty {};
-
-    let mut node_discovery = NodeDiscovery::new(&args.database_url, max_age, Box::new(notifier))
-        .await
-        .expect("Failed to create NodeDiscovery");
+    let mut node_discovery =
+        NodeDiscovery::new(&args.database_url, max_age, Box::new(ReloadOpenResty))
+            .await
+            .expect("Failed to create NodeDiscovery");
 
     node_discovery
         .subscribe_cluster_info_loop(&args.output_file)
