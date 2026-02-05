@@ -4,9 +4,7 @@
 //! information updates, writing the current cluster state to an output file.
 use async_trait::async_trait;
 use clap::Parser;
-use sov_proxy_utils::{
-    ClusterInfo, ClusterUpdateNotifier, NodeDiscovery, SimpleClusterUpdateNotifier,
-};
+use sov_proxy_utils::{ClusterInfo, ClusterUpdateNotifier, NodeDiscovery};
 use tokio::process::Command;
 
 #[derive(Parser)]
@@ -30,12 +28,27 @@ struct ReloadOpenResty {}
 #[async_trait]
 impl ClusterUpdateNotifier for ReloadOpenResty {
     async fn on_cluster_update(&self, _cluster_info: &ClusterInfo) {
-        let _out = Command::new("systemctl")
+        match Command::new("systemctl")
             .arg("reload")
             .arg("openresty")
             .output()
             .await
-            .unwrap();
+        {
+            Ok(output) => {
+                if output.status.success() {
+                    tracing::info!("Successfully reloaded openresty");
+                } else {
+                    tracing::error!(
+                        exit_code = ?output.status.code(),
+                        stderr = ?String::from_utf8_lossy(&output.stderr),
+                        "Failed to reload openresty"
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = ?e, "Failed to execute systemctl reload openresty");
+            }
+        }
     }
 }
 
