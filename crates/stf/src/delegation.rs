@@ -209,6 +209,7 @@ where
             sequencer_registry: &mut self.0.sequencer_registry,
             accounts: &mut self.0.accounts,
             uniqueness: &mut self.0.uniqueness,
+            chain_state: &mut self.0.chain_state,
             gas_payer: &mut self.0.paymaster,
             operator_incentives: &mut self.0.operator_incentives,
             attester_incentives: &mut self.0.attester_incentives,
