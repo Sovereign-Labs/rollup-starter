@@ -2,8 +2,12 @@
 //!
 //! This binary connects to a PostgreSQL database and subscribes to cluster
 //! information updates, writing the current cluster state to an output file.
+use async_trait::async_trait;
 use clap::Parser;
-use sov_proxy_utils::{NodeDiscovery, SimpleClusterUpdateNotifier};
+use sov_proxy_utils::{
+    ClusterInfo, ClusterUpdateNotifier, NodeDiscovery, SimpleClusterUpdateNotifier,
+};
+use tokio::process::Command;
 
 #[derive(Parser)]
 #[command(name = "node-discovery")]
@@ -21,6 +25,20 @@ struct Args {
     max_age_millis: u64,
 }
 
+struct ReloadOpenResty {}
+
+#[async_trait]
+impl ClusterUpdateNotifier for ReloadOpenResty {
+    async fn on_cluster_update(&self, _cluster_info: &ClusterInfo) {
+        let _out = Command::new("systemctl")
+            .arg("reload")
+            .arg("openresty")
+            .output()
+            .await
+            .unwrap();
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
@@ -33,7 +51,8 @@ async fn main() {
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
 
-    let (notifier, _) = SimpleClusterUpdateNotifier::new();
+    let notifier = ReloadOpenResty {};
+
     let mut node_discovery = NodeDiscovery::new(&args.database_url, max_age, Box::new(notifier))
         .await
         .expect("Failed to create NodeDiscovery");
