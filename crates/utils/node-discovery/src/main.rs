@@ -35,18 +35,18 @@ impl ClusterUpdateNotifier for ReloadOpenResty {
         {
             Ok(output) => {
                 if output.status.success() {
-                    tracing::info!("Successfully reloaded openresty");
+                    tracing::info!("Successfully reloaded nginx");
                 } else {
                     tracing::error!(
                         exit_code = ?output.status.code(),
                         stderr = ?String::from_utf8_lossy(&output.stderr),
                         stdout = ?String::from_utf8_lossy(&output.stdout),
-                        "Failed to reload openresty"
+                        "Failed to reload nginx"
                     );
                 }
             }
             Err(e) => {
-                tracing::error!(error = ?e, "Failed to execute systemctl reload openresty");
+                tracing::error!(error = ?e, "Failed to execute reload nginx");
             }
         }
     }
