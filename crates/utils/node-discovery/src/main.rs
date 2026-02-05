@@ -28,9 +28,8 @@ struct ReloadOpenResty;
 #[async_trait]
 impl ClusterUpdateNotifier for ReloadOpenResty {
     async fn on_cluster_update(&self, _cluster_info: &ClusterInfo) {
-        match Command::new("systemctl")
-            .arg("reload")
-            .arg("openresty")
+        match Command::new("/usr/local/openresty/nginx/sbin/nginx")
+            .args(["-g", "daemon on; master_process on;", "-s", "reload"])
             .output()
             .await
         {
