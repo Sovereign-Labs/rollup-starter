@@ -17,52 +17,9 @@ use std::str::FromStr;
 use sov_address::EthereumAddress;
 use sov_modules_api::capabilities::RollupHeight;
 
-#[cfg(all(
-    feature = "mock_da",
-    feature = "mock_da_external",
-    feature = "celestia_da"
-))]
-compile_error!("mock_da,mock_da_external and celestia_da are enabled, but only one should be.");
 
-#[cfg(all(feature = "mock_da", feature = "celestia_da"))]
-compile_error!("Both mock_da and celestia_da are enabled, but only one should be.");
-
-#[cfg(all(feature = "mock_da", feature = "mock_da_external"))]
-compile_error!("Both mock_da and mock_da_external are enabled, but only one should be.");
-
-#[cfg(all(feature = "mock_da_external", feature = "celestia_da"))]
-compile_error!("Both mock_da_external and celestia_da are enabled, but only one should be.");
-
-#[cfg(all(
-    not(feature = "mock_da"),
-    not(feature = "celestia_da"),
-    not(feature = "mock_da_external")
-))]
-compile_error!("Neither mock_da and celestia_da are enabled, but only one should be.");
-
-// Ensure exactly one zkvm feature is enabled
-const _: () = {
-    let risc0 = cfg!(feature = "risc0") as u8;
-    let sp1 = cfg!(feature = "sp1") as u8;
-    let mock_zkvm = cfg!(feature = "mock_zkvm") as u8;
-    let count = risc0 + sp1 + mock_zkvm;
-
-    assert!(
-        count == 1,
-        "Exactly one zkvm feature must be enabled: risc0, sp1, or mock_zkvm"
-    );
-};
-
-#[cfg(feature = "mock_da")]
-const ROLLUP_CONFIG_PATH: &str = "configs/mock/rollup.toml";
-#[cfg(feature = "mock_da_external")]
-const ROLLUP_CONFIG_PATH: &str = "configs/mock/rollup_external_mock_da.toml";
-#[cfg(feature = "celestia_da")]
 const ROLLUP_CONFIG_PATH: &str = "configs/celestia/rollup.toml";
 
-#[cfg(any(feature = "mock_da", feature = "mock_da_external"))]
-const GENESIS_PATH: &str = "configs/mock/genesis.json";
-#[cfg(feature = "celestia_da")]
 const GENESIS_PATH: &str = "configs/celestia/genesis.json";
 
 fn default_genesis_path() -> PathBuf {

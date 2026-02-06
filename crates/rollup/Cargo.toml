@@ -33,7 +33,6 @@ sov-sequencer = { workspace = true }
 sov-rest-utils = { workspace = true }
 sov-eip712-auth = { workspace = true }
 sov-rollup-interface = { workspace = true }
-sov-mock-da = { workspace = true, features = ["native"], optional = true }
 sov-celestia-adapter = { workspace = true, features = ["native", ], optional = true }
 
 axum = { workspace = true }
@@ -48,11 +47,7 @@ tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
 sha2 = { workspace = true }
 prometheus_exporter = { workspace = true }
 
-risc0-starter = { path = "../provers/risc0", optional = true }
-sp1-starter = { path = "../provers/sp1", optional = true }
 stf-starter = { workspace = true, default-features = false, features = ["native"] }
-sov-risc0-adapter = { workspace = true, features = ["native"], optional = true }
-sov-sp1-adapter = { workspace = true, features = ["native"], optional = true }
 
 # binary dependencies
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
@@ -68,12 +63,8 @@ futures = { version = "0.3", default-features = false }
 sov-address = { workspace = true, features = ["evm"] }
 
 [features]
-default = ["mock_da", "mock_zkvm"]
-mock_da = ["sov-mock-da", "stf-starter/mock_da"]
-mock_da_external = ["sov-mock-da", "stf-starter/mock_da_external"]
+default = ["celestia_da", "mock_zkvm"]
 celestia_da = ["sov-celestia-adapter", "stf-starter/celestia_da"]
-sp1 = ["sov-sp1-adapter", "sp1-starter"]
-risc0 = ["sov-risc0-adapter", "risc0-starter"]
 mock_zkvm = []
 acceptance-testing = ["stf-starter/acceptance-testing"]
 
@@ -84,8 +75,3 @@ path = "src/bin/rollup.rs"
 [[bin]]
 name = "starter-cli-wallet"
 path = "src/bin/starter_cli_wallet.rs"
-
-[[bin]]
-name = "mock-da-server"
-path = "src/bin/mock_da.rs"
-required-features = ["mock_da_external"]

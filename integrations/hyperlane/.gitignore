@@ -1,6 +1,0 @@
-keys/*
-!keys/.gitkeep
-.env
-docker-data/*
-configs/**/addresses.yaml
-configs/deployments

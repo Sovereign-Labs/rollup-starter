@@ -3,14 +3,10 @@
 rollup-state/
 rollup-starter-data/
 rollup-starter-data-external/
-/crates/provers/risc0/guest-mock/target
-/crates/provers/sp1/guest-celestia/elf/riscv32im-succinct-zkvm-elf
-/crates/provers/sp1/guest-mock/elf/riscv32im-succinct-zkvm-elf
 docker/credentials/*
 !docker/credentials/bridge-0.addr
 !docker/credentials/bridge-0.key
 .keys
-**/mock_da.sqlite*
 .artifacts
 **/node_modules
 **/dist
@@ -19,7 +15,6 @@ docker/credentials/*
 docker/observability
 test-data/rollup-starter-data-celestia
 test-data/rollup-starter-data
-test-data/mock_da.sqlite*
 test-data/docker
 scripts/rollup-starter.sh
 scripts/rollup-starter-celestia.sh

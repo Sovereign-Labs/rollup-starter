@@ -37,7 +37,6 @@ stf-starter-declaration = { workspace = true }
 sov-address = { workspace = true, features = ["evm"] }
 sov-modules-api = { workspace = true }
 sov-mock-zkvm = { workspace = true }
-sov-mock-da = { workspace = true, optional = true }
 sov-celestia-adapter = { workspace = true, optional = true }
 serde_json = { workspace = true }
 sov-universal-wallet = { workspace = true, features = ["serde"] }
@@ -45,8 +44,6 @@ sov-build = { workspace = true }
 
 [features]
 default = []
-mock_da = ["sov-mock-da"]
-mock_da_external = ["sov-mock-da"]
 celestia_da = ["sov-celestia-adapter"]
 acceptance-testing = ["stf-starter-declaration/acceptance-testing"]
 native = [
@@ -62,7 +59,6 @@ native = [
 	"sov-sequencer-registry/native",
 	"sov-bank/native",
 	"sov-address/native",
-	"sov-mock-da?/native",
 	"sov-celestia-adapter?/native",
 	"sov-mock-zkvm/native",
 	"sov-evm/native",
