@@ -6,10 +6,8 @@ use sov_hyperlane_integration::HyperlaneAddress;
 use sov_modules_api::capabilities::TransactionAuthenticator;
 #[cfg(feature = "native")]
 use sov_modules_api::prelude::*;
-use sov_modules_api::Context;
 use sov_modules_api::OperatingMode;
 use sov_modules_api::Spec;
-use sov_modules_api::TxState;
 use sov_rollup_interface::da::DaSpec;
 pub use stf_starter_declaration::GenesisConfig;
 pub use stf_starter_declaration::Mailbox;
@@ -104,40 +102,6 @@ where
             EvmAndEip712AuthenticatorInput::Eip712(call) => call,
             EvmAndEip712AuthenticatorInput::Standard(call) => call,
         }
-    }
-
-    fn is_unauthorized_system_tx(
-        &self,
-        call: &Self::Decodable,
-        context: &Context<S>,
-        state: &mut impl TxState<S>,
-    ) -> bool {
-        match call {
-            Self::Decodable::ChainState(sov_chain_state::CallMessage::SetOracleTime { .. }) => {
-                // Reject tx conservatively if a preferred sequencer is not registered
-                let Ok(Some((_, preferred_sequencer_address))) =
-                    self.0.sequencer_registry.get_preferred_sequencer(state)
-                else {
-                    return true;
-                };
-                // The tx is unauthorized if it's not from the preferred sequencer
-                context.sequencer() != &preferred_sequencer_address
-            }
-            // All non oracle calls are allowed
-            _ => false,
-        }
-    }
-
-    #[cfg(feature = "native")]
-    fn maybe_set_oracle_timestamp(
-        &self,
-        millis_since_epoch: i64,
-    ) -> Option<<Self as sov_modules_api::DispatchCall>::Decodable> {
-        Some(Self::Decodable::ChainState(
-            sov_chain_state::CallMessage::SetOracleTime {
-                milliseconds_since_epoch: millis_since_epoch,
-            },
-        ))
     }
 
     #[cfg(feature = "native")]

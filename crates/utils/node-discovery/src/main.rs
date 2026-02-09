@@ -3,7 +3,7 @@
 //! This binary connects to a PostgreSQL database and subscribes to cluster
 //! information updates, writing the current cluster state to an output file.
 use clap::Parser;
-use sov_proxy_utils::NodeDiscovery;
+use sov_proxy_utils::{NodeDiscovery, SimpleClusterUpdateNotifier};
 
 #[derive(Parser)]
 #[command(name = "node-discovery")]
@@ -32,7 +32,8 @@ async fn main() {
     tracing::info!("Starting node discovery.");
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
-    let (node_discovery, _) = NodeDiscovery::new_with_max_age(&args.database_url, max_age)
+    let (notifier, _receiver) = SimpleClusterUpdateNotifier::new();
+    let mut node_discovery = NodeDiscovery::new(&args.database_url, max_age, Box::new(notifier))
         .await
         .expect("Failed to create NodeDiscovery");
 
