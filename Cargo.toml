@@ -70,6 +70,7 @@ sov-soak-testing = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git"
 sov-eip712-auth = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3319187722e367dca6bfa743b28f6783e6121c0a" }
 sov-rest-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3319187722e367dca6bfa743b28f6783e6121c0a" }
 sov-proxy-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3319187722e367dca6bfa743b28f6783e6121c0a" }
+sov-eth-client = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "3319187722e367dca6bfa743b28f6783e6121c0a" }
 stf-starter = { path = "./crates/stf", default-features = false }
 stf-starter-declaration = { path = "./crates/stf/stf-declaration", default-features = false }
 node-discovery = { path = "./crates/utils/node-discovery", default-features = false }
@@ -78,9 +79,9 @@ strum = { version = "0.26.3", features = ["derive"] }
 
 alloy = { version = "1.0.37", default-features = false, features = ["std", "essentials"] }
 alloy-consensus = { version = "1.0.37", default-features = false }
-alloy-eips = { version = "1.0.37", default-features = false }
 alloy-primitives = { version = "1.4.0", default-features = false }
-alloy-signer = { version = "1.0.37", default-features = false }
+alloy-rpc-types = { version = "1.0.37", default-features = false, features = ["eth"] }
+alloy-sol-types = { version = "1.4.0", default-features = false }
 axum = { version = "0.7.9", default-features = false }
 serde = { version = "1.0.192", features = ["derive", "rc"] }
 serde_json = { version = "1.0" }

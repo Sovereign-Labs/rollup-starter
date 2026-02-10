@@ -19,6 +19,7 @@ use tracing::{debug, info};
 
 use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
 pub mod fetch_and_compare;
+mod evm_contracts;
 pub mod evm_soak;
 mod state_consistency;
 
