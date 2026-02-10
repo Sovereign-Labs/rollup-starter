@@ -118,7 +118,7 @@
   "evm": {
     "accounts": [],
     "contract_creation_policy": "everyone",
-    "initial_base_fee": 0,
+    "initial_base_fee": 10,
     "genesis_timestamp": 0,
     "admin": "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085",
     "chain_spec": {
