@@ -6058,6 +6058,7 @@ checksum = "a5b0c77c1b780822bc749a33e39aeb2c07584ab93332303babeabb645298a76e"
 name = "node-discovery"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "clap",
  "sov-proxy-utils",
  "tokio",
