@@ -494,7 +494,9 @@ pub async fn run_soak(
         }
     }
 
-    tx.send(true)?;
+    if tx.send(true).is_err() {
+        debug!("Soak worker channel closed; workers already shut down");
+    }
     _ = worker_set.join_all();
 
     // Wait for rollup to finish if it hasn't already
