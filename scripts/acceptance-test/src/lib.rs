@@ -291,7 +291,7 @@ pub fn build_rollup(root_dir: PathBuf) -> anyhow::Result<()> {
 
 /// Send SIGINT to the rollup process to gracefully shut it down.
 /// If the process doesn't respond within 10 seconds, send SIGKILL.
-fn kill_rollup(rollup_id: u32) {
+pub fn kill_rollup(rollup_id: u32) {
     tracing::info!("Sending SIGINT to rollup process {}", rollup_id);
 
     // Send SIGINT
@@ -497,7 +497,19 @@ pub async fn run_soak(
     if tx.send(true).is_err() {
         debug!("Soak worker channel closed; workers already shut down");
     }
-    _ = worker_set.join_all();
+    let worker_errors: Vec<_> = worker_set
+        .join_all()
+        .await
+        .into_iter()
+        .filter_map(Result::err)
+        .collect();
+    if !worker_errors.is_empty() {
+        for (idx, err) in worker_errors.iter().enumerate() {
+            tracing::error!("Worker task failed during shutdown ({}): {}", idx + 1, err);
+        }
+        kill_rollup(rollup_id);
+        anyhow::bail!("{} worker task(s) failed during shutdown", worker_errors.len());
+    }
 
     // Wait for rollup to finish if it hasn't already
     if let Ok(rollup_result) = rollup_rx.try_recv() {

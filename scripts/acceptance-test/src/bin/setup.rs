@@ -3,7 +3,8 @@ use std::process::Command;
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
     build_rollup, cleanup_postgres_container, generate_postgres_password, get_rollup_client,
-    interpolate_config, run_soak, start_and_wait_for_postgres_ready, wait_for_sequencer_ready,
+    interpolate_config, kill_rollup, run_soak, start_and_wait_for_postgres_ready,
+    wait_for_sequencer_ready,
     Directories, Runtime, Spec, ThroughputReport, API_URL, NUM_SOAK_BATCHES,
     POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
 };
@@ -122,7 +123,7 @@ async fn main() -> Result<(), anyhow::Error> {
         "Starting rollup from rollup workspace root: {}",
         directories.rollup_root.display()
     );
-    let rollup = Command::new("cargo")
+    let mut rollup = Command::new("cargo")
         .args([
             "run",
             "--release",
@@ -145,7 +146,6 @@ async fn main() -> Result<(), anyhow::Error> {
             &stop_at_height.to_string(),
         ])
         .current_dir(directories.rollup_root.clone())
-        .env("RUST_LOG", "info")
         .stdout(std::fs::File::create(
             directories.output_dir.join("rollup.log"),
         )?)
@@ -153,8 +153,18 @@ async fn main() -> Result<(), anyhow::Error> {
         .expect("Failed to start rollup");
 
     // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
-    do_manual_setup(directories.clone()).await?;
-    let res = run_soak(directories.clone(), rollup, 3, stop_at_height, true).await;
+    // If manual setup fails, skip soak and stop the rollup process so cleanup can proceed.
+    let res = match do_manual_setup(directories.clone()).await {
+        Ok(()) => run_soak(directories.clone(), rollup, 3, stop_at_height, true).await,
+        Err(err) => {
+            warn!("Manual setup failed, skipping soak run: {err}");
+            kill_rollup(rollup.id());
+            if let Err(wait_err) = rollup.wait() {
+                warn!("Failed to wait for rollup process after manual setup failure: {wait_err}");
+            }
+            Err(err)
+        }
+    };
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
     if let Ok(throughput_report) = res {
         let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
