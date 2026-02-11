@@ -44,8 +44,11 @@ async fn main() {
     .expect("Failed to create NodeDiscovery");
 
     let task = node_discovery.spawn();
-    task.handle
+
+    tokio::signal::ctrl_c()
         .await
-        .unwrap_or_else(|e| panic!("Node discovery task panicked: {e:?}"))
-        .unwrap_or_else(|e| panic!("Failed to start node discovery loop: {e:?}"));
+        .expect("Failed to listen for ctrl+c");
+
+    tracing::info!("Shutting down node discovery.");
+    task.abort();
 }
