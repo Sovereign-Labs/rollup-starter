@@ -17,7 +17,7 @@ struct ReloadOpenResty {
 #[async_trait]
 impl ClusterUpdateNotifier for ReloadOpenResty {
     async fn on_cluster_update(&mut self, _cluster_info: &ClusterInfo) -> anyhow::Result<()> {
-        let reload_error = match Command::new(&self.nginx_binary)
+        let reload_result = match Command::new(&self.nginx_binary)
             .args(["-s", "reload"])
             .output()
             .await
@@ -25,9 +25,9 @@ impl ClusterUpdateNotifier for ReloadOpenResty {
             Ok(output) => {
                 if output.status.success() {
                     tracing::info!("Successfully reloaded nginx");
-                    None
+                    Ok(())
                 } else {
-                    Some(anyhow::anyhow!(
+                    Err(anyhow::anyhow!(
                         "Failed to reload nginx (exit_code={:?}, stderr={}, stdout={})",
                         output.status.code(),
                         String::from_utf8_lossy(&output.stderr),
@@ -35,10 +35,10 @@ impl ClusterUpdateNotifier for ReloadOpenResty {
                     ))
                 }
             }
-            Err(error) => Some(anyhow::anyhow!("Failed to execute reload nginx: {error}")),
+            Err(error) => Err(anyhow::anyhow!("Failed to execute reload nginx: {error}")),
         };
 
-        if let Some(error) = reload_error {
+        if let Err(error) = reload_result {
             tracing::error!(?error, "Failed to reload nginx");
             return Err(error);
         }
