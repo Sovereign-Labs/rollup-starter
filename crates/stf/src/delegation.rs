@@ -210,6 +210,7 @@ where
             accounts: &mut self.0.accounts,
             uniqueness: &mut self.0.uniqueness,
             gas_payer: &mut self.0.paymaster,
+            chain_state: &mut self.0.chain_state,
             operator_incentives: &mut self.0.operator_incentives,
             attester_incentives: &mut self.0.attester_incentives,
             prover_incentives: &mut self.0.prover_incentives,

@@ -6,10 +6,9 @@ use sov_hyperlane_integration::HyperlaneAddress;
 use sov_modules_api::capabilities::TransactionAuthenticator;
 #[cfg(feature = "native")]
 use sov_modules_api::prelude::*;
-use sov_modules_api::Context;
 use sov_modules_api::OperatingMode;
 use sov_modules_api::Spec;
-use sov_modules_api::TxState;
+use sov_modules_api::{Context, TxState};
 use sov_rollup_interface::da::DaSpec;
 pub use stf_starter_declaration::GenesisConfig;
 pub use stf_starter_declaration::Mailbox;
@@ -75,6 +74,7 @@ where
             &serde_json::from_str(__generated::SCHEMA_JSON)
                 .expect("Failed to deserialize schema json"),
             Self::CHAIN_HASH.into(),
+            api_state.checkpoint_receiver(),
         )
         .expect("Failed to initialize StandardSchemaEndpoint");
         let axum_router = axum_router.merge(schema_endpoint.axum_router());
@@ -126,18 +126,6 @@ where
             // All non oracle calls are allowed
             _ => false,
         }
-    }
-
-    #[cfg(feature = "native")]
-    fn maybe_set_oracle_timestamp(
-        &self,
-        millis_since_epoch: i64,
-    ) -> Option<<Self as sov_modules_api::DispatchCall>::Decodable> {
-        Some(Self::Decodable::ChainState(
-            sov_chain_state::CallMessage::SetOracleTime {
-                milliseconds_since_epoch: millis_since_epoch,
-            },
-        ))
     }
 
     #[cfg(feature = "native")]
