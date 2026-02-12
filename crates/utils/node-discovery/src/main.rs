@@ -9,12 +9,14 @@ use clap::Parser;
 use sov_proxy_utils::{ClusterInfo, ClusterInfoService, ClusterUpdateNotifier};
 use tokio::process::Command;
 
-struct ReloadOpenResty;
+struct ReloadOpenResty {
+    nginx_binary: PathBuf,
+}
 
 #[async_trait]
 impl ClusterUpdateNotifier for ReloadOpenResty {
     async fn on_cluster_update(&self, _cluster_info: &ClusterInfo) {
-        match Command::new("/usr/local/openresty/nginx/sbin/nginx")
+        match Command::new(&self.nginx_binary)
             .args(["-s", "reload"])
             .output()
             .await
@@ -46,12 +48,19 @@ struct Args {
     database_url: String,
 
     /// Output file path.
-    #[arg(long)]
+    #[arg(
+        long,
+        default_value = "/usr/local/openresty/nginx/conf/cluster_info.txt"
+    )]
     output_file: String,
 
     /// Maximum age (in milliseconds) for cached cluster information.
     #[arg(long, default_value = "1000")]
     max_age_millis: u64,
+
+    /// Nginx binary used for reload command (`<binary> -s reload`).
+    #[arg(long, default_value = "/usr/local/openresty/nginx/sbin/nginx")]
+    nginx_binary: String,
 }
 
 #[tokio::main]
@@ -61,7 +70,6 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let args = Args::parse();
-
     tracing::info!("Starting node discovery.");
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
@@ -70,7 +78,9 @@ async fn main() -> anyhow::Result<()> {
         &args.database_url,
         max_age,
         PathBuf::from(&args.output_file),
-        Some(Box::new(ReloadOpenResty)),
+        Some(Box::new(ReloadOpenResty {
+            nginx_binary: PathBuf::from(args.nginx_binary),
+        })),
     )
     .await?;
 
