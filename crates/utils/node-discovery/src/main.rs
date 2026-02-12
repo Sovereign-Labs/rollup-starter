@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use clap::Parser;
+use sov_metrics::{init_metrics_tracker, MonitoringConfig};
 use sov_proxy_utils::{ClusterInfo, ClusterInfoService, ClusterUpdateNotifier};
 use tokio::process::Command;
 
@@ -98,6 +99,12 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,sqlx=info,hyper=info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
+    let (metrics_shutdown_sender, mut metrics_shutdown_receiver) = tokio::sync::watch::channel(());
+    metrics_shutdown_receiver.mark_unchanged();
+
+    let monitoring_config = MonitoringConfig::standard();
+    init_metrics_tracker(&monitoring_config, metrics_shutdown_receiver.clone());
+
     let args = Args::parse();
     tracing::info!("Starting node discovery.");
 
@@ -114,6 +121,7 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     cluster_info_service.join().await?;
+    let _ = metrics_shutdown_sender.send(());
 
     Ok(())
 }
