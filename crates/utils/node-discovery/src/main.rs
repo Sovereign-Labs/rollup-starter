@@ -2,7 +2,6 @@
 //!
 //! This binary connects to a PostgreSQL database and subscribes to cluster
 //! information updates, writing the current cluster state to an output file.
-use std::io::Write;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -13,32 +12,6 @@ use tokio::process::Command;
 
 struct ReloadOpenResty {
     nginx_binary: PathBuf,
-}
-
-#[derive(Debug)]
-struct NginxReloadFailureMetric {
-    reason: &'static str,
-}
-
-impl sov_metrics::Metric for NginxReloadFailureMetric {
-    fn measurement_name(&self) -> &'static str {
-        "sov_proxy_nginx_reload_failure"
-    }
-
-    fn serialize_for_telegraf(&self, buffer: &mut Vec<u8>) -> std::io::Result<()> {
-        write!(
-            buffer,
-            "{},reason={} failures=1",
-            self.measurement_name(),
-            self.reason,
-        )
-    }
-}
-
-fn emit_nginx_reload_failure_metric(reason: &'static str) {
-    sov_metrics::track_metrics(|tracker| {
-        tracker.submit(NginxReloadFailureMetric { reason });
-    });
 }
 
 #[async_trait]
@@ -53,7 +26,6 @@ impl ClusterUpdateNotifier for ReloadOpenResty {
                 if output.status.success() {
                     tracing::info!("Successfully reloaded nginx");
                 } else {
-                    emit_nginx_reload_failure_metric("nonzero_exit");
                     tracing::error!(
                         exit_code = ?output.status.code(),
                         stderr = ?String::from_utf8_lossy(&output.stderr),
@@ -63,10 +35,9 @@ impl ClusterUpdateNotifier for ReloadOpenResty {
                 }
             }
             Err(e) => {
-                emit_nginx_reload_failure_metric("command_error");
                 tracing::error!(error = ?e, "Failed to execute reload nginx");
             }
-        }
+        };
     }
 }
 
