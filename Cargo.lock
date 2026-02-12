@@ -6061,6 +6061,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "sov-metrics",
  "sov-proxy-utils",
  "tokio",
  "tracing",
