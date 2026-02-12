@@ -43,7 +43,7 @@ fn emit_nginx_reload_failure_metric(reason: &'static str) {
 
 #[async_trait]
 impl ClusterUpdateNotifier for ReloadOpenResty {
-    async fn on_cluster_update(&self, _cluster_info: &ClusterInfo) {
+    async fn on_cluster_update(&mut self, _cluster_info: &ClusterInfo) {
         match Command::new(&self.nginx_binary)
             .args(["-s", "reload"])
             .output()
