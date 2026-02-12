@@ -4,8 +4,39 @@
 //! information updates, writing the current cluster state to an output file.
 use std::path::PathBuf;
 
+use async_trait::async_trait;
 use clap::Parser;
-use sov_proxy_utils::ClusterInfoService;
+use sov_proxy_utils::{ClusterInfo, ClusterInfoService, ClusterUpdateNotifier};
+use tokio::process::Command;
+
+struct ReloadOpenResty;
+
+#[async_trait]
+impl ClusterUpdateNotifier for ReloadOpenResty {
+    async fn on_cluster_update(&self, _cluster_info: &ClusterInfo) {
+        match Command::new("/usr/local/openresty/nginx/sbin/nginx")
+            .args(["-s", "reload"])
+            .output()
+            .await
+        {
+            Ok(output) => {
+                if output.status.success() {
+                    tracing::info!("Successfully reloaded nginx");
+                } else {
+                    tracing::error!(
+                        exit_code = ?output.status.code(),
+                        stderr = ?String::from_utf8_lossy(&output.stderr),
+                        stdout = ?String::from_utf8_lossy(&output.stdout),
+                        "Failed to reload nginx"
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = ?e, "Failed to execute reload nginx");
+            }
+        }
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "node-discovery")]
@@ -26,7 +57,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,sqlx=info"));
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,sqlx=info,hyper=info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let args = Args::parse();
@@ -39,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
         &args.database_url,
         max_age,
         PathBuf::from(&args.output_file),
-        None,
+        Some(Box::new(ReloadOpenResty)),
     )
     .await?;
 

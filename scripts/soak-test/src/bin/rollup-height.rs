@@ -1,0 +1,78 @@
+use std::time::Duration;
+
+use anyhow::Context;
+use clap::Parser;
+use serde::Deserialize;
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long, default_value = "http://localhost:12346")]
+    /// The URL of the rollup node to connect to.
+    api_url: String,
+
+    #[arg(short = 'i', long, default_value_t = 1000)]
+    /// Poll interval in milliseconds.
+    interval_ms: u64,
+}
+
+#[derive(Deserialize, Debug)]
+struct ValueResponse<T> {
+    value: T,
+}
+
+async fn read_rollup_height(client: &sov_api_spec::Client, api_url: &str) -> anyhow::Result<u64> {
+    let endpoint = format!(
+        "{}/modules/chain-state/state/current-heights/",
+        api_url.trim_end_matches('/')
+    );
+
+    let response = client
+        .client()
+        .get(&endpoint)
+        .send()
+        .await
+        .context("failed to request current-heights")?
+        .error_for_status()
+        .context("current-heights endpoint returned an error status")?;
+
+    let heights = response
+        .json::<ValueResponse<(u64, u64)>>()
+        .await
+        .context("failed to decode current-heights response")?;
+
+    Ok(heights.value.0)
+}
+
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
+    let args = Args::parse();
+    let poll_every_ms = args.interval_ms.max(1);
+    let reqwest_client = reqwest::ClientBuilder::new()
+        .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(10))
+        .build()?;
+    let client = sov_api_spec::Client::new_with_client(&args.api_url, reqwest_client);
+    let mut interval = tokio::time::interval(Duration::from_millis(poll_every_ms));
+
+    println!(
+        "Polling rollup height from {} every {}ms. Press Ctrl+C to stop.",
+        args.api_url, poll_every_ms
+    );
+
+    loop {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                println!("Stopping rollup height poller.");
+                break;
+            }
+            _ = interval.tick() => {
+                match read_rollup_height(&client, &args.api_url).await {
+                    Ok(height) => println!("rollup_height={height}"),
+                    Err(err) => eprintln!("failed to read rollup height: {err:#}"),
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
