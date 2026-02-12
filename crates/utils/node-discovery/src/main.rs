@@ -91,6 +91,10 @@ struct Args {
     /// Nginx binary used for reload command (`<binary> -s reload`).
     #[arg(long, default_value = "/usr/local/openresty/nginx/sbin/nginx")]
     nginx_binary: String,
+
+    /// UDP port for sov-metrics telegraf exporter.
+    #[arg(long, default_value_t = 8094)]
+    metrics_port: u16,
 }
 
 #[tokio::main]
@@ -99,14 +103,14 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,sqlx=info,hyper=info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
+    let args = Args::parse();
+    tracing::info!("Starting node discovery.");
+
     let (metrics_shutdown_sender, mut metrics_shutdown_receiver) = tokio::sync::watch::channel(());
     metrics_shutdown_receiver.mark_unchanged();
 
-    let monitoring_config = MonitoringConfig::standard();
+    let monitoring_config = MonitoringConfig::default_on_port(args.metrics_port);
     init_metrics_tracker(&monitoring_config, metrics_shutdown_receiver.clone());
-
-    let args = Args::parse();
-    tracing::info!("Starting node discovery.");
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
 
