@@ -10,12 +10,13 @@ use sov_metrics::{init_metrics_tracker, MonitoringConfig};
 use sov_proxy_utils::{ClusterInfo, ClusterInfoService, ClusterUpdateNotifier};
 use tokio::process::Command;
 
-struct ReloadOpenResty {
+struct ReloadNginx {
     nginx_binary: PathBuf,
 }
 
-impl ReloadOpenResty {
-    async fn reload_result(&self) -> anyhow::Result<()> {
+#[async_trait]
+impl ClusterUpdateNotifier for ReloadNginx {
+    async fn on_cluster_update(&mut self, _cluster_info: &ClusterInfo) -> anyhow::Result<()> {
         match Command::new(&self.nginx_binary)
             .args(["-s", "reload"])
             .output()
@@ -36,20 +37,6 @@ impl ReloadOpenResty {
             }
             Err(error) => anyhow::bail!("Failed to execute reload nginx: {error}"),
         }
-    }
-}
-
-#[async_trait]
-impl ClusterUpdateNotifier for ReloadOpenResty {
-    async fn on_cluster_update(&mut self, _cluster_info: &ClusterInfo) -> anyhow::Result<()> {
-        let reload_result = self.reload_result().await;
-
-        if let Err(error) = reload_result {
-            tracing::error!(?error, "Failed to reload nginx");
-            return Err(error);
-        }
-
-        Ok(())
     }
 }
 
@@ -101,13 +88,15 @@ async fn main() -> anyhow::Result<()> {
         &args.database_url,
         max_age,
         PathBuf::from(&args.output_file),
-        Some(Box::new(ReloadOpenResty {
+        Some(Box::new(ReloadNginx {
             nginx_binary: PathBuf::from(args.nginx_binary),
         })),
     )
     .await?;
 
-    cluster_info_service.join().await?;
+    if let Err(err) = cluster_info_service.join().await {
+        tracing::error!(?err, "Failed to join cluster info service");
+    }
     let _ = metrics_shutdown_sender.send(());
 
     Ok(())
