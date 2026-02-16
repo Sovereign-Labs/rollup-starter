@@ -7,16 +7,23 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use clap::Parser;
 use sov_metrics::{init_metrics_tracker, MonitoringConfig};
-use sov_proxy_utils::{ClusterInfo, ClusterInfoService, ClusterUpdateNotifier};
+use sov_proxy_utils::{
+    write_to_file_atomically, ClusterInfo, ClusterInfoService, ClusterUpdateNotifier,
+};
 use tokio::process::Command;
 
 struct ReloadNginx {
     nginx_binary: PathBuf,
+    config_path: PathBuf,
 }
 
-#[async_trait]
-impl ClusterUpdateNotifier for ReloadNginx {
-    async fn on_cluster_update(&mut self, _cluster_info: &ClusterInfo) -> anyhow::Result<()> {
+impl ReloadNginx {
+    async fn write_config(&self, cluster_info: &ClusterInfo) -> anyhow::Result<()> {
+        let content = to_lua_backend_cache_content(cluster_info);
+        write_to_file_atomically(&self.config_path, &content).await
+    }
+
+    async fn reload(&self) -> anyhow::Result<()> {
         match Command::new(&self.nginx_binary)
             .args(["-s", "reload"])
             .output()
@@ -37,6 +44,14 @@ impl ClusterUpdateNotifier for ReloadNginx {
             }
             Err(error) => anyhow::bail!("Failed to execute reload nginx: {error}"),
         }
+    }
+}
+
+#[async_trait]
+impl ClusterUpdateNotifier for ReloadNginx {
+    async fn on_cluster_update(&mut self, _cluster_info: &ClusterInfo) -> anyhow::Result<()> {
+        self.write_config(_cluster_info).await?;
+        self.reload().await
     }
 }
 
@@ -84,12 +99,15 @@ async fn main() -> anyhow::Result<()> {
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
 
+    let config_path = PathBuf::from(args.output_file);
+    write_to_file_atomically(&config_path, "").await?;
+
     let cluster_info_service = ClusterInfoService::spawn(
         &args.database_url,
         max_age,
-        PathBuf::from(&args.output_file),
         Some(Box::new(ReloadNginx {
             nginx_binary: PathBuf::from(args.nginx_binary),
+            config_path,
         })),
     )
     .await?;
@@ -100,4 +118,25 @@ async fn main() -> anyhow::Result<()> {
     let _ = metrics_shutdown_sender.send(());
 
     Ok(())
+}
+
+fn to_lua_backend_cache_content(cluster_info: &ClusterInfo) -> String {
+    let mut lines = vec![
+        "local c = ngx.shared.backend_cache".to_string(),
+        "c:flush_all()".to_string(),
+    ];
+
+    if let Some(leader) = &cluster_info.leader {
+        lines.push(format!("c:set(\"leader\", \"{}\")", leader.address));
+    }
+
+    for (index, follower) in cluster_info.followers.values().enumerate() {
+        lines.push(format!(
+            "  c:set(\"follower_{}\", \"{}\")",
+            index + 1,
+            follower.address
+        ));
+    }
+
+    lines.join("\n")
 }
