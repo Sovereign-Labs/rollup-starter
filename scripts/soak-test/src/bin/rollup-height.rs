@@ -47,10 +47,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut interval = tokio::time::interval(Duration::from_millis(poll_every_ms));
 
     loop {
+        interval.tick().await;
         match read_rollup_height(&client, &args.api_url).await {
             Ok(height) => println!("rollup_height={height}"),
             Err(err) => eprintln!("failed to read rollup height: {err:#}"),
         }
-        interval.tick().await;
     }
 }
