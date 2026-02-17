@@ -17,5 +17,3 @@ clap = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
-sov-metrics = { workspace = true }
-async-trait = { workspace = true }
