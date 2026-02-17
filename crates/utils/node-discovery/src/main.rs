@@ -2,8 +2,6 @@
 //!
 //! This binary connects to a PostgreSQL database and subscribes to cluster
 //! information updates, writing the current cluster state to an output file.
-use std::path::PathBuf;
-
 use clap::Parser;
 use sov_proxy_utils::ClusterInfoService;
 
@@ -35,13 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
 
-    let cluster_info_service = ClusterInfoService::spawn(
-        &args.database_url,
-        max_age,
-        PathBuf::from(&args.output_file),
-        None,
-    )
-    .await?;
+    let cluster_info_service = ClusterInfoService::spawn(&args.database_url, max_age, None).await?;
 
     cluster_info_service.join().await?;
 
