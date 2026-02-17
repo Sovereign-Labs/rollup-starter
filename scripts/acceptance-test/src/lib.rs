@@ -517,7 +517,6 @@ pub async fn run_soak(
                         if is_very_close_to_soak_test_end(num_soak_batches) {
                             tracing::debug!("Worker task failed near the end of the test; num_soak_batches: {num_soak_batches}, NUM_SOAK_BATCHES: {NUM_SOAK_BATCHES}, rollup_stop_height: {rollup_stop_height}, err: {e}");
                             tracing::warn!("Worker task failed very near the end of the test. Assuming the rollup shut down.");
-                            break;
                         } else {
                             tracing::error!("Worker task failed: {}", e);
                             kill_rollup(rollup_id);
