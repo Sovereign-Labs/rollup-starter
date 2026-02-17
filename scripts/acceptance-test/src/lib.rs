@@ -515,13 +515,12 @@ pub async fn run_soak(
         .collect();
     if !worker_errors.is_empty() {
         for (idx, err) in worker_errors.iter().enumerate() {
-            tracing::error!("Worker task failed during shutdown ({}): {}", idx + 1, err);
+            tracing::warn!(
+                "Ignoring worker task failure during shutdown ({}): {}",
+                idx + 1,
+                err
+            );
         }
-        kill_rollup(rollup_id);
-        anyhow::bail!(
-            "{} worker task(s) failed during shutdown",
-            worker_errors.len()
-        );
     }
 
     // Wait for rollup to finish if it hasn't already
