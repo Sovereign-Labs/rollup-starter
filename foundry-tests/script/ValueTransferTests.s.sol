@@ -6,6 +6,9 @@ import {console2} from "forge-std/console2.sol";
 import {ValueTransferTester, ValueRejecter, ValueReceiver} from "../src/ValueTransferTester.sol";
 
 contract ValueTransferTests is Script {
+    address constant BROADCAST_SENDER = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+    uint256 constant MIN_REQUIRED_WEI = 1600;
+
     ValueTransferTester tester;
     ValueRejecter rejecter;
     ValueReceiver receiver;
@@ -24,9 +27,20 @@ contract ValueTransferTests is Script {
         console2.log("");
         vm.stopBroadcast();
 
-        testDirectSend();
-        testForwardValue();
-        testRejectValue();
+        uint256 senderBalance = getBalance(BROADCAST_SENDER);
+        if (senderBalance >= MIN_REQUIRED_WEI) {
+            testDirectSend();
+            testForwardValue();
+            testRejectValue();
+        } else {
+            console2.log(
+                "SKIP: sender has insufficient ETH for positive-value sends (balance:",
+                senderBalance,
+                "wei)"
+            );
+            console2.log("");
+        }
+
         testZeroValue();
         testGetBalanceRpc();
 
@@ -94,6 +108,14 @@ contract ValueTransferTests is Script {
 
         require(rpcBalance == localBalance, "eth_getBalance mismatch with address.balance");
         console2.log("PASS: balances match\n");
+    }
+
+    function getBalance(address account) internal returns (uint256) {
+        string memory params = string.concat(
+            '["', vm.toString(account), '","latest"]'
+        );
+        bytes memory rpcResult = vm.rpc("eth_getBalance", params);
+        return decodeRpcQuantity(rpcResult);
     }
 
     function decodeRpcQuantity(bytes memory raw) internal pure returns (uint256 value) {

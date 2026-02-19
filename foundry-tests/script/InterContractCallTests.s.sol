@@ -6,6 +6,9 @@ import {console2} from "forge-std/console2.sol";
 import {Callee, DelegateeLibrary, Caller} from "../src/InterContractCallTester.sol";
 
 contract InterContractCallTests is Script {
+    address constant BROADCAST_SENDER = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+    uint256 constant VALUE_CALL_WEI = 1000;
+
     Callee callee;
     DelegateeLibrary lib;
     Caller caller;
@@ -31,7 +34,17 @@ contract InterContractCallTests is Script {
         testNestedCall();
         testCallNonExistent();
         testDeepCalls();
-        testCallWithValue();
+        uint256 senderBalance = getBalance(BROADCAST_SENDER);
+        if (senderBalance >= VALUE_CALL_WEI) {
+            testCallWithValue();
+        } else {
+            console2.log(
+                "SKIP: sender has insufficient ETH for CALL with value (balance:",
+                senderBalance,
+                "wei)"
+            );
+            console2.log("");
+        }
 
         console2.log("=== Inter-Contract Call Tests Complete ===\n");
     }
@@ -124,14 +137,30 @@ contract InterContractCallTests is Script {
         uint256 balanceBefore = address(callee).balance;
 
         vm.startBroadcast();
-        caller.callWithValue{value: 1000}(address(callee), 7);
+        caller.callWithValue{value: VALUE_CALL_WEI}(address(callee), 7);
         vm.stopBroadcast();
 
         require(callee.value() == 7, "callee value should be 7");
         require(
-            address(callee).balance == balanceBefore + 1000,
-            "callee should have received 1000 wei"
+            address(callee).balance == balanceBefore + VALUE_CALL_WEI,
+            "callee should have received value"
         );
         console2.log("PASS: value transferred through call\n");
+    }
+
+    function getBalance(address account) internal returns (uint256) {
+        string memory params = string.concat(
+            '["', vm.toString(account), '","latest"]'
+        );
+        bytes memory rpcResult = vm.rpc("eth_getBalance", params);
+        return decodeRpcQuantity(rpcResult);
+    }
+
+    function decodeRpcQuantity(bytes memory raw) internal pure returns (uint256 value) {
+        require(raw.length > 0, "rpc quantity must not be empty");
+        require(raw.length <= 32, "rpc quantity too large");
+        for (uint256 i = 0; i < raw.length; i++) {
+            value = (value << 8) | uint8(raw[i]);
+        }
     }
 }

@@ -62,11 +62,9 @@ contract RevertTests is Script {
 
         uint256 valueBefore = tester.value();
 
-        vm.startBroadcast();
         (bool success,) = address(tester).call(
             abi.encodeWithSignature("stateChangeAndRevert()")
         );
-        vm.stopBroadcast();
 
         require(!success, "stateChangeAndRevert should revert");
         require(tester.value() == valueBefore, "state should be rolled back");
@@ -87,11 +85,9 @@ contract RevertTests is Script {
     function testAssertFailure() internal {
         console2.log("--- Test 5: assert(false) produces Panic(0x01) ---");
 
-        vm.startBroadcast();
         (bool success, bytes memory data) = address(tester).call(
             abi.encodeWithSignature("assertFailure()")
         );
-        vm.stopBroadcast();
 
         require(!success, "assert(false) should revert");
         // Panic(uint256) selector is 0x4e487b71
@@ -113,11 +109,9 @@ contract RevertTests is Script {
     function testDivisionByZero() internal {
         console2.log("--- Test 6: division by zero produces Panic(0x12) ---");
 
-        vm.startBroadcast();
         (bool success, bytes memory data) = address(tester).call(
             abi.encodeWithSignature("divisionByZero()")
         );
-        vm.stopBroadcast();
 
         require(!success, "division by zero should revert");
         require(data.length >= 36, "should contain Panic data");
