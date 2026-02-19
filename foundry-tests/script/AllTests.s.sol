@@ -10,6 +10,11 @@ import {MemoryTests} from "./MemoryTests.s.sol";
 import {PrecompileTests} from "./PrecompileTests.s.sol";
 import {CalldataTests} from "./CalldataTests.s.sol";
 import {ContextTests} from "./ContextTests.s.sol";
+import {GasEstimationTests} from "./GasEstimationTests.s.sol";
+import {CallConsistencyTests} from "./CallConsistencyTests.s.sol";
+import {ValueTransferTests} from "./ValueTransferTests.s.sol";
+import {RevertTests} from "./RevertTests.s.sol";
+import {InterContractCallTests} from "./InterContractCallTests.s.sol";
 
 /**
  * @title AllTests
@@ -28,6 +33,11 @@ contract AllTests is Script {
         new PrecompileTests().run();
         new CalldataTests().run();
         new ContextTests().run();
+        new GasEstimationTests().run();
+        new CallConsistencyTests().run();
+        new ValueTransferTests().run();
+        new RevertTests().run();
+        new InterContractCallTests().run();
 
         console2.log("\n========================================");
         console2.log("All Tests Complete\n");
