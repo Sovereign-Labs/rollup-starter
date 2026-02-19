@@ -19,7 +19,7 @@ struct ReloadNginx {
 
 impl ReloadNginx {
     async fn write_config(&self, cluster_info: &ClusterInfo) -> anyhow::Result<()> {
-        let content = to_lua_backend_cache_content(cluster_info);
+        let content = create_lua_backend_cache_content(cluster_info);
         write_to_file_atomically(&self.config_path, &content).await
     }
 
@@ -109,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
 
     let config_path = PathBuf::from(args.output_file);
 
-    let content = to_lua_backend_cache_content(&ClusterInfo::default());
+    let content = create_lua_backend_cache_content(&ClusterInfo::default());
     write_to_file_atomically(&config_path, &content).await?;
 
     let cluster_info_service = ClusterInfoService::spawn(
@@ -133,7 +133,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn to_lua_backend_cache_content(cluster_info: &ClusterInfo) -> String {
+fn create_lua_backend_cache_content(cluster_info: &ClusterInfo) -> String {
     let mut lines = vec![
         "local c = ngx.shared.backend_cache".to_string(),
         "c:flush_all()".to_string(),
@@ -156,7 +156,7 @@ fn to_lua_backend_cache_content(cluster_info: &ClusterInfo) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{to_lua_backend_cache_content, ClusterInfo};
+    use super::{create_lua_backend_cache_content, ClusterInfo};
     use sov_proxy_utils::{NodeInfo, OffsetDateTime};
     use std::collections::BTreeMap;
 
@@ -169,30 +169,30 @@ mod tests {
     }
 
     #[test]
-    fn to_lua_backend_cache_content_for_empty_cluster() {
+    fn test_lua_backend_cache_content_for_empty_cluster() {
         let cluster_info = ClusterInfo::default();
 
         assert_eq!(
-            to_lua_backend_cache_content(&cluster_info),
+            create_lua_backend_cache_content(&cluster_info),
             "local c = ngx.shared.backend_cache\nc:flush_all()"
         );
     }
 
     #[test]
-    fn to_lua_backend_cache_content_with_leader_only() {
+    fn test_lua_backend_cache_content_with_leader_only() {
         let cluster_info = ClusterInfo {
             leader: Some(node_info("leader_id", "127.0.0.1:3030")),
             followers: BTreeMap::new(),
         };
 
         assert_eq!(
-            to_lua_backend_cache_content(&cluster_info),
+            create_lua_backend_cache_content(&cluster_info),
             "local c = ngx.shared.backend_cache\nc:flush_all()\nc:set(\"leader\", \"127.0.0.1:3030\")"
         );
     }
 
     #[test]
-    fn to_lua_backend_cache_content_orders_followers_by_node_id() {
+    fn test_lua_backend_cache_content_orders_followers_by_node_id() {
         let mut followers = BTreeMap::new();
         followers.insert(
             "follower-b".to_owned(),
@@ -209,7 +209,7 @@ mod tests {
         };
 
         assert_eq!(
-            to_lua_backend_cache_content(&cluster_info),
+            create_lua_backend_cache_content(&cluster_info),
             "local c = ngx.shared.backend_cache\nc:flush_all()\nc:set(\"leader\", \"127.0.0.1:3030\")\nc:set(\"follower_1\", \"127.0.0.1:3031\")\nc:set(\"follower_2\", \"127.0.0.1:3032\")"
         );
     }
