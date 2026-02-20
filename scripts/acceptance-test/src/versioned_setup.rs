@@ -398,10 +398,6 @@ pub fn prepare_acceptance_run_plan(
         let interpolated = render_config_template(&config_template_content, password, directories);
         let config_path = versioned_configs_dir.join(format!("config_{}.toml", idx));
         fs::write(&config_path, interpolated)?;
-        if idx == 0 {
-            // Keep this for backward compatibility with existing tooling/scripts.
-            fs::copy(&config_path, directories.output_dir.join("config.toml"))?;
-        }
 
         manager_versions.push(RollupVersion {
             rollup_binary,

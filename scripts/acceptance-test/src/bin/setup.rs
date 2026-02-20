@@ -178,15 +178,16 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     };
     cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
-    if let Ok(throughput_report) = res {
-        let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
-        if should_overwrite_throughput(&throughput_path, &throughput_report) {
-            std::fs::write(&throughput_path, serde_json::to_string(&throughput_report)?)?;
+    match res {
+        Ok(throughput_report) => {
+            let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
+            if should_overwrite_throughput(&throughput_path, &throughput_report) {
+                std::fs::write(&throughput_path, serde_json::to_string(&throughput_report)?)?;
+            }
+            save_mock_data(directories.clone())?;
+            Ok(())
         }
-        save_mock_data(directories.clone())?;
-        Ok(())
-    } else {
-        Err(anyhow!("Data generation failed."))
+        Err(e) => Err(e),
     }
 }
 
