@@ -25,8 +25,8 @@ pub mod fetch_and_compare;
 mod state_consistency;
 mod versioned_setup;
 pub use versioned_setup::{
-    default_binary_cache_dir, extend_last_stop_height, prepare_acceptance_run_plan,
-    spawn_rollup_manager, write_manager_config, AcceptanceRunPlan,
+    extend_last_stop_height, prepare_acceptance_run_plan, spawn_rollup_manager,
+    write_manager_config, AcceptanceRunPlan,
 };
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
@@ -129,6 +129,8 @@ pub fn generate_postgres_password() -> Result<String, anyhow::Error> {
 pub struct Directories {
     pub rollup_root: PathBuf,
     pub acceptance_test_dir: PathBuf,
+    pub rollup_build_cache_dir: PathBuf,
+    pub manager_build_dir: PathBuf,
     pub output_dir: PathBuf,
     pub rollup_data_path: PathBuf,
     pub snapshots_dir: PathBuf,
@@ -148,6 +150,10 @@ impl Directories {
             .unwrap()
             .to_path_buf();
 
+        let rollup_build_cache_dir = acceptance_test_dir.join("rollup-build-cache");
+        fs::create_dir_all(&rollup_build_cache_dir)?;
+        let manager_build_dir = acceptance_test_dir.join("rollup-manager-build");
+
         let output_dir = acceptance_test_dir.join("acceptance-test-data");
         fs::create_dir_all(&output_dir)?;
         let rollup_data_path = output_dir.join("rollup-starter-data");
@@ -164,11 +170,19 @@ impl Directories {
         Ok(Self {
             rollup_root,
             acceptance_test_dir,
+            rollup_build_cache_dir,
+            manager_build_dir,
             output_dir,
             rollup_data_path,
             snapshots_dir,
             throughput_dir,
         })
+    }
+
+    pub fn set_rollup_build_cache_dir(&mut self, path: PathBuf) -> Result<(), anyhow::Error> {
+        fs::create_dir_all(&path)?;
+        self.rollup_build_cache_dir = path;
+        Ok(())
     }
 }
 

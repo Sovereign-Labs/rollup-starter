@@ -59,10 +59,6 @@ pub struct AcceptanceRunPlan {
     pub soak_config: SoakManagerConfig,
 }
 
-pub fn default_binary_cache_dir(directories: &Directories) -> PathBuf {
-    directories.acceptance_test_dir.join("rollup-build-cache")
-}
-
 fn default_build_targets() -> BuildTargets {
     let mut targets = BuildTargets::upgrade_simulator_defaults();
     targets.rollup.features = vec![
@@ -275,8 +271,8 @@ fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, any
 pub fn prepare_acceptance_run_plan(
     directories: &Directories,
     password: &str,
-    binary_cache_dir: &Path,
 ) -> Result<AcceptanceRunPlan, anyhow::Error> {
+    let binary_cache_dir = &directories.rollup_build_cache_dir;
     fs::create_dir_all(binary_cache_dir)?;
 
     let resolved_versions = load_version_sources(directories)?;
@@ -409,8 +405,7 @@ pub fn prepare_acceptance_run_plan(
         soak_versions.push((soak_binary, stop_height));
     }
 
-    let manager_binary =
-        build_rollup_manager_binary(&directories.output_dir.join("rollup-manager-build"))?;
+    let manager_binary = build_rollup_manager_binary(&directories.manager_build_dir)?;
 
     Ok(AcceptanceRunPlan {
         manager_binary,

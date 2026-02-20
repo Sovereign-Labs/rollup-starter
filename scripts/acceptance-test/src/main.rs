@@ -1,6 +1,6 @@
 use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
-    cleanup_postgres_container, default_binary_cache_dir, extend_last_stop_height,
+    cleanup_postgres_container, extend_last_stop_height,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
     generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
     spawn_rollup_manager, start_and_wait_for_postgres_ready, write_manager_config, Directories,
@@ -84,9 +84,10 @@ fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Er
 async fn run_test(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Error> {
     // Generate a config file with our db password and all paths set relative to the workspace root
     let password = generate_postgres_password()?;
-    let directories = Directories::new()?;
-    let binary_cache_dir =
-        binary_cache_dir.unwrap_or_else(|| default_binary_cache_dir(&directories));
+    let mut directories = Directories::new()?;
+    if let Some(binary_cache_dir) = binary_cache_dir {
+        directories.set_rollup_build_cache_dir(binary_cache_dir)?;
+    }
 
     tracing::info!(
         "Removing rollup data path: {}",
@@ -100,7 +101,7 @@ async fn run_test(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Error
     // Start the sequencer postgres and wait for it to be ready
     start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
 
-    let plan = prepare_acceptance_run_plan(&directories, &password, &binary_cache_dir)?;
+    let plan = prepare_acceptance_run_plan(&directories, &password)?;
     let expected_setup_batches = plan
         .manager_versions
         .last()

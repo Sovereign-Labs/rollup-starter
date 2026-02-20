@@ -5,12 +5,11 @@ use acceptance_test::evm_soak::{
 };
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
-    cleanup_postgres_container, default_binary_cache_dir, generate_postgres_password,
-    get_rollup_client, kill_rollup, prepare_acceptance_run_plan, run_soak, spawn_rollup_manager,
-    start_and_wait_for_postgres_ready, wait_for_sequencer_ready, write_manager_config, Directories,
-    Runtime, Spec, ThroughputReport, API_URL, POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
+    cleanup_postgres_container, generate_postgres_password, get_rollup_client, kill_rollup,
+    prepare_acceptance_run_plan, run_soak, spawn_rollup_manager, start_and_wait_for_postgres_ready,
+    wait_for_sequencer_ready, write_manager_config, Directories, Runtime, Spec, ThroughputReport,
+    API_URL, POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
 };
-use anyhow::anyhow;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use clap::Parser;
@@ -119,14 +118,14 @@ async fn main() -> Result<(), anyhow::Error> {
         .init();
 
     let args = Args::parse();
-    let directories = Directories::new()?;
+    let mut directories = Directories::new()?;
+    if let Some(binary_cache_dir) = args.binary_cache_dir {
+        directories.set_rollup_build_cache_dir(binary_cache_dir)?;
+    }
     let password = generate_postgres_password()?;
     start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
     ensure_evm_pinned_cache_config(&directories)?;
-    let binary_cache_dir = args
-        .binary_cache_dir
-        .unwrap_or_else(|| default_binary_cache_dir(&directories));
-    let plan = prepare_acceptance_run_plan(&directories, &password, &binary_cache_dir)?;
+    let plan = prepare_acceptance_run_plan(&directories, &password)?;
     let manager_config_path = directories.output_dir.join("setup_manager_config.json");
     write_manager_config(&manager_config_path, &plan.manager_versions)?;
 
