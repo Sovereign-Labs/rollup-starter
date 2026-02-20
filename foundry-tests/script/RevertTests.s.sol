@@ -24,6 +24,9 @@ contract RevertTests is Script {
         testAssertFailure();
         testDivisionByZero();
         testRevertViaEthCall();
+        testCustomErrorPayload();
+        testEmptyRevertData();
+        testSimpleCustomError();
 
         console2.log("=== Revert Tests Complete ===\n");
     }
@@ -149,6 +152,60 @@ contract RevertTests is Script {
         } catch {
             console2.log("PASS: eth_call reverted for reverting function\n");
         }
+    }
+
+    function testCustomErrorPayload() internal {
+        console2.log("--- Test 8: revertWithCustomError payload ---");
+
+        uint256 code = 7;
+        (bool success, bytes memory data) = address(tester).call(
+            abi.encodeWithSignature("revertWithCustomError(uint256)", code)
+        );
+
+        require(!success, "custom error call should revert");
+        require(data.length >= 4, "custom error data must include selector");
+
+        bytes4 selector;
+        assembly {
+            selector := mload(add(data, 32))
+        }
+        bytes4 expectedSelector = bytes4(keccak256("CustomError(uint256,string)"));
+        require(selector == expectedSelector, "unexpected custom error selector");
+
+        bytes memory expectedData = abi.encodeWithSelector(expectedSelector, code, "custom error");
+        require(keccak256(data) == keccak256(expectedData), "custom error payload mismatch");
+        console2.log("PASS: custom error selector and payload match\n");
+    }
+
+    function testEmptyRevertData() internal {
+        console2.log("--- Test 9: revertEmpty has no data ---");
+
+        (bool success, bytes memory data) = address(tester).call(
+            abi.encodeWithSignature("revertEmpty()")
+        );
+
+        require(!success, "empty revert call should revert");
+        require(data.length == 0, "empty revert should return no data");
+        console2.log("PASS: empty revert data verified\n");
+    }
+
+    function testSimpleCustomError() internal {
+        console2.log("--- Test 10: revertSimpleError selector ---");
+
+        (bool success, bytes memory data) = address(tester).call(
+            abi.encodeWithSignature("revertSimpleError()")
+        );
+
+        require(!success, "simple custom error call should revert");
+        require(data.length == 4, "simple custom error should return selector only");
+
+        bytes4 selector;
+        assembly {
+            selector := mload(add(data, 32))
+        }
+        bytes4 expectedSelector = bytes4(keccak256("SimpleError()"));
+        require(selector == expectedSelector, "unexpected simple custom error selector");
+        console2.log("PASS: simple custom error selector verified\n");
     }
 
     function doRpcCall(string memory params) external returns (bytes memory) {

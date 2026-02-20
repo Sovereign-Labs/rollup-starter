@@ -11,7 +11,6 @@ import {PrecompileTests} from "./PrecompileTests.s.sol";
 import {CalldataTests} from "./CalldataTests.s.sol";
 import {ContextTests} from "./ContextTests.s.sol";
 import {GasEstimationTests} from "./GasEstimationTests.s.sol";
-import {CallConsistencyTests} from "./CallConsistencyTests.s.sol";
 import {ValueTransferTests} from "./ValueTransferTests.s.sol";
 import {RevertTests} from "./RevertTests.s.sol";
 import {InterContractCallTests} from "./InterContractCallTests.s.sol";
@@ -34,7 +33,7 @@ contract AllTests is Script {
         new CalldataTests().run();
         new ContextTests().run();
         new GasEstimationTests().run();
-        new CallConsistencyTests().run();
+        console2.log("Skipping inline CallConsistency in AllTests; run ./run.sh CallConsistencyFlow for deploy/read RPC checks.");
         new ValueTransferTests().run();
         new RevertTests().run();
         new InterContractCallTests().run();
