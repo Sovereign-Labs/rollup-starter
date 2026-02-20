@@ -143,8 +143,8 @@ contract RevertTests is Script {
         );
 
         // eth_call on a reverting function should return error data
-        // We use try/catch on vm.rpc since it may revert on error responses
-        try this.doRpcCall(params) returns (bytes memory) {
+        // Use direct vm.rpc to avoid Foundry's script self-call restriction.
+        try vm.rpc("eth_call", params) returns (bytes memory) {
             // If it succeeds, the RPC returned data despite the revert
             // This is unexpected but not necessarily wrong for all implementations
             console2.log("NOTE: eth_call returned data for reverting function");
@@ -206,9 +206,5 @@ contract RevertTests is Script {
         bytes4 expectedSelector = bytes4(keccak256("SimpleError()"));
         require(selector == expectedSelector, "unexpected simple custom error selector");
         console2.log("PASS: simple custom error selector verified\n");
-    }
-
-    function doRpcCall(string memory params) external returns (bytes memory) {
-        return vm.rpc("eth_call", params);
     }
 }

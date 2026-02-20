@@ -16,15 +16,6 @@ contract Callee {
         return value;
     }
 
-    function getContextInfo() public view returns (address caller, address origin) {
-        caller = lastCaller;
-        origin = lastOrigin;
-    }
-
-    function pureAdd(uint256 a, uint256 b) public pure returns (uint256) {
-        return a + b;
-    }
-
     function writeInView() public returns (uint256) {
         // Not actually view — contains sstore that will fail under STATICCALL
         assembly {
@@ -44,10 +35,6 @@ contract DelegateeLibrary {
         delegatedValue = v;
     }
 
-    function getContextInDelegate() public view returns (address sender, address self) {
-        sender = msg.sender;
-        self = address(this);
-    }
 }
 
 contract Caller {

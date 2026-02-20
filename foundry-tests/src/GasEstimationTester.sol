@@ -2,15 +2,14 @@
 pragma solidity ^0.8.13;
 
 contract GasEstimationTester {
+    event ValueSet(uint256 indexed newValue);
+
     mapping(uint256 => uint256) public store;
     uint256 public value;
 
     function setValue(uint256 v) public {
         value = v;
-    }
-
-    function getValue() public view returns (uint256) {
-        return value;
+        emit ValueSet(v);
     }
 
     function multiStore(uint256 count) public {
@@ -31,7 +30,4 @@ contract GasEstimationTester {
         return b;
     }
 
-    function revertIf(bool shouldRevert) public pure {
-        require(!shouldRevert, "Forced revert");
-    }
 }

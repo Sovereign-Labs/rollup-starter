@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
+import {RpcHelper} from "./RpcHelper.s.sol";
 import {GasEstimationTester} from "../src/GasEstimationTester.sol";
 
-contract GasEstimationTests is Script {
+contract GasEstimationTests is RpcHelper {
     address constant FUNDED_SENDER = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
     GasEstimationTester tester;
 
@@ -104,14 +104,10 @@ contract GasEstimationTests is Script {
         console2.log("--- Test 4: plain ETH transfer estimate ---");
 
         address dest = address(0xBEEF);
-        uint256 requestedValue = 1000;
-        uint256 senderBalance = ethBalance(FUNDED_SENDER);
-        string memory valueHex = "0x3e8";
-        if (senderBalance < requestedValue) {
-            // On some rollup configs there is no premine in `evm.accounts`, so value-bearing
-            // estimates from this address fail with OutOfFunds. Fall back to intrinsic transfer gas.
-            console2.log("NOTE: sender has insufficient ETH balance for value transfer; estimating with value=0");
-            valueHex = "0x0";
+        string memory valueHex = "0x0";
+        uint256 senderBalance = getBalance(FUNDED_SENDER);
+        if (senderBalance >= 1000) {
+            valueHex = "0x3e8";
         }
 
         string memory txObj = string.concat(
@@ -125,22 +121,6 @@ contract GasEstimationTests is Script {
         console2.log("Estimate:", estimate);
         require(estimate >= 21000, "ETH transfer estimate must be >= 21000");
         console2.log("PASS: transfer estimate >= 21000\n");
-    }
-
-    function decodeRpcQuantity(bytes memory raw) internal pure returns (uint256 value) {
-        require(raw.length > 0, "rpc quantity must not be empty");
-        require(raw.length <= 32, "rpc quantity too large");
-        for (uint256 i = 0; i < raw.length; i++) {
-            value = (value << 8) | uint8(raw[i]);
-        }
-    }
-
-    function ethBalance(address account) internal returns (uint256) {
-        string memory params = string.concat(
-            '["', vm.toString(account), '","latest"]'
-        );
-        bytes memory rpcResult = vm.rpc("eth_getBalance", params);
-        return decodeRpcQuantity(rpcResult);
     }
 
     function buildTxJson(address to, bytes memory data, uint256 valueWei) internal view returns (string memory) {

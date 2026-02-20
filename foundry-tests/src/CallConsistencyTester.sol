@@ -8,11 +8,6 @@ contract CallConsistencyTester {
         return counter;
     }
 
-    function incrementAndReturn() public returns (uint256) {
-        counter++;
-        return counter;
-    }
-
     function getBlockDependentValue() public view returns (uint256 blockNum, uint256 timestamp, uint256 basefee) {
         blockNum = block.number;
         timestamp = block.timestamp;

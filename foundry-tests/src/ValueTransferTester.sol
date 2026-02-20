@@ -17,11 +17,6 @@ contract ValueTransferTester {
         require(success, "Forward failed");
     }
 
-    function sendAmount(address payable dest, uint256 amount) public {
-        (bool success,) = dest.call{value: amount}("");
-        require(success, "Send failed");
-    }
-
     function getBalance() public view returns (uint256) {
         return address(this).balance;
     }

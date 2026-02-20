@@ -88,6 +88,11 @@ explicitly logged as skipped.
 - **PrecompileTests**: Standard precompile contract calls
 - **CalldataTests**: ABI decoding and calldata handling
 - **GasEstimationTests**: `eth_estimateGas` coherence checks
+- **RpcTxLifecycleTests**: Tx/receipt/block linkage coherence across RPC endpoints
+- **RpcFeeAndEstimationSafetyTests**: Fee endpoint shape + estimate/execution safety bounds
+- **RpcLogAndFilterTests**: `eth_getLogs` address/topic filter compatibility checks
+- **RpcErrorEnvelopeTests**: malformed params and revert-path RPC error behavior
+- **RpcTagAndNonceMatrixTests**: block-tag matrix + nonce progression/pending coherence
 - **ValueTransferTests**: Native value transfer semantics
 - **RevertTests**: Revert payload and panic/custom error checks
 - **InterContractCallTests**: CALL/DELEGATECALL/STATICCALL behavior

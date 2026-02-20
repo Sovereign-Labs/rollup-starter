@@ -19,21 +19,3 @@ from the previous run. To fix, simply `docker rm -f postgres-acceptance-test`.
 If you need to generate a new test, simply run `rm -r acceptance-test-data && cargo run --bin setup`. This will generate all of the 
 needed files, including a fresh mockDA. Note that setup may take an hour or more to run, since we have to generate a full history
 for the rollup.
-
-### RPC Compatibility Checks
-
-Use the compatibility runner to validate high-priority Ethereum RPC invariants against a live rollup endpoint:
-
-```bash
-cargo run -p acceptance-test --bin rpc-compat -- --rpc-url http://127.0.0.1:12346/rpc
-```
-
-What it validates:
-
-- Decode-safe core quantity responses (`eth_chainId`, `eth_blockNumber`, `eth_gasPrice`)
-- `eth_feeHistory` response shape coherence
-- Block-tag behavior for `eth_getBlockByNumber` and `eth_getTransactionCount`
-- `eth_call` / `eth_estimateGas` / executed tx consistency
-- Tx/receipt/block cross-endpoint consistency
-- `eth_getLogs` linkage with emitted events
-- Nonce progression under pending/latest semantics

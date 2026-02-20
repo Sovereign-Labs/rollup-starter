@@ -11,14 +11,14 @@ import {PrecompileTests} from "./PrecompileTests.s.sol";
 import {CalldataTests} from "./CalldataTests.s.sol";
 import {ContextTests} from "./ContextTests.s.sol";
 import {GasEstimationTests} from "./GasEstimationTests.s.sol";
+import {RpcFeeAndEstimationSafetyTests} from "./RpcFeeAndEstimationSafetyTests.s.sol";
+import {RpcLogAndFilterTests} from "./RpcLogAndFilterTests.s.sol";
+import {RpcErrorEnvelopeTests} from "./RpcErrorEnvelopeTests.s.sol";
+import {RpcTagAndNonceMatrixTests} from "./RpcTagAndNonceMatrixTests.s.sol";
 import {ValueTransferTests} from "./ValueTransferTests.s.sol";
 import {RevertTests} from "./RevertTests.s.sol";
 import {InterContractCallTests} from "./InterContractCallTests.s.sol";
 
-/**
- * @title AllTests
- * @notice Umbrella script that runs all test suites
- */
 contract AllTests is Script {
     function run() public {
         console2.log("========================================");
@@ -33,6 +33,11 @@ contract AllTests is Script {
         new CalldataTests().run();
         new ContextTests().run();
         new GasEstimationTests().run();
+        console2.log("Skipping inline RpcTxLifecycle in AllTests; run ./run.sh RpcTxLifecycleFlow for deploy/read RPC lifecycle checks.");
+        new RpcFeeAndEstimationSafetyTests().run();
+        new RpcLogAndFilterTests().run();
+        new RpcErrorEnvelopeTests().run();
+        new RpcTagAndNonceMatrixTests().run();
         console2.log("Skipping inline CallConsistency in AllTests; run ./run.sh CallConsistencyFlow for deploy/read RPC checks.");
         new ValueTransferTests().run();
         new RevertTests().run();

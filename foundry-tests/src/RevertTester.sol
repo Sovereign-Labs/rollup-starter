@@ -55,6 +55,6 @@ contract RevertTester {
     function divisionByZero() public pure returns (uint256) {
         uint256 a = 1;
         uint256 b = 0;
-        return a / b; // Panic(0x12)
+        return a / b;
     }
 }

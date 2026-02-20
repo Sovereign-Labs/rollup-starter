@@ -39,6 +39,49 @@ if [ "$TEST_NAME" = "CallConsistencyFlow" ] || [ "$TEST_NAME" = "CallConsistency
     exit $?
 fi
 
+if [ "$TEST_NAME" = "RpcTxLifecycleFlow" ] || [ "$TEST_NAME" = "RpcTxLifecycleTests" ]; then
+    if ! DEPLOY_OUTPUT=$(forge script \
+        RpcTxLifecycleDeploy \
+        --rpc-url "$RPC_ALIAS" \
+        --private-key "$PRIVATE_KEY" \
+        --broadcast \
+        --code-size-limit "$CODE_SIZE_LIMIT" 2>&1); then
+        echo "$DEPLOY_OUTPUT"
+        exit 1
+    fi
+    echo "$DEPLOY_OUTPUT"
+
+    BROADCAST_FILE=$(printf '%s\n' "$DEPLOY_OUTPUT" | sed -n 's/.*Transactions saved to:[[:space:]]*\(.*run-latest\.json\).*/\1/p' | tail -n1)
+    if [ -z "$BROADCAST_FILE" ] || [ ! -f "$BROADCAST_FILE" ]; then
+        echo "Failed to locate RpcTxLifecycleDeploy broadcast file"
+        exit 1
+    fi
+
+    TARGET_ADDRESS=$(jq -r '.transactions[] | select(.transactionType=="CREATE" and .contractName=="RpcLifecycleTester") | .contractAddress' "$BROADCAST_FILE" | tail -n1)
+    TX_PRIMARY=$(jq -r '.transactions[] | select(.transactionType=="CALL") | .hash' "$BROADCAST_FILE" | sed -n '1p')
+    TX_SECONDARY=$(jq -r '.transactions[] | select(.transactionType=="CALL") | .hash' "$BROADCAST_FILE" | sed -n '2p')
+    if [ -z "$TX_SECONDARY" ]; then
+        TX_SECONDARY="$TX_PRIMARY"
+    fi
+
+    if [ -z "$TARGET_ADDRESS" ] || [ -z "$TX_PRIMARY" ] || [ -z "$TX_SECONDARY" ]; then
+        echo "Failed to parse lifecycle deploy context from $BROADCAST_FILE"
+        exit 1
+    fi
+
+    RPC_LIFECYCLE_TARGET="$TARGET_ADDRESS" \
+    RPC_LIFECYCLE_TX_PRIMARY="$TX_PRIMARY" \
+    RPC_LIFECYCLE_TX_SECONDARY="$TX_SECONDARY" \
+    forge script \
+        RpcTxLifecycleTests \
+        --rpc-url "$RPC_ALIAS" \
+        --private-key "$PRIVATE_KEY" \
+        --broadcast \
+        --ffi \
+        --code-size-limit "$CODE_SIZE_LIMIT"
+    exit $?
+fi
+
 forge script \
     "$TEST_NAME" \
     --rpc-url "$RPC_ALIAS" \
