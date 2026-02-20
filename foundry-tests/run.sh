@@ -82,9 +82,15 @@ if [ "$TEST_NAME" = "RpcTxLifecycleFlow" ] || [ "$TEST_NAME" = "RpcTxLifecycleTe
     exit $?
 fi
 
+FFI_FLAG=""
+if [ "$TEST_NAME" = "AllTests" ] || [ "$TEST_NAME" = "RpcTagAndNonceMatrixTests" ]; then
+    FFI_FLAG="--ffi"
+fi
+
 forge script \
     "$TEST_NAME" \
     --rpc-url "$RPC_ALIAS" \
     --private-key "$PRIVATE_KEY" \
     --broadcast \
+    $FFI_FLAG \
     --code-size-limit "$CODE_SIZE_LIMIT"
