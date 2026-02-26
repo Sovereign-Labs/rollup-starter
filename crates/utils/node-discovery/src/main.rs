@@ -2,9 +2,12 @@
 //!
 //! This binary connects to a PostgreSQL database and subscribes to cluster
 //! information updates, writing the current cluster state to an output file.
+<<<<<<< HEAD
 use std::{path::PathBuf, process::exit};
 
 use async_trait::async_trait;
+=======
+>>>>>>> c6daff7 (Updating to the more latest dev)
 use clap::Parser;
 use sov_metrics::{init_metrics_tracker, MonitoringConfig};
 use sov_proxy_utils::{
@@ -107,6 +110,7 @@ async fn main() -> anyhow::Result<()> {
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
 
+<<<<<<< HEAD
     let config_path = PathBuf::from(args.output_file);
 
     let content = create_lua_backend_cache_content(&ClusterInfo::default());
@@ -121,6 +125,9 @@ async fn main() -> anyhow::Result<()> {
         })),
     )
     .await?;
+=======
+    let cluster_info_service = ClusterInfoService::spawn(&args.database_url, max_age, None).await?;
+>>>>>>> c6daff7 (Updating to the more latest dev)
 
     if let Err(err) = cluster_info_service.join().await {
         tracing::error!(?err, "Failed to join cluster info service");
