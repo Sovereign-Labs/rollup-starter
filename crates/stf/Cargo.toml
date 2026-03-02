@@ -52,6 +52,7 @@ acceptance-testing = ["stf-starter-declaration/acceptance-testing"]
 native = [
 	"stf-starter-declaration/native",
 	"sov-modules-api/native",
+	"sov-modules-api/expensive-observability",
 	"sov-modules-stf-blueprint/native",
 	"sov-rollup-interface/native",
 	"sov-capabilities/native",
