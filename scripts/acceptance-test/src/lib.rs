@@ -13,7 +13,7 @@ use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
 use state_consistency::state_validation_worker;
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
-use tokio::sync::watch;
+use tokio::sync::{oneshot, watch};
 use tokio::task::JoinSet;
 use tracing::{debug, info};
 
@@ -31,6 +31,12 @@ pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 // Save a full snapshot of the slot every N slots
 const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
 pub const NUM_SOAK_BATCHES: u64 = 1000;
+const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
+const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
+
+type RollupWaitResult = Result<std::process::ExitStatus, std::io::Error>;
+type RollupJoinResult = Result<RollupWaitResult, tokio::task::JoinError>;
+type RollupExitReceiver = oneshot::Receiver<RollupJoinResult>;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
@@ -351,6 +357,54 @@ pub fn kill_rollup(rollup_id: u32) {
     }
 }
 
+fn ensure_rollup_exit_result(rollup_result: RollupJoinResult) -> anyhow::Result<()> {
+    match rollup_result {
+        Ok(Ok(exit_status)) => {
+            anyhow::ensure!(
+                exit_status.success(),
+                "Rollup process exited with non-zero status: {exit_status}"
+            );
+            Ok(())
+        }
+        Ok(Err(e)) => Err(anyhow::anyhow!("Rollup process wait failed: {e}")),
+        Err(e) => Err(anyhow::anyhow!("Rollup wait task failed: {e}")),
+    }
+}
+
+async fn wait_for_rollup_exit_with_timeout(
+    rollup_id: u32,
+    rollup_rx: &mut RollupExitReceiver,
+) -> anyhow::Result<()> {
+    match tokio::time::timeout(ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT, &mut *rollup_rx).await {
+        Ok(Ok(rollup_result)) => return ensure_rollup_exit_result(rollup_result),
+        Ok(Err(e)) => {
+            return Err(anyhow::anyhow!(
+                "Failed to receive rollup process result while waiting for graceful shutdown: {e}"
+            ));
+        }
+        Err(_) => {
+            tracing::warn!(
+                "Timed out waiting {:?} for rollup process {} to exit gracefully. Sending shutdown signal.",
+                ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT,
+                rollup_id
+            );
+            kill_rollup(rollup_id);
+        }
+    }
+
+    match tokio::time::timeout(ROLLUP_FORCED_SHUTDOWN_TIMEOUT, &mut *rollup_rx).await {
+        Ok(Ok(rollup_result)) => ensure_rollup_exit_result(rollup_result),
+        Ok(Err(e)) => Err(anyhow::anyhow!(
+            "Failed to receive rollup process result after forcing shutdown: {e}"
+        )),
+        Err(_) => Err(anyhow::anyhow!(
+            "Rollup process {} did not terminate within {:?} after forced shutdown",
+            rollup_id,
+            ROLLUP_FORCED_SHUTDOWN_TIMEOUT
+        )),
+    }
+}
+
 pub async fn run_soak(
     directories: Directories,
     mut rollup: std::process::Child,
@@ -358,8 +412,9 @@ pub async fn run_soak(
     rollup_stop_height: u64,
     save_slot_snapshots: bool,
 ) -> Result<ThroughputReport, anyhow::Error> {
-    let (rollup_tx, mut rollup_rx) = tokio::sync::oneshot::channel();
+    let (rollup_tx, mut rollup_rx) = oneshot::channel();
     let rollup_id = rollup.id();
+    let mut rollup_exited = false;
     // Spawn background task to wait for rollup process
     tokio::spawn(async move {
         let result = tokio::task::spawn_blocking(move || rollup.wait()).await;
@@ -495,15 +550,14 @@ pub async fn run_soak(
             // Rollup shutdown
             rollup_result = &mut rollup_rx => {
                 match rollup_result {
-                    Ok(Ok(exit_status)) => {
-                        tracing::info!("Rollup process finished with status: {:?}", exit_status);
+                    Ok(rollup_result) => {
+                        ensure_rollup_exit_result(rollup_result)?;
+                        tracing::info!("Rollup process finished with successful status");
+                        rollup_exited = true;
                     },
-                    Ok(Err(e)) => {
-                        tracing::error!("Rollup process failed: {}", e);
+                    Err(e) => {
+                        return Err(anyhow::anyhow!("Failed to receive rollup process result: {e}"));
                     },
-                    Err(_) => {
-                        tracing::error!("Failed to receive rollup process result");
-                    }
                 }
                 break;
             }
@@ -552,15 +606,9 @@ pub async fn run_soak(
         }
     }
 
-    // Wait for rollup to finish if it hasn't already
-    if let Ok(rollup_result) = rollup_rx.try_recv() {
-        match rollup_result {
-            Ok(_) => info!("Rollup process finished successfully"),
-            Err(e) => {
-                tracing::error!("Rollup process failed: {}", e);
-                panic!("Rollup process failed");
-            }
-        }
+    // Make sure the rollup process has fully exited before allowing postgres cleanup.
+    if !rollup_exited {
+        wait_for_rollup_exit_with_timeout(rollup_id, &mut rollup_rx).await?;
     }
     info!(
         "Rollup process finished. Processed {} txs in  {} slots. Average throughput: {} txs/slot",
