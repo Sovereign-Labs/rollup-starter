@@ -15,6 +15,12 @@ STOP_HEIGHT="$4"
 
 LOG_FILE="log.txt"
 
+echo "Parameters:"
+echo "  SOURCE_DIR:   $SOURCE_DIR"
+echo "  DEST_DIR:     $DEST_DIR"
+echo "  START_HEIGHT: $START_HEIGHT"
+echo "  STOP_HEIGHT:  $STOP_HEIGHT"
+
 # ---- Safety check ----
 if [ "$SOURCE_DIR" = "$DEST_DIR" ]; then
   echo "ERROR: SOURCE_DIR and DEST_DIR must be different!"

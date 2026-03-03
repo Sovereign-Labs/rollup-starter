@@ -1,35 +1,38 @@
-# Debug state acceses for celestia
+# Debug state accesses for Celestia
+
+Collect user inputs, configure the rollup, and run a debug session that produces detailed state access logs.
+
+## Variables
+
+All variables below are collected from the user and referenced as `{variable-name}` throughout the steps.
 
 ## Steps
 
-### 1. Prepare input.
+### 1. Collect inputs
 
-1. Ask user for inputt to the script. Don't show default options, but wait for each input.
-Write the following message "Let's gather the inputs for debugging state accesses."
-Ask the user for:
-  - branch name. 
-        Assign to {branch-name}.
-  - A start-at-rollup-height. 
-        Assign to {start-at-rollup-height}.
-  - A stop-at-rollup-height. 
-        Assign to {stop-at-rollup-height} and validate that {start-at-rollup-height} < {stop-at-rollup-height}.
-  - State directory 
-         (Print the follwong message "The state must be synced to {start-at-rollup-height}").
-         Assign to {state-dir}.  
+Print: "Let's gather the inputs for debugging state accesses."
 
-3. Write the following output:
- "This skill will provide detailed state access logs for rollup on a {branch-name} between heights {start-at-rollup-height} {stop-at-rollup-height} based on state in {state-dir}"
+Ask the user for each input one at a time (do not show default options). Wait for each response before asking the next question:
 
+1. **Branch name** — assign to `{branch-name}`.
+2. **Start rollup height** — assign to `{start-at-rollup-height}`.
+3. **Stop rollup height** — assign to `{stop-at-rollup-height}`. Validate that `{start-at-rollup-height}` < `{stop-at-rollup-height}`. If invalid, ask the user to re-enter.
+4. **State directory** — before asking, print: "The state must be synced to height `{start-at-rollup-height}`." Assign to `{state-dir}`.
+
+After all inputs are collected, print:
+
+> This script will provide detailed state access logs for the rollup on branch `{branch-name}` between heights `{start-at-rollup-height}` and `{stop-at-rollup-height}` based on state in `{state-dir}`.
 
 ### 2. Override config
 
-1. git checkout {branch-name}
-2. create variable {state-dir-debug} = {state-dir}_debug
-3. Override path in configs/celestia/rollup.toml with
-[storage]
-path = {state-dir-debug}
+1. Run `git checkout {branch-name}`.
+2. Create variable `{state-dir-debug}` = `{state-dir}_debug`.
+3. In `configs/celestia/rollup.toml`, update the `[storage]` section's `path` value to `{state-dir-debug}`.
 
-### 3. Run the debuh session
+### 3. Run the debug session
 
-1. Print the following
-{start-at-rollup-height}, {stop-at-rollup-height}, {state-dir}, {state-dir-debug}
+Run the following command:
+
+```
+./scripts/debug.sh {state-dir} {state-dir-debug} {start-at-rollup-height}+1 {stop-at-rollup-height}
+```
