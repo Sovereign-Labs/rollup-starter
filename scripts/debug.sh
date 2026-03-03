@@ -41,6 +41,8 @@ cp -r --sparse=always "$SOURCE_DIR"/. "$DEST_DIR"/
 
 echo "Starting rollup (cargo run)..."
 
+export RUST_LOG="warn,sov=info,sov_modules_api::containers=trace,sov_modules_api::state::traits=trace"
+
 echo "Using start height: $START_HEIGHT, stop height: $STOP_HEIGHT"
 cargo run --release --no-default-features --features celestia_da,mock_zkvm -- --start-at-rollup-height "$START_HEIGHT" --stop-at-rollup-height "$STOP_HEIGHT" > "$LOG_FILE" 2>&1
 
