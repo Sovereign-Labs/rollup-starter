@@ -24,8 +24,9 @@ After all inputs are collected, print:
 
 ### 2. Override config
 
-1. Create variable `{state-dir-debug}` = `{state-dir}_debug`.
-2. In `configs/celestia/rollup.toml`, update the `[storage]` section's `path` value to `{state-dir-debug}`.
+1. Cherry pick the folloing commit `753bf44`. Fix all conflict if needed.
+2. Create variable `{state-dir-debug}` = `{state-dir}_debug`.
+3. In `configs/celestia/rollup.toml`, update the `[storage]` section's `path` value to `{state-dir-debug}`.
 
 ### 3. Run the debug session
 
