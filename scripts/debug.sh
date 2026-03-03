@@ -3,14 +3,15 @@
 set -euo pipefail
 
 # ---- Parameters ----
-if [ "$#" -lt 2 ]; then
-  echo "Usage: $0 <SOURCE_DIR> <DEST_DIR> [STOP_HEIGHT]"
+if [ "$#" -lt 4 ]; then
+  echo "Usage: $0 <SOURCE_DIR> <DEST_DIR> <START_HEIGHT> <STOP_HEIGHT>"
   exit 1
 fi
 
 SOURCE_DIR="$1"
 DEST_DIR="$2"
-STOP_HEIGHT="${3:-}"
+START_HEIGHT="$3"
+STOP_HEIGHT="$4"
 
 LOG_FILE="log.txt"
 
@@ -34,8 +35,8 @@ cp -r "$SOURCE_DIR"/. "$DEST_DIR"/
 
 echo "Starting rollup (cargo run)..."
 
-echo "Using stop height: $STOP_HEIGHT"
-cargo run --release --no-default-features --features celestia_da,mock_zkvm -- --stop-at-rollup-height "$STOP_HEIGHT" > "$LOG_FILE" 2>&1
+echo "Using start height: $START_HEIGHT, stop height: $STOP_HEIGHT"
+cargo run --release --no-default-features --features celestia_da,mock_zkvm -- --start-at-rollup-height "$START_HEIGHT" --stop-at-rollup-height "$STOP_HEIGHT" > "$LOG_FILE" 2>&1
 
 
 
