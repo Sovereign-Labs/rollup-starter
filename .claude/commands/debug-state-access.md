@@ -13,7 +13,7 @@ All variables below are collected from the user and referenced as `{variable-nam
 Print: "Note: The state must be synced to a height just below the fork height so that the log volume doesn't explode."
 Print: "Let's gather the inputs for debugging state accesses."
 
-Ask the user for each input one at a time (do not show default options). Wait for each response before asking the next question:
+Ask the user for each input one at a time. Do NOT use the AskUserQuestion tool — just print the question as plain text and wait for the user to reply with their value. Never propose or suggest default values. Wait for each response before asking the next question:
 
 1. **Start rollup height** — assign to `{start-at-rollup-height}`.
 2. **Stop rollup height** — assign to `{stop-at-rollup-height}`. Validate that `{start-at-rollup-height}` < `{stop-at-rollup-height}`. If invalid, ask the user to re-enter.

@@ -10,7 +10,7 @@ fi
 
 SOURCE_DIR="$1"
 DEST_DIR="$2"
-START_HEIGHT=$(( $3 + 1 ))
+START_HEIGHT="$3" 
 STOP_HEIGHT="$4"
 LOG_FILE="$5"
 
