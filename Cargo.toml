@@ -7,8 +7,9 @@ members = [
   "crates/stf",
   "crates/stf/stf-declaration",
   "crates/stf/value-setter", 
+  "crates/utils/node-discovery",
 ]
-default-members = ["crates/rollup"]
+default-members = ["crates/rollup", "crates/utils/node-discovery"]
 
 [workspace.package]
 version = "0.3.0"
@@ -63,6 +64,9 @@ sov-evm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "
 sov-soak-testing = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "ff511358b46e77a7f35d481d74fb56049ab67b34" }
 sov-eip712-auth = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "ff511358b46e77a7f35d481d74fb56049ab67b34" }
 sov-rest-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "ff511358b46e77a7f35d481d74fb56049ab67b34" }
+sov-proxy-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d22e4ba2b058a1483160f10e9e96b3c035476ee0" }
+sov-metrics = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d22e4ba2b058a1483160f10e9e96b3c035476ee0", features = ["native"] }
+
 stf-starter = { path = "./crates/stf", default-features = false }
 stf-starter-declaration = { path = "./crates/stf/stf-declaration", default-features = false }
 value-setter = { path = "./crates/stf/value-setter" }
@@ -82,6 +86,7 @@ clap = { version = "4.4.10", features = ["derive"] }
 async-trait = "0.1.71"
 borsh = { version = "1", features = ["rc", "bytes"] }
 tracing = { version = "0.1.40", default-features = false }
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing-appender = "0.2"
 tokio = { version = "1", features = ["full"] }
 lazy_static = "1.5.0"

@@ -4595,6 +4595,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "node-discovery"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=d22e4ba2b058a1483160f10e9e96b3c035476ee0)",
+ "sov-proxy-utils",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.20",
+]
+
+[[package]]
 name = "nom"
 version = "7.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7587,7 +7601,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sov-db",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-api",
  "sov-rollup-interface",
  "tokio",
@@ -7668,7 +7682,7 @@ dependencies = [
  "schemars 0.8.22",
  "serde",
  "serde_json",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-macros",
  "sov-rollup-interface",
  "tendermint",
@@ -7744,7 +7758,7 @@ dependencies = [
  "serde",
  "serde_with",
  "sov-db-types",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-rollup-interface",
  "strum 0.26.3",
  "tempfile",
@@ -7821,7 +7835,7 @@ dependencies = [
  "sov-address",
  "sov-eth-dev-signer",
  "sov-evm",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-api",
  "sov-rest-utils",
  "sov-rpc-eth-types",
@@ -7865,7 +7879,7 @@ dependencies = [
  "sov-bank",
  "sov-chain-state",
  "sov-kernels",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-api",
  "sov-rollup-interface",
  "sov-rpc-eth-types",
@@ -7907,7 +7921,7 @@ dependencies = [
  "sha3",
  "sov-address",
  "sov-bank",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-api",
  "sov-state",
  "strum 0.26.3",
@@ -7951,6 +7965,26 @@ dependencies = [
  "tokio",
  "tracing",
  "utoipa-swagger-ui",
+]
+
+[[package]]
+name = "sov-metrics"
+version = "0.3.0"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=d22e4ba2b058a1483160f10e9e96b3c035476ee0#d22e4ba2b058a1483160f10e9e96b3c035476ee0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "derivative",
+ "derive-new",
+ "derive_more 1.0.0",
+ "hex",
+ "http",
+ "schemars 0.8.22",
+ "serde",
+ "strum 0.26.3",
+ "tokio",
+ "tokio-metrics",
+ "tracing",
 ]
 
 [[package]]
@@ -8056,7 +8090,7 @@ dependencies = [
  "serde_yaml",
  "sha2 0.10.9",
  "sov-db",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-macros",
  "sov-rest-utils",
  "sov-rollup-interface",
@@ -8089,7 +8123,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-universal-wallet-macro-helpers",
  "syn 2.0.106",
  "toml",
@@ -8119,7 +8153,7 @@ dependencies = [
  "sov-cli",
  "sov-db",
  "sov-ledger-apis",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-api",
  "sov-modules-stf-blueprint",
  "sov-rollup-apis",
@@ -8146,7 +8180,7 @@ dependencies = [
  "jsonrpsee",
  "schemars 0.8.22",
  "serde",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-api",
  "sov-rollup-interface",
  "sov-state",
@@ -8230,6 +8264,23 @@ dependencies = [
  "sov-rollup-interface",
  "sov-state",
  "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "sov-proxy-utils"
+version = "0.3.0"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=d22e4ba2b058a1483160f10e9e96b3c035476ee0#d22e4ba2b058a1483160f10e9e96b3c035476ee0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "reqwest",
+ "serde",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=d22e4ba2b058a1483160f10e9e96b3c035476ee0)",
+ "sqlx",
+ "thiserror 1.0.69",
+ "time",
+ "tokio",
  "tracing",
 ]
 
@@ -8383,7 +8434,7 @@ dependencies = [
  "sov-db",
  "sov-full-node-configs",
  "sov-kernels",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-api",
  "sov-modules-stf-blueprint",
  "sov-rest-utils",
@@ -8442,7 +8493,7 @@ dependencies = [
  "serde_with",
  "sov-db",
  "sov-db-types",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-modules-macros",
  "sov-rollup-interface",
  "tracing",
@@ -8470,7 +8521,7 @@ dependencies = [
  "serde",
  "sov-db",
  "sov-full-node-configs",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=ff511358b46e77a7f35d481d74fb56049ab67b34)",
  "sov-rest-utils",
  "sov-rollup-interface",
  "strum 0.26.3",
