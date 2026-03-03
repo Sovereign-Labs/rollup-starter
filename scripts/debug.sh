@@ -37,13 +37,12 @@ mkdir -p "$DEST_DIR"
 rm -rf "${DEST_DIR:?}/"*
 
 echo "Copying contents..."
-cp -r "$SOURCE_DIR"/. "$DEST_DIR"/
+cp -r --sparse=always "$SOURCE_DIR"/. "$DEST_DIR"/
 
 echo "Starting rollup (cargo run)..."
 
 echo "Using start height: $START_HEIGHT, stop height: $STOP_HEIGHT"
 cargo run --release --no-default-features --features celestia_da,mock_zkvm -- --start-at-rollup-height "$START_HEIGHT" --stop-at-rollup-height "$STOP_HEIGHT" > "$LOG_FILE" 2>&1
-
 
 
 EXIT_CODE=$?
