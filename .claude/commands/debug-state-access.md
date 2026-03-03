@@ -34,5 +34,5 @@ After all inputs are collected, print:
 Run the following command:
 
 ```
-./scripts/debug.sh {state-dir} {state-dir-debug} {start-at-rollup-height}+1 {stop-at-rollup-height}
+./scripts/debug.sh {state-dir} {state-dir-debug} {start-at-rollup-height} {stop-at-rollup-height}
 ```
