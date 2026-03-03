@@ -3,8 +3,8 @@
 set -euo pipefail
 
 # ---- Parameters ----
-if [ "$#" -lt 4 ]; then
-  echo "Usage: $0 <SOURCE_DIR> <DEST_DIR> <START_HEIGHT> <STOP_HEIGHT>"
+if [ "$#" -lt 5 ]; then
+  echo "Usage: $0 <SOURCE_DIR> <DEST_DIR> <START_HEIGHT> <STOP_HEIGHT> <LOG_FILE>"
   exit 1
 fi
 
@@ -12,14 +12,14 @@ SOURCE_DIR="$1"
 DEST_DIR="$2"
 START_HEIGHT=$(( $3 + 1 ))
 STOP_HEIGHT="$4"
-
-LOG_FILE="log.txt"
+LOG_FILE="$5"
 
 echo "Parameters:"
 echo "  SOURCE_DIR:   $SOURCE_DIR"
 echo "  DEST_DIR:     $DEST_DIR"
 echo "  START_HEIGHT: $START_HEIGHT"
 echo "  STOP_HEIGHT:  $STOP_HEIGHT"
+echo "  LOG_FILE:     $LOG_FILE"
 
 # ---- Safety check ----
 if [ "$SOURCE_DIR" = "$DEST_DIR" ]; then
