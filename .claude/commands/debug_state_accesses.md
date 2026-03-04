@@ -36,7 +36,7 @@ Check if commit `753bf44` ("Enable expensive state debug") has already been appl
 
 1. Create variable `{log-file-name}` = `debug_log_{start-at-rollup-height}_{stop-at-rollup-height}.txt`. 
 2. Print
-> "Logs are available in: `{log-file-name}`. After the rollup run ends, the log file can be used to investigate state accesses in detail—for example, to determine why two forks diverge..
+> "Logs are available in: `{log-file-name}`. After the rollup run ends, the log file can be used to investigate state accesses in detail—for example, to determine why two forks diverge."
 3. Run the following command:
 
 ```
