@@ -201,7 +201,7 @@ async fn run_test(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Error
 
     let new_throughput_report = run_soak(
         directories.clone(),
-        rollup,
+        rollup.into_child().expect("Rollup process missing before soak"),
         resync_soak_config,
         latest_batch_num,
         stop_at_height,

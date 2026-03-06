@@ -10,7 +10,7 @@ use sov_versioned_artifact_builder::{
 };
 use tracing::info;
 
-use crate::{Directories, BLOCKS_PER_VERSION};
+use crate::{Directories, ManagedRollupProcess, BLOCKS_PER_VERSION};
 
 pub const ROLLUP_REPO_URL: &str = "https://github.com/Sovereign-Labs/rollup-starter.git";
 pub const ROLLUP_MANAGER_REPO_URL: &str = "https://github.com/Sovereign-Labs/sov-rollup-manager";
@@ -452,7 +452,7 @@ pub fn spawn_rollup_manager(
     manager_config: &Path,
     directories: &Directories,
     stdout_log_path: Option<&Path>,
-) -> Result<std::process::Child, anyhow::Error> {
+) -> Result<ManagedRollupProcess, anyhow::Error> {
     let manager_config_arg = manager_config.to_string_lossy().to_string();
     let genesis_arg = directories
         .acceptance_test_dir
@@ -480,10 +480,11 @@ pub fn spawn_rollup_manager(
         cmd.stdout(log_file.try_clone()?).stderr(log_file);
     }
 
-    cmd.spawn().with_context(|| {
+    let child = cmd.spawn().with_context(|| {
         format!(
             "failed to spawn rollup manager {}",
             manager_binary.display()
         )
-    })
+    })?;
+    Ok(ManagedRollupProcess::new(child))
 }

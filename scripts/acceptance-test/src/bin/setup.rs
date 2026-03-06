@@ -159,7 +159,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Ok(()) => {
             run_soak(
                 directories.clone(),
-                rollup,
+                rollup.into_child().expect("Rollup process missing before soak"),
                 plan.soak_config.clone(),
                 throughput_start_batch,
                 stop_at_height,

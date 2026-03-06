@@ -13,7 +13,12 @@ use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_manager::{run_soak_coordinator, SoakManagerConfig};
 use state_consistency::state_validation_worker;
 use std::path::PathBuf;
-use std::{env, fs, process::Command, thread, time::Duration};
+use std::{
+    env, fs,
+    process::{Child, Command, ExitStatus},
+    thread,
+    time::Duration,
+};
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinSet;
 use tracing::{debug, info};
@@ -36,7 +41,8 @@ pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 
 // Save a full snapshot of the slot every N slots
 const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
-pub const NUM_SOAK_BATCHES: u64 = 1000;
+// Run each version of a multi-version rollup for this many blocks.
+pub const BLOCKS_PER_VERSION: u64 = 1000;
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -220,6 +226,56 @@ fn save_slot_snapshot_if_needed(
     Ok(())
 }
 
+#[derive(Debug)]
+pub struct ManagedRollupProcess {
+    child: Option<Child>,
+}
+
+impl ManagedRollupProcess {
+    pub fn new(child: Child) -> Self {
+        Self { child: Some(child) }
+    }
+
+    pub fn id(&self) -> u32 {
+        self.child
+            .as_ref()
+            .expect("managed rollup process child is missing")
+            .id()
+    }
+
+    pub fn into_child(mut self) -> Option<Child> {
+        self.child.take()
+    }
+
+    pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        let Some(child) = self.child.as_mut() else {
+            return Ok(None);
+        };
+
+        match child.try_wait()? {
+            Some(status) => {
+                // Child has exited and was reaped by try_wait.
+                self.child.take();
+                Ok(Some(status))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+impl Drop for ManagedRollupProcess {
+    fn drop(&mut self) {
+        let Some(mut child) = self.child.take() else {
+            return;
+        };
+
+        kill_rollup(child.id());
+        if let Err(e) = child.wait() {
+            tracing::warn!("Failed to wait for rollup process during cleanup: {e}");
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThroughputReport {
     pub num_txs: u64,
@@ -236,17 +292,17 @@ fn is_very_close_to_soak_test_end(num_soak_batches: u64, target_soak_batches: u6
     num_soak_batches.saturating_add(15) > target_soak_batches
 }
 
-/// Send SIGINT to the rollup process to gracefully shut it down.
+/// Send SIGTERM to the rollup process to gracefully shut it down.
 /// If the process doesn't respond within 10 seconds, send SIGKILL.
 pub fn kill_rollup(rollup_id: u32) {
-    tracing::info!("Sending SIGINT to rollup process {}", rollup_id);
+    tracing::info!("Sending SIGTERM to rollup process {}", rollup_id);
 
-    // Send SIGINT
+    // Send SIGTERM
     if let Err(e) = Command::new("kill")
-        .args(["-s", "SIGINT", &rollup_id.to_string()])
+        .args(["-s", "SIGTERM", &rollup_id.to_string()])
         .status()
     {
-        tracing::error!("Failed to send SIGINT: {}", e);
+        tracing::error!("Failed to send SIGTERM: {}", e);
         return;
     }
 
