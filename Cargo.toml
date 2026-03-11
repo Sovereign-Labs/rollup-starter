@@ -22,6 +22,27 @@ publish = false
 rust-version = "1.88"
 
 [workspace.dependencies]
+alloy-primitives = { version = "1.4.0", default-features = false }
+alloy-eips = { version = "1.0.37", default-features = false }
+alloy-evm = { version = "0.23.1", default-features = false }
+alloy-consensus = { version = "1.0.37", default-features = false }
+alloy-rlp = { version = "0.3", default-features = false }
+reth-errors = { git = "https://github.com/paradigmxyz/reth", tag = "v1.9.0", default-features = false }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.9.0", default-features = false }
+reth-primitives-traits = { git = "https://github.com/paradigmxyz/reth", tag = "v1.9.0", default-features = false }
+reth-ethereum-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.9.0", default-features = false }
+revm = { version = "31.0.0", features = ["serde"], default-features = false }
+revm-database-interface = { version = "8.0.4", default-features = false }
+revm-context = { version = "11.0.0", default-features = false }
+revm-handler = { version = "12.0.0", default-features = false }
+revm-context-interface = { version = "12.0.0", default-features = false }
+revm-inspector = { version = "12.0.0", default-features = false }
+revm-inspectors = { version = "0.32.0", default-features = false }
+secp256k1 = { version = "=0.30.0", default-features = false, features = [
+    "global-context",
+    "recovery",
+] }
+k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "std"] }
 sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "9ee4ff7c15b2fd178de1e8628efe361f021b8618", features = [
   "evm",
 ] }
@@ -81,8 +102,6 @@ value-setter = { path = "./examples/value-setter" }
 strum = { version = "0.26.3", features = ["derive"] }
 
 alloy = { version = "1.0.37", default-features = false, features = ["std", "essentials"] }
-alloy-consensus = { version = "1.0.37", default-features = false }
-alloy-primitives = { version = "1.4.0", default-features = false }
 alloy-rpc-types = { version = "1.0.37", default-features = false, features = ["eth"] }
 alloy-sol-types = { version = "1.4.0", default-features = false }
 axum = { version = "0.7.9", default-features = false }
@@ -108,3 +127,7 @@ risc0-build = "2.1"
 
 # [patch."https://github.com/paradigmxyz/reth"]
 # reth-rpc-eth-types = { path = "/home/gentoo/work/sovereign/reth/crates/rpc/rpc-eth-types" }
+
+[profile.rust-analyzer-optimized]
+inherits = "dev"
+opt-level = 0

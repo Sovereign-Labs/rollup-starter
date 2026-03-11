@@ -12,12 +12,41 @@ resolver = "2"
 [dependencies]
 anyhow = { workspace = true }
 borsh = { workspace = true, features = ["rc"] }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
+hex = { version = "0.4.3" }
 sov-bank = { workspace = true }
 sov-modules-api = { workspace = true }
 sov-state = { workspace = true }
 schemars = { workspace = true }
+
+alloy-eips = { workspace = true, features = ["std"] }
+# `rlp` feature implicitly enabled via `reth-` crates, but this allows us to explicitly access Error type from there
+alloy-primitives = { workspace = true, default-features = false, features = [
+	"rlp",
+] }
+alloy-consensus = { workspace = true, features = [
+	"serde",
+	"serde-bincode-compat",
+] }
+alloy-rlp = { workspace = true }
+revm = { workspace = true, features = [
+	"optional_block_gas_limit",
+	"optional_eip3607",
+	"optional_no_base_fee",
+	"optional_balance_check",
+	"memory_limit",
+	"std",
+] }
+revm-database-interface = { workspace = true }
+reth-ethereum-primitives = { workspace = true, features = [
+	"serde",
+	"serde-bincode-compat",
+] }
+reth-primitives = { workspace = true }
+reth-primitives-traits = { workspace = true }
+revm-inspectors = { workspace = true, default-features = false, optional = true }
+thiserror = "1.0.64"
 
 [dev-dependencies]
 sov-address = { workspace = true, features = ["evm"] }

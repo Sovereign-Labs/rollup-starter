@@ -83,7 +83,7 @@ where
     /// The hyperlane warp route module
     pub warp: Warp<S>,
     /// The ValueSetter module (recommended as a starting point for building new modules)
-    pub value_setter: value_setter::ValueSetter<S>,
+    pub value_setter: value_setter::Derive<S>,
     /// The StateConsistency module, used for acceptance testing
     #[cfg(feature = "acceptance-testing")]
     pub state_consistency: sov_test_state_consistency::StateConsistency<S>,

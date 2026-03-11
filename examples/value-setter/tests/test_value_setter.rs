@@ -1,13 +1,13 @@
 use sov_modules_api::Spec;
 use sov_test_utils::{generate_optimistic_runtime, TestSpec};
-use value_setter::ValueSetter;
+use value_setter::Derive;
 
 type S = TestSpec;
 
 // This macro creates a temporary runtime for testing.
 generate_optimistic_runtime!(
     TestRuntime <=
-    value_setter: ValueSetter<S>
+    value_setter: Derive<S>
 );
 
 use sov_test_utils::runtime::genesis::optimistic::HighLevelOptimisticGenesisConfig;
@@ -57,7 +57,7 @@ fn test_can_set_value() {
     // 2. Execute the transaction
     runner.execute_transaction(TransactionTestCase {
         // The transaction input created by a regular user.
-        input: regular_user.create_plain_message::<TestRuntime<S>, ValueSetter<S>>(
+        input: regular_user.create_plain_message::<TestRuntime<S>, Derive<S>>(
             CallMessage::SetValue(new_value),
         ),
         // The assertions to run after execution.
@@ -66,7 +66,7 @@ fn test_can_set_value() {
             assert!(result.tx_receipt.is_successful());
 
             // Assert that the state was updated correctly by querying the module.
-            let value_setter = ValueSetter::<S>::default();
+            let value_setter = Derive::<S>::default();
             let current_value = value_setter.value.get(state).unwrap();
             assert_eq!(current_value, Some(new_value));
         }),
