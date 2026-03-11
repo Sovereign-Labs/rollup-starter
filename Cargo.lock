@@ -3423,6 +3423,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive"
+version = "0.3.0"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-sol-types",
+ "anyhow",
+ "borsh",
+ "derive",
+ "hex",
+ "reth-ethereum-primitives",
+ "reth-primitives",
+ "reth-primitives-traits",
+ "revm",
+ "revm-database-interface",
+ "revm-inspectors",
+ "schemars 0.8.22",
+ "serde",
+ "sov-address",
+ "sov-bank",
+ "sov-modules-api",
+ "sov-state",
+ "sov-test-utils",
+ "strum 0.26.3",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "derive-new"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12541,6 +12571,7 @@ dependencies = [
  "anyhow",
  "borsh",
  "clap",
+ "derive",
  "jsonrpsee",
  "serde",
  "sov-accounts",
@@ -12567,7 +12598,6 @@ dependencies = [
  "sov-uniqueness",
  "strum 0.26.3",
  "tracing",
- "value-setter",
 ]
 
 [[package]]
@@ -14027,23 +14057,6 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
-
-[[package]]
-name = "value-setter"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "borsh",
- "schemars 0.8.22",
- "serde",
- "sov-address",
- "sov-bank",
- "sov-modules-api",
- "sov-state",
- "sov-test-utils",
- "strum 0.26.3",
- "value-setter",
-]
 
 [[package]]
 name = "vcpkg"

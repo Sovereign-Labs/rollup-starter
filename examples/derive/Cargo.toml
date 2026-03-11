@@ -1,5 +1,5 @@
 [package]
-name = "value-setter"
+name = "derive"
 authors = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
@@ -30,6 +30,7 @@ alloy-consensus = { workspace = true, features = [
 	"serde-bincode-compat",
 ] }
 alloy-rlp = { workspace = true }
+alloy-sol-types = { workspace = true }
 revm = { workspace = true, features = [
 	"optional_block_gas_limit",
 	"optional_eip3607",
@@ -50,7 +51,7 @@ thiserror = "1.0.64"
 
 [dev-dependencies]
 sov-address = { workspace = true, features = ["evm"] }
-value-setter = { path = ".", version = "*", features = ["native"] }
+derive = { path = ".", version = "*", features = ["native"] }
 sov-test-utils = { workspace = true }
 schemars = { workspace = true }
 strum = { workspace = true }
@@ -58,13 +59,13 @@ strum = { workspace = true }
 [features]
 default = []
 arbitrary = [
-    "value-setter/arbitrary",
+    "derive/arbitrary",
     "sov-modules-api/arbitrary",
     "sov-state/arbitrary",
     "sov-test-utils/arbitrary",
 ]
 native = [
-    "value-setter/native",
+    "derive/native",
     "sov-bank/native",
     "sov-modules-api/native",
     "sov-state/native",

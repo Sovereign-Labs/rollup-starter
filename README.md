@@ -11,7 +11,7 @@ It includes everything you need to create a rollup with customizable modules, RE
 - `crates/stf`: Contains the State Transition Function (STF) derived from the Runtime, used by both the rollup and prover crates
 - `crates/provers`: Generates proofs for the STF
 - `crates/rollup`: Runs the main rollup binary. This includes both the full-node and the soft-confirming sequencer (as well as replica + fail-over logic.)
-- `examples/value-setter`: Example module.
+- `examples/derive`: Example module showing how to let users deploy arbitrary solidity code to control matches on their own account.
 
 ## Prerequisites
 
@@ -32,6 +32,101 @@ The following tools are optional and only needed for specific features:
 - **SP1 toolchain**: For generating zero-knowledge proofs with SP1 (not needed for initial development)
 
 > **Note:** Start with the mock DA and zkVM configurations shown below. You can add the optional tools later when needed.
+
+
+### Example: Using solidity to Accept/Reject Transactions
+This example shows how to let users write custom code to accept/reject matched orders on their own account. (See `examples/derive` for full source code).
+Note that each account (maker and taker) sets the bytecode for their account only. They have complete discretion to accept or reject any match for any reason.
+
+For this demo, contracts invocations are limited to 100k gas and no state access. Any attempts to read state inside the authorizer will return 0. 
+
+1. (Prerequisite) In the repo root, run `cargo run` and to start the rollup leave it running
+2. In a fresh terminal, navigate to `examples/starter-js` and `npm install`. Then run `npm run match`.
+
+The script generates `maker`, `taker`, and `admin` accounts, funds them, installs the maker/taker authorizers code, and submits a match. 
+
+The order submitted is as follows:
+```json
+{
+  id: 1,
+  price: 42,
+  quantity: 3,
+  long_account: maker.address,
+  short_account: taker.address,
+  timestamp: Math.floor(Date.now() / 1000),
+  long_account_calldata: [0x01],
+  short_account_calldata: [0x01],
+},
+```
+
+The default solidity for each account is:
+
+```solidity
+pragma solidity ^0.8.24;
+
+  contract SkeletonAuthorizer {
+      error MatchRejected(string reason);
+
+      struct MatchInput {
+          uint64 id;
+          uint64 price;
+          uint64 quantity;
+          bytes longAccount;
+          bytes shortAccount;
+          uint64 timestamp;
+          bytes longAccountCalldata;
+          bytes shortAccountCalldata;
+      }
+
+      // The rollup passes raw abi.encode(MatchInput), not a function selector.
+      fallback(bytes calldata rawInput) external returns (bytes memory) {
+          MatchInput memory m = abi.decode(rawInput, (MatchInput));
+          _authorize(m);
+          return "";
+      }
+
+      function _authorize(MatchInput memory m) internal pure {
+          if (m.quantity == 0) revert MatchRejected("quantity is zero");
+          if (m.price == 0) revert MatchRejected("price is zero");
+          if (m.id != 4) revert MatchRejected("Only asset 4 is allowed");
+          if ((m.quantity * m.price) > 1000) revert MatchRejected("Max budget is 1000 tokens");
+
+          // Example policy hooks.
+          if (m.longAccountCalldata.length > 0 && m.longAccountCalldata[0] == 0x00) {
+              revert MatchRejected("long side rejected");
+          }
+
+          if (m.shortAccountCalldata.length > 0 && m.shortAccountCalldata[0] == 0x00) {
+              revert MatchRejected("short side rejected");
+          }
+
+          // Accept by returning normally.
+      }
+  }
+```
+
+You should see on your command line that the order is rejected because it has the wrong asset ID (only asset 4 is allowed). You can modify the
+script to submit asset ID 4 and see that the match is accepted. 
+
+To override the authorizer program for an account: 
+
+2. In Remix, compile your Solidity authorizer.
+3. Open `Compilation Details`.
+4. Under `Deployed Bytecode`, copy the `object` field.
+
+```
+
+```bash
+MAKER_AUTHORIZER_RUNTIME_BYTECODE=<paste_deployed_bytecode_object> \ 
+TAKER_AUTHORIZER_RUNTIME_BYTECODE=<paste_deployed_bytecode_object> \
+npm run match
+```
+
+This will use the appropriate private keys for the maker and taker accounts to update their authorizer bytecode. Then, it'll submit the match 
+and print the result.
+
+If at any point your rollup gets into a bad state, simply stop it and run `make clean-db` to reset.
+
 
 # Getting Started
 
@@ -60,21 +155,13 @@ $ cargo run
 $ sleep 12
 ```
 
+
 ### Explore the REST API endpoints via Swagger UI
 
 The rollup includes several built-in modules: Bank (for token management), Paymaster, Hyperlane, and more. You can query any state item in these modules:
 
 ```bash
 open http://127.0.0.1:12346/swagger-ui/#/ 
-```
-
-### Example: Query the `ValueSetter` Module's state value
-
-For now, you should just see null returned for the value state item, as the item hasn't been initialized:
-
-```bash,test-ci,bashtestmd:compare-output
-$ curl http://127.0.0.1:12346/modules/value-setter/state/value
-{"value":null}
 ```
 
 ## Programmatic Interaction with TypeScript

@@ -33,7 +33,7 @@ sov-evm = { workspace = true }
 sov-address = { workspace = true }
 
 tracing = { workspace = true }
-value-setter = { workspace = true }
+derive = { workspace = true }
 strum = { workspace = true }
 
 anyhow = { workspace = true }
@@ -63,7 +63,7 @@ native = [
 	"sov-sequencer-registry/native",
 	"sov-capabilities/native",
 	"sov-state/native",
-	"value-setter/native",
+	"derive/native",
 	"sov-rollup-apis",
 	"sov-kernels/native",
 	"sov-paymaster/native",
