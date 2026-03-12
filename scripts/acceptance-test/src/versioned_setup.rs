@@ -1,8 +1,7 @@
 use std::fs;
 use std::io;
-use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::Command as StdCommand;
 
 use anyhow::{anyhow, Context};
 use sov_rollup_manager::{ManagerConfig, RollupVersion};
@@ -10,6 +9,7 @@ use sov_soak_manager::{SoakManagerConfig, SoakWorkerConfig};
 use sov_versioned_artifact_builder::{
     prepare_artifacts, BuildRequest, BuildSpec, BuildTargets, RollupBuilder, VersionBuildSpec,
 };
+use tokio::process::Command as TokioCommand;
 use tracing::info;
 
 use crate::{Directories, ManagedRollupProcess, BLOCKS_PER_VERSION};
@@ -86,7 +86,7 @@ fn default_build_targets() -> BuildTargets {
     targets
 }
 
-fn run_checked(cmd: &mut Command, context: &str) -> Result<(), anyhow::Error> {
+fn run_checked(cmd: &mut StdCommand, context: &str) -> Result<(), anyhow::Error> {
     let output = cmd.output().with_context(|| format!("{context}: spawn"))?;
     if output.status.success() {
         return Ok(());
@@ -173,7 +173,7 @@ fn build_local_head_binaries(rollup_root: &Path) -> Result<(PathBuf, PathBuf), a
 
     tracing::info!("Building rollup at local HEAD...");
     run_checked(
-        Command::new("cargo").current_dir(rollup_root).args([
+        StdCommand::new("cargo").current_dir(rollup_root).args([
             "build",
             "--release",
             "--package",
@@ -189,7 +189,7 @@ fn build_local_head_binaries(rollup_root: &Path) -> Result<(PathBuf, PathBuf), a
 
     tracing::info!("Building soak test at local HEAD...");
     run_checked(
-        Command::new("cargo").current_dir(rollup_root).args([
+        StdCommand::new("cargo").current_dir(rollup_root).args([
             "build",
             "--release",
             "--package",
@@ -257,7 +257,7 @@ fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, any
     let manager_repo_arg = manager_repo.to_string_lossy().to_string();
 
     run_checked(
-        Command::new("git").args([
+        StdCommand::new("git").args([
             "clone",
             "--depth",
             "1",
@@ -270,7 +270,7 @@ fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, any
     )?;
 
     run_checked(
-        Command::new("cargo").current_dir(&manager_repo).args([
+        StdCommand::new("cargo").current_dir(&manager_repo).args([
             "build",
             "--release",
             "--bin",
@@ -481,7 +481,7 @@ pub fn spawn_rollup_manager(
         .to_string_lossy()
         .to_string();
 
-    let mut cmd = Command::new(manager_binary);
+    let mut cmd = TokioCommand::new(manager_binary);
     cmd.args([
         "-c",
         &manager_config_arg,

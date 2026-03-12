@@ -170,9 +170,7 @@ async fn run_setup(
         Ok(()) => {
             run_soak(
                 directories.clone(),
-                rollup
-                    .into_child()
-                    .expect("Rollup process missing before soak"),
+                rollup,
                 plan.soak_config.clone(),
                 throughput_start_batch,
                 stop_at_height,

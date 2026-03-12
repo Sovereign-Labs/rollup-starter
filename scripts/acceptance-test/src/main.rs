@@ -213,9 +213,7 @@ async fn run_test(
 
     let new_throughput_report = run_soak(
         directories.clone(),
-        rollup
-            .into_child()
-            .expect("Rollup process missing before soak"),
+        rollup,
         resync_soak_config,
         latest_batch_num,
         stop_at_height,

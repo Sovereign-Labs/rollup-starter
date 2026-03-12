@@ -15,11 +15,12 @@ use state_consistency::state_validation_worker;
 use std::path::PathBuf;
 use std::{
     env, fs,
-    process::{Child, Command, Output},
+    process::{Command as StdCommand, Output},
     thread,
     time::Duration,
 };
 use std::{fmt, future::Future};
+use tokio::process::Child;
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinSet;
 use tracing::{debug, info};
@@ -45,12 +46,8 @@ const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
 // Run each version of a multi-version rollup for this many blocks.
 pub const BLOCKS_PER_VERSION: u64 = 1000;
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
-const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
+const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 const TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT: Duration = Duration::from_secs(90);
-
-type RollupWaitResult = Result<std::process::ExitStatus, std::io::Error>;
-type RollupJoinResult = Result<RollupWaitResult, tokio::task::JoinError>;
-type RollupExitReceiver = oneshot::Receiver<RollupJoinResult>;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
@@ -100,43 +97,6 @@ impl Drop for PostgresContainerGuard {
                 container = %self.container_name,
                 "Failed to cleanup postgres container during drop: {e}"
             );
-        }
-    }
-}
-
-#[derive(Debug)]
-struct RollupCleanupGuard {
-    rollup_id: u32,
-    exited: bool,
-}
-
-impl RollupCleanupGuard {
-    fn new(rollup_id: u32) -> Self {
-        Self {
-            rollup_id,
-            exited: false,
-        }
-    }
-
-    fn rollup_id(&self) -> u32 {
-        self.rollup_id
-    }
-
-    fn request_shutdown(&self) {
-        if !self.exited {
-            kill_rollup(self.rollup_id);
-        }
-    }
-
-    fn mark_exited(&mut self) {
-        self.exited = true;
-    }
-}
-
-impl Drop for RollupCleanupGuard {
-    fn drop(&mut self) {
-        if !self.exited {
-            kill_rollup(self.rollup_id);
         }
     }
 }
@@ -205,7 +165,7 @@ pub fn cleanup_postgres_container(container_name: &str) -> Result<(), anyhow::Er
 }
 
 fn docker_output(args: &[&str]) -> Result<Output, anyhow::Error> {
-    Command::new("docker")
+    StdCommand::new("docker")
         .args(args)
         .output()
         .with_context(|| format!("failed to run docker {}", args.join(" ")))
@@ -403,28 +363,97 @@ fn save_slot_snapshot_if_needed(
 
 #[derive(Debug)]
 pub struct ManagedRollupProcess {
-    child: Option<Child>,
+    child: Child,
 }
 
 impl ManagedRollupProcess {
     pub fn new(child: Child) -> Self {
-        Self { child: Some(child) }
+        Self { child }
     }
 
-    pub fn into_child(mut self) -> Option<Child> {
-        self.child.take()
+    pub fn request_shutdown(&self) {
+        if let Some(rollup_id) = self.child.id() {
+            send_rollup_sigterm(rollup_id);
+        }
+    }
+
+    pub async fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
+        self.child.wait().await
+    }
+
+    async fn wait_for_exit(
+        &mut self,
+        timeout_duration: Duration,
+    ) -> Result<Option<std::process::ExitStatus>, anyhow::Error> {
+        let rollup_id = self.child.id();
+        match tokio::time::timeout(timeout_duration, self.wait()).await {
+            Ok(Ok(exit_status)) => Ok(Some(exit_status)),
+            Ok(Err(e)) => match rollup_id {
+                Some(rollup_id) => Err(anyhow!(
+                    "Failed to wait for rollup process {rollup_id}: {e}"
+                )),
+                None => Err(anyhow!("Failed to wait for already-exited rollup process: {e}")),
+            },
+            Err(_) => Ok(None),
+        }
+    }
+
+    pub async fn shutdown(&mut self) -> Result<(), anyhow::Error> {
+        if self.child.id().is_none() {
+            return Ok(());
+        }
+
+        self.request_shutdown();
+        if let Some(exit_status) = self.wait_for_exit(ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT).await? {
+            return ensure_rollup_exit_status(exit_status);
+        }
+
+        let Some(rollup_id) = self.child.id() else {
+            return Ok(());
+        };
+        tracing::warn!(
+            "Timed out waiting {:?} for rollup process {} to exit after SIGTERM. Sending SIGKILL.",
+            ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT,
+            rollup_id
+        );
+        send_rollup_sigkill(rollup_id);
+        if let Some(exit_status) = self.wait_for_exit(ROLLUP_FORCED_SHUTDOWN_TIMEOUT).await? {
+            return ensure_rollup_exit_status(exit_status);
+        }
+
+        Err(anyhow!(
+            "Rollup process {} did not terminate within {:?} after SIGKILL",
+            rollup_id,
+            ROLLUP_FORCED_SHUTDOWN_TIMEOUT
+        ))
+    }
+
+    pub async fn ensure_stopped(&mut self) -> Result<(), anyhow::Error> {
+        if self.child.id().is_none() {
+            return Ok(());
+        }
+
+        match self.wait_for_exit(ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT).await? {
+            Some(exit_status) => ensure_rollup_exit_status(exit_status),
+            None => {
+                let Some(rollup_id) = self.child.id() else {
+                    return Ok(());
+                };
+                tracing::warn!(
+                    "Timed out waiting {:?} for rollup process {} to exit naturally. Sending shutdown signal.",
+                    ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT,
+                    rollup_id
+                );
+                self.shutdown().await
+            }
+        }
     }
 }
 
 impl Drop for ManagedRollupProcess {
     fn drop(&mut self) {
-        let Some(mut child) = self.child.take() else {
-            return;
-        };
-
-        kill_rollup(child.id());
-        if let Err(e) = child.wait() {
-            tracing::warn!("Failed to wait for rollup process during cleanup: {e}");
+        if let Some(rollup_id) = self.child.id() {
+            send_rollup_sigkill(rollup_id);
         }
     }
 }
@@ -445,119 +474,44 @@ fn is_very_close_to_soak_test_end(num_soak_batches: u64, target_soak_batches: u6
     num_soak_batches.saturating_add(15) > target_soak_batches
 }
 
-/// Send SIGTERM to the rollup manager process group to gracefully shut it down.
-/// If the process group doesn't respond within 10 seconds, send SIGKILL.
-pub fn kill_rollup(rollup_id: u32) {
-    let process_group = format!("-{rollup_id}");
-    tracing::info!(
-        "Sending SIGTERM to rollup manager process group {} (leader pid {})",
-        process_group,
-        rollup_id
-    );
-
-    // Send SIGTERM to the full process group (manager + rollup children).
-    if let Err(e) = Command::new("kill")
-        .args(["-s", "SIGTERM", &process_group])
-        .status()
-    {
-        tracing::error!("Failed to send SIGTERM: {}", e);
+fn send_rollup_process_group_signal(rollup_id: u32, signal: libc::c_int, signal_name: &str) {
+    let process_group = -(rollup_id as libc::pid_t);
+    // SAFETY: `kill` is called with a negative pid to signal the entire process group whose
+    // leader pid we created when spawning the manager.
+    let rc = unsafe { libc::kill(process_group, signal) };
+    if rc == 0 {
+        tracing::info!(
+            "Sent {signal_name} to rollup manager process group {process_group} (leader pid {rollup_id})"
+        );
         return;
     }
 
-    // Wait up to 10 seconds for graceful shutdown.
-    for _ in 0..100 {
-        thread::sleep(Duration::from_millis(100));
-
-        // Check if the process group still exists using kill -0.
-        match Command::new("kill").args(["-0", &process_group]).status() {
-            Ok(status) if !status.success() => {
-                tracing::info!("Rollup process group {process_group} shut down gracefully");
-                return;
-            }
-            Err(_) => {
-                tracing::info!(
-                    "Unable to check rollup process group {process_group} status; assuming it no longer exists"
-                );
-                return;
-            }
-            Ok(_) => {
-                // Process group still exists, continue waiting.
-            }
-        }
+    let err = std::io::Error::last_os_error();
+    if err.raw_os_error() == Some(libc::ESRCH) {
+        tracing::debug!(
+            "Rollup process group {process_group} no longer exists while sending {signal_name}"
+        );
+    } else {
+        tracing::error!(
+            "Failed to send {signal_name} to rollup manager process group {process_group}: {err}"
+        );
     }
+}
 
-    // Process group didn't respond to SIGTERM, force kill.
-    tracing::warn!(
-        "Rollup process group {process_group} didn't respond to SIGTERM after 10s, sending SIGKILL"
+fn send_rollup_sigterm(rollup_id: u32) {
+    send_rollup_process_group_signal(rollup_id, libc::SIGTERM, "SIGTERM");
+}
+
+fn send_rollup_sigkill(rollup_id: u32) {
+    send_rollup_process_group_signal(rollup_id, libc::SIGKILL, "SIGKILL");
+}
+
+fn ensure_rollup_exit_status(exit_status: std::process::ExitStatus) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        exit_status.success(),
+        "Rollup process exited with non-zero status: {exit_status}"
     );
-    if let Err(e) = Command::new("kill").args(["-9", &process_group]).status() {
-        tracing::error!("Failed to send SIGKILL: {e}");
-    }
-}
-
-fn ensure_rollup_exit_result(rollup_result: RollupJoinResult) -> anyhow::Result<()> {
-    match rollup_result {
-        Ok(Ok(exit_status)) => {
-            anyhow::ensure!(
-                exit_status.success(),
-                "Rollup process exited with non-zero status: {exit_status}"
-            );
-            Ok(())
-        }
-        Ok(Err(e)) => Err(anyhow::anyhow!("Rollup process wait failed: {e}")),
-        Err(e) => Err(anyhow::anyhow!("Rollup wait task failed: {e}")),
-    }
-}
-
-async fn wait_for_rollup_exit_with_timeout(
-    rollup_id: u32,
-    rollup_rx: &mut RollupExitReceiver,
-) -> anyhow::Result<()> {
-    match tokio::time::timeout(ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT, &mut *rollup_rx).await {
-        Ok(Ok(rollup_result)) => return ensure_rollup_exit_result(rollup_result),
-        Ok(Err(e)) => {
-            return Err(anyhow::anyhow!(
-                "Failed to receive rollup process result while waiting for graceful shutdown: {e}"
-            ));
-        }
-        Err(_) => {
-            tracing::warn!(
-                "Timed out waiting {:?} for rollup process {} to exit gracefully. Sending shutdown signal.",
-                ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT,
-                rollup_id
-            );
-            kill_rollup(rollup_id);
-        }
-    }
-
-    match tokio::time::timeout(ROLLUP_FORCED_SHUTDOWN_TIMEOUT, &mut *rollup_rx).await {
-        Ok(Ok(rollup_result)) => ensure_rollup_exit_result(rollup_result),
-        Ok(Err(e)) => Err(anyhow::anyhow!(
-            "Failed to receive rollup process result after forcing shutdown: {e}"
-        )),
-        Err(_) => Err(anyhow::anyhow!(
-            "Rollup process {} did not terminate within {:?} after forced shutdown",
-            rollup_id,
-            ROLLUP_FORCED_SHUTDOWN_TIMEOUT
-        )),
-    }
-}
-
-async fn wait_for_rollup_exit_after_shutdown_request(
-    rollup_id: u32,
-    rollup_rx: &mut RollupExitReceiver,
-) -> anyhow::Result<()> {
-    match tokio::time::timeout(ROLLUP_FORCED_SHUTDOWN_TIMEOUT, &mut *rollup_rx).await {
-        Ok(Ok(rollup_result)) => ensure_rollup_exit_result(rollup_result),
-        Ok(Err(e)) => Err(anyhow::anyhow!(
-            "Failed to receive rollup process result after shutdown request: {e}"
-        )),
-        Err(_) => Err(anyhow::anyhow!(
-            "Rollup process {} did not terminate within {:?} after shutdown request",
-            rollup_id,
-            ROLLUP_FORCED_SHUTDOWN_TIMEOUT
-        )),
-    }
+    Ok(())
 }
 
 fn combine_soak_errors(
@@ -589,24 +543,14 @@ fn combine_soak_errors(
 
 pub async fn run_soak(
     directories: Directories,
-    mut rollup: std::process::Child,
+    mut rollup: ManagedRollupProcess,
     soak_config: SoakManagerConfig,
     throughput_start_batch: u64,
     rollup_stop_height: u64,
     save_slot_snapshots: bool,
     mut shutdown_rx: ShutdownReceiver,
 ) -> Result<ThroughputReport, anyhow::Error> {
-    let (rollup_tx, mut rollup_rx) = oneshot::channel();
-    let rollup_id = rollup.id();
-    let mut rollup_guard = RollupCleanupGuard::new(rollup_id);
-    let mut rollup_exited = false;
     let target_soak_batches = rollup_stop_height.saturating_sub(throughput_start_batch);
-
-    // Spawn background task to wait for rollup process
-    tokio::spawn(async move {
-        let result = tokio::task::spawn_blocking(move || rollup.wait()).await;
-        let _ = rollup_tx.send(result);
-    });
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
     slot_fetcher.subscribe_slots(false).await?;
@@ -654,18 +598,11 @@ pub async fn run_soak(
             tokio::select! {
             biased;
             // Rollup shutdown
-            rollup_result = &mut rollup_rx => {
-                match rollup_result {
-                    Ok(rollup_result) => {
-                        rollup_exited = true;
-                        rollup_guard.mark_exited();
-                        ensure_rollup_exit_result(rollup_result)?;
-                        tracing::info!("Rollup process finished with successful status");
-                    },
-                    Err(e) => {
-                        break Err(anyhow!("Failed to receive rollup process result: {e}"));
-                    },
-                }
+            rollup_result = rollup.wait() => {
+                let exit_status = rollup_result
+                    .map_err(|e| anyhow!("Failed to wait for rollup process: {e}"))?;
+                ensure_rollup_exit_status(exit_status)?;
+                tracing::info!("Rollup process finished with successful status");
                 break Ok(());
             }
             // Background task failure
@@ -785,22 +722,16 @@ pub async fn run_soak(
         }
     }
 
-    if !rollup_exited {
-        let rollup_shutdown_result = if primary_error.is_some() {
-            rollup_guard.request_shutdown();
-            wait_for_rollup_exit_after_shutdown_request(rollup_guard.rollup_id(), &mut rollup_rx)
-                .await
-        } else {
-            wait_for_rollup_exit_with_timeout(rollup_guard.rollup_id(), &mut rollup_rx).await
-        };
+    let rollup_shutdown_result = if primary_error.is_some() {
+        rollup.shutdown().await
+    } else {
+        rollup.ensure_stopped().await
+    };
 
-        match rollup_shutdown_result {
-            Ok(()) => {
-                rollup_guard.mark_exited();
-            }
-            Err(e) => {
-                additional_errors.push(e);
-            }
+    match rollup_shutdown_result {
+        Ok(()) => {}
+        Err(e) => {
+            additional_errors.push(e);
         }
     }
 
