@@ -1,17 +1,14 @@
-use alloy_primitives::{address, Address as EvmAddress, Bytes, B256, U256};
-use alloy_sol_types::{decode_revert_reason, sol, SolError, SolValue};
-use anyhow::{anyhow, bail, Context as _, Result};
+use alloy_primitives::{address, Address as EvmAddress, Bytes};
+use alloy_sol_types::sol;
+use anyhow::{anyhow, bail};
 use borsh::{BorshDeserialize, BorshSerialize};
+use revm::handler::Handler;
 use revm::context::{
-    result::{EVMError, ExecutionResult, HaltReason, InvalidTransaction},
-    Cfg, ContextTr, JournalTr, LocalContextTr, Transaction, TxEnv,
+    result::{EVMError, ExecutionResult, InvalidTransaction},
+    TxEnv,
 };
-use revm::handler::{execution, EvmTr, EvmTrError, FrameResult, FrameTr, Handler};
-use revm::interpreter::{interpreter_action::FrameInit, FrameInput, SharedMemory};
 use revm::primitives::hardfork::SpecId;
-use revm::state::{AccountInfo, Bytecode};
-use revm::{Context as EvmContext, Database, ExecuteEvm, MainBuilder, MainContext};
-use revm_database_interface::DBErrorMarker;
+use revm::{Context as EvmContext, ExecuteEvm, MainBuilder, MainContext};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sov_modules_api::macros::{serialize, UniversalWallet};
@@ -22,27 +19,17 @@ use sov_modules_api::{
 use sov_state::BcsCodec;
 use std::marker::PhantomData;
 
+use crate::evm_helpers::{
+    encode_match_authorizer_input, execute_authorizer, EvmTxState, EvmTxStateError,
+    StaticAuthorizerHandler,
+};
+
+mod evm_helpers;
+
 const AUTHORIZER_GAS_LIMIT: u64 = 100_000;
 const AUTHORIZER_MEMORY_LIMIT: u64 = 50 * 1024 * 1024;
 const AUTHORIZER_ADDRESS: EvmAddress = address!("0000000000000000000000000000000000001000");
 const AUTHORIZER_CALLER: EvmAddress = address!("0000000000000000000000000000000000000000");
-
-type AuthorizerEvmError = EVMError<EvmTxStateError, InvalidTransaction>;
-
-sol! {
-    struct MatchAuthorizerInput {
-        uint64 id;
-        uint64 price;
-        uint64 quantity;
-        bytes longAccount;
-        bytes shortAccount;
-        uint64 timestamp;
-        bytes longAccountCalldata;
-        bytes shortAccountCalldata;
-    }
-
-    error MatchRejected(string reason);
-}
 
 /// A new module:
 /// - Must derive `ModuleInfo`
@@ -81,7 +68,7 @@ impl<S: Spec> Module for Derive<S> {
         msg: Self::CallMessage,
         context: &CallContext<Self::Spec>,
         state: &mut impl TxState<S>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         match msg {
             CallMessage::Match(match_msg) => {
                 let Some(long_authorizer) = self.authorizers.get(&match_msg.long_account, state)?
@@ -103,9 +90,11 @@ impl<S: Spec> Module for Derive<S> {
                 let calldata = encode_match_authorizer_input(&match_msg);
                 execute_authorizer(&long_authorizer, calldata.clone())?;
                 execute_authorizer(&short_authorizer, calldata)?;
+                // Note: Code to actually update exchange state based on the match is omitted here.
                 Ok(())
             }
             CallMessage::SetAuthorizer(authorizer) => {
+                // Allows the transaction sender to set the EVM bytecode for transactions against their own account.
                 self.authorizers.set(context.sender(), &authorizer, state)?;
                 self.emit_event(
                     state,
@@ -117,167 +106,51 @@ impl<S: Spec> Module for Derive<S> {
     }
 }
 
-pub struct EvmTxState {
-    code: Bytecode,
-    code_hash: B256,
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    JsonSchema,
+    UniversalWallet,
+    Deserialize,
+    Serialize,
+    BorshDeserialize,
+    BorshSerialize,
+)]
+#[schemars(rename = "call_message")]
+#[schemars(bound = "S: Spec")]
+#[serde(bound = "S: Spec")]
+#[serde(rename_all = "snake_case")]
+/// we support two transaction types
+pub enum CallMessage<S: Spec> {
+    /// Match simulates the result of a match on the exchange
+    Match(Match<S>),
+    /// SetAuthorizer allows the transaction sender to set the EVM bytecode which is used to accept or reject matches against their account.
+    SetAuthorizer(Vec<u8>),
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum EvmTxStateError {
-    #[error("Code not found")]
-    CodeNotFound,
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    JsonSchema,
+    Deserialize,
+    Serialize,
+    BorshDeserialize,
+    BorshSerialize,
+)]
+#[schemars(rename = "call_message")]
+#[schemars(bound = "S: Spec")]
+pub enum Event<S: Spec> {
+    AuthorizerSet(S::Address, String),
 }
 
-impl DBErrorMarker for EvmTxStateError {}
-
-impl EvmTxState {
-    fn new(code: &[u8]) -> Result<Self> {
-        let code = Bytecode::new_raw_checked(Bytes::from(code.to_vec()))
-            .context("Authorizer bytecode is invalid")?;
-        let code_hash = code.hash_slow();
-
-        Ok(Self { code, code_hash })
-    }
-
-    fn authorizer_account(&self) -> AccountInfo {
-        AccountInfo::new(U256::ZERO, 0, self.code_hash, self.code.clone())
-    }
-}
-
-impl Database for EvmTxState {
-    type Error = EvmTxStateError;
-
-    fn basic(&mut self, address: EvmAddress) -> Result<Option<AccountInfo>, Self::Error> {
-        if address == AUTHORIZER_ADDRESS {
-            Ok(Some(self.authorizer_account()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
-        if code_hash == self.code_hash {
-            Ok(self.code.clone())
-        } else {
-            Err(EvmTxStateError::CodeNotFound)
-        }
-    }
-
-    fn storage(&mut self, _address: EvmAddress, _index: U256) -> Result<U256, Self::Error> {
-        Ok(U256::ZERO)
-    }
-
-    fn block_hash(&mut self, _number: u64) -> Result<B256, Self::Error> {
-        Ok(B256::ZERO)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct StaticAuthorizerHandler<CTX, ERROR, FRAME> {
-    _phantom: PhantomData<(CTX, ERROR, FRAME)>,
-}
-
-impl<EVM, ERROR, FRAME> Handler for StaticAuthorizerHandler<EVM, ERROR, FRAME>
-where
-    EVM: EvmTr<Context: ContextTr<Journal: JournalTr>, Frame = FRAME>,
-    ERROR: EvmTrError<EVM>,
-    FRAME: FrameTr<FrameResult = FrameResult, FrameInit = FrameInit>,
-{
-    type Evm = EVM;
-    type Error = ERROR;
-    type HaltReason = HaltReason;
-
-    fn first_frame_input(
-        &mut self,
-        evm: &mut Self::Evm,
-        gas_limit: u64,
-    ) -> Result<FrameInit, Self::Error> {
-        let ctx = evm.ctx_mut();
-        let mut memory = SharedMemory::new_with_buffer(ctx.local().shared_memory_buffer().clone());
-        memory.set_memory_limit(ctx.cfg().memory_limit());
-
-        let (tx, journal) = ctx.tx_journal_mut();
-        let bytecode = if let Some(&to) = tx.kind().to() {
-            let account = &journal.load_account_with_code(to)?.info;
-
-            if let Some(Bytecode::Eip7702(eip7702_bytecode)) = &account.code {
-                let delegated_address = eip7702_bytecode.delegated_address;
-                let account = &journal.load_account_with_code(delegated_address)?.info;
-                Some((
-                    account.code.clone().unwrap_or_default(),
-                    account.code_hash(),
-                ))
-            } else {
-                Some((
-                    account.code.clone().unwrap_or_default(),
-                    account.code_hash(),
-                ))
-            }
-        } else {
-            None
-        };
-
-        let mut frame_input = execution::create_init_frame(tx, bytecode, gas_limit);
-        let FrameInput::Call(inputs) = &mut frame_input else {
-            unreachable!("authorizer execution must be a call");
-        };
-        inputs.is_static = true;
-
-        Ok(FrameInit {
-            depth: 0,
-            memory,
-            frame_input,
-        })
-    }
-}
-
-impl<CTX, ERROR, FRAME> Default for StaticAuthorizerHandler<CTX, ERROR, FRAME> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-fn encode_match_authorizer_input<S: Spec>(match_msg: &Match<S>) -> Vec<u8> {
-    MatchAuthorizerInput {
-        id: match_msg.id,
-        price: match_msg.price,
-        quantity: match_msg.quantity,
-        longAccount: Bytes::from(match_msg.long_account.as_ref().to_vec()),
-        shortAccount: Bytes::from(match_msg.short_account.as_ref().to_vec()),
-        timestamp: match_msg.timestamp,
-        longAccountCalldata: Bytes::from(match_msg.long_account_calldata.clone()),
-        shortAccountCalldata: Bytes::from(match_msg.short_account_calldata.clone()),
-    }
-    .abi_encode()
-}
-
-fn decode_authorizer_revert(output: &[u8]) -> String {
-    if let Ok(err) = MatchRejected::abi_decode(output) {
-        return err.reason;
-    }
-
-    decode_revert_reason(output).unwrap_or_else(|| format!("0x{}", hex::encode(output)))
-}
-
-fn execute_authorizer(authorizer: &[u8], calldata: Vec<u8>) -> Result<()> {
-    match run_authorizer(authorizer, calldata)? {
-        ExecutionResult::Success { .. } => Ok(()),
-        ExecutionResult::Revert { output, .. } => {
-            bail!(
-                "Authorizer rejected the match: {}",
-                decode_authorizer_revert(&output)
-            )
-        }
-        ExecutionResult::Halt { reason, .. } => {
-            bail!("Authorizer halted during evaluation: {reason:?}")
-        }
-    }
-}
-
-fn run_authorizer(authorizer: &[u8], calldata: Vec<u8>) -> Result<ExecutionResult> {
+fn run_authorizer(authorizer: &[u8], calldata: Vec<u8>) -> anyhow::Result<ExecutionResult> {
     let db = EvmTxState::new(authorizer)?;
+    // Cratft a dummy transaction for the authorizer that calls the authorizer precompile
     let tx = TxEnv::builder()
         .caller(AUTHORIZER_CALLER)
         .call(AUTHORIZER_ADDRESS)
@@ -303,6 +176,7 @@ fn run_authorizer(authorizer: &[u8], calldata: Vec<u8>) -> Result<ExecutionResul
         })
         .build_mainnet();
 
+    // Use revm `run_system_call` to execute the authorizer without extra setup or teardown
     let result = StaticAuthorizerHandler::<_, AuthorizerEvmError, _>::default()
         .run_system_call(&mut evm)
         .map_err(|err| anyhow!("Failed to execute authorizer: {err:?}"));
@@ -310,43 +184,24 @@ fn run_authorizer(authorizer: &[u8], calldata: Vec<u8>) -> Result<ExecutionResul
     result
 }
 
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    JsonSchema,
-    UniversalWallet,
-    Deserialize,
-    Serialize,
-    BorshDeserialize,
-    BorshSerialize,
-)]
-#[schemars(rename = "call_message")]
-#[schemars(bound = "S: Spec")]
-#[serde(bound = "S: Spec")]
-#[serde(rename_all = "snake_case")]
-pub enum CallMessage<S: Spec> {
-    Match(Match<S>),
-    SetAuthorizer(Vec<u8>),
+
+type AuthorizerEvmError = EVMError<EvmTxStateError, InvalidTransaction>;
+
+sol! {
+    struct MatchAuthorizerInput {
+        uint64 id;
+        uint64 price;
+        uint64 quantity;
+        bytes longAccount;
+        bytes shortAccount;
+        uint64 timestamp;
+        bytes longAccountCalldata;
+        bytes shortAccountCalldata;
+    }
+
+    error MatchRejected(string reason);
 }
 
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    JsonSchema,
-    Deserialize,
-    Serialize,
-    BorshDeserialize,
-    BorshSerialize,
-)]
-#[schemars(rename = "call_message")]
-#[schemars(bound = "S: Spec")]
-pub enum Event<S: Spec> {
-    AuthorizerSet(S::Address, String),
-}
 #[derive(Debug, Clone, PartialEq, Eq, JsonSchema, UniversalWallet)]
 #[serialize(Borsh, Serde)]
 #[serde(rename = "match")]
