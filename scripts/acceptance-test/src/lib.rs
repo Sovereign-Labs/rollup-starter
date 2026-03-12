@@ -543,6 +543,50 @@ async fn wait_for_rollup_exit_with_timeout(
     }
 }
 
+async fn wait_for_rollup_exit_after_shutdown_request(
+    rollup_id: u32,
+    rollup_rx: &mut RollupExitReceiver,
+) -> anyhow::Result<()> {
+    match tokio::time::timeout(ROLLUP_FORCED_SHUTDOWN_TIMEOUT, &mut *rollup_rx).await {
+        Ok(Ok(rollup_result)) => ensure_rollup_exit_result(rollup_result),
+        Ok(Err(e)) => Err(anyhow::anyhow!(
+            "Failed to receive rollup process result after shutdown request: {e}"
+        )),
+        Err(_) => Err(anyhow::anyhow!(
+            "Rollup process {} did not terminate within {:?} after shutdown request",
+            rollup_id,
+            ROLLUP_FORCED_SHUTDOWN_TIMEOUT
+        )),
+    }
+}
+
+fn combine_soak_errors(
+    primary_error: Option<anyhow::Error>,
+    additional_errors: Vec<anyhow::Error>,
+) -> Option<anyhow::Error> {
+    let additional_len = additional_errors.len();
+    match (primary_error, additional_len) {
+        (None, 0) => None,
+        (Some(err), 0) => Some(err),
+        (None, 1) => Some(
+            additional_errors
+                .into_iter()
+                .next()
+                .expect("single additional error must exist"),
+        ),
+        (primary_error, _) => {
+            let mut messages = Vec::new();
+            if let Some(err) = primary_error {
+                messages.push(format!("Primary error: {err:#}"));
+            }
+            for (idx, err) in additional_errors.into_iter().enumerate() {
+                messages.push(format!("Additional error {}: {err:#}", idx + 1));
+            }
+            Some(anyhow!(messages.join("\n")))
+        }
+    }
+}
+
 pub async fn run_soak(
     directories: Directories,
     mut rollup: std::process::Child,
@@ -604,12 +648,26 @@ pub async fn run_soak(
     let mut num_soak_slots = 0;
     let mut num_soak_batches = 0;
     let mut num_previous_txs: Option<u64> = None;
-    let mut shutdown_requested = false;
 
     let run_result: anyhow::Result<()> = async {
         loop {
             tokio::select! {
             biased;
+            // Rollup shutdown
+            rollup_result = &mut rollup_rx => {
+                match rollup_result {
+                    Ok(rollup_result) => {
+                        rollup_exited = true;
+                        rollup_guard.mark_exited();
+                        ensure_rollup_exit_result(rollup_result)?;
+                        tracing::info!("Rollup process finished with successful status");
+                    },
+                    Err(e) => {
+                        break Err(anyhow!("Failed to receive rollup process result: {e}"));
+                    },
+                }
+                break Ok(());
+            }
             // Background task failure
             Some(task_result) = background_tasks.join_next() => {
                 match task_result {
@@ -622,13 +680,11 @@ pub async fn run_soak(
                             tracing::warn!("Background task failed very near the end of the test. Assuming the rollup shut down.");
                         } else {
                             tracing::error!("Background task failed: {}", e);
-                            rollup_guard.request_shutdown();
                             break Err(e);
                         }
                     }
                     Err(e) => {
                         tracing::error!("Background task panicked: {}", e);
-                        rollup_guard.request_shutdown();
                         break Err(e.into());
                     }
                 }
@@ -699,31 +755,15 @@ pub async fn run_soak(
             }
             shutdown_reason = wait_for_shutdown(&mut shutdown_rx) => {
                 tracing::info!("Received {shutdown_reason}, initiating soak shutdown");
-                shutdown_requested = true;
-                rollup_guard.request_shutdown();
                 break Err(shutdown_error(shutdown_reason));
             },
-            // Rollup shutdown
-            rollup_result = &mut rollup_rx => {
-                match rollup_result {
-                    Ok(rollup_result) => {
-                        ensure_rollup_exit_result(rollup_result)?;
-                        tracing::info!("Rollup process finished with successful status");
-                        rollup_exited = true;
-                        rollup_guard.mark_exited();
-                    },
-                    Err(e) => {
-                        break Err(anyhow!("Failed to receive rollup process result: {e}"));
-                    },
-                }
-                break Ok(());
-            }
         }
         }
     }
     .await;
 
-    let mut final_error = run_result.err();
+    let primary_error = run_result.err();
+    let mut additional_errors = Vec::new();
 
     background_tasks.abort_all();
     while let Some(task_result) = background_tasks.join_next().await {
@@ -734,46 +774,37 @@ pub async fn run_soak(
                     tracing::warn!(
                         "Ignoring background task failure during shutdown very near the end of the test: {e}"
                     );
-                } else if final_error.is_none() || shutdown_requested {
-                    final_error = Some(e);
-                    shutdown_requested = false;
                 } else {
-                    tracing::warn!(
-                        "Ignoring additional background task failure during shutdown: {e}"
-                    );
+                    additional_errors.push(e);
                 }
             }
             Err(e) if e.is_cancelled() => {}
             Err(e) => {
-                let err = anyhow!("Background task panicked during shutdown: {e}");
-                if final_error.is_none() || shutdown_requested {
-                    final_error = Some(err);
-                    shutdown_requested = false;
-                } else {
-                    tracing::warn!(
-                        "Ignoring additional background task panic during shutdown: {e}"
-                    );
-                }
+                additional_errors.push(anyhow!("Background task panicked during shutdown: {e}"));
             }
         }
     }
 
     if !rollup_exited {
-        match wait_for_rollup_exit_with_timeout(rollup_guard.rollup_id(), &mut rollup_rx).await {
+        let rollup_shutdown_result = if primary_error.is_some() {
+            rollup_guard.request_shutdown();
+            wait_for_rollup_exit_after_shutdown_request(rollup_guard.rollup_id(), &mut rollup_rx)
+                .await
+        } else {
+            wait_for_rollup_exit_with_timeout(rollup_guard.rollup_id(), &mut rollup_rx).await
+        };
+
+        match rollup_shutdown_result {
             Ok(()) => {
                 rollup_guard.mark_exited();
             }
             Err(e) => {
-                if final_error.is_none() {
-                    final_error = Some(e);
-                } else {
-                    tracing::warn!("Ignoring additional rollup shutdown failure: {e}");
-                }
+                additional_errors.push(e);
             }
         }
     }
 
-    if let Some(err) = final_error {
+    if let Some(err) = combine_soak_errors(primary_error, additional_errors) {
         return Err(err);
     }
 
