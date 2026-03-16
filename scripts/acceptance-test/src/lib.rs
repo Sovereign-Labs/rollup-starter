@@ -42,9 +42,9 @@ pub const API_ADDR: &str = "127.0.0.1:12348";
 pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 
 // Save a full snapshot of the slot every N slots
-const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
+const FULL_SLOT_SAVE_INTERVAL: u64 = 5;
 // Run each version of a multi-version rollup for this many blocks.
-pub const BLOCKS_PER_VERSION: u64 = 1000;
+pub const BLOCKS_PER_VERSION: u64 = 25;
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 const TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT: Duration = Duration::from_secs(90);
@@ -371,6 +371,10 @@ impl ManagedRollupProcess {
         Self { child }
     }
 
+    pub fn id(&self) -> Option<u32> {
+        self.child.id()
+    }
+
     pub fn request_shutdown(&self) {
         if let Some(rollup_id) = self.child.id() {
             send_rollup_sigterm(rollup_id);
@@ -631,65 +635,99 @@ pub async fn run_soak(
             // On each slot, we update our counters and save a snapshot of the slot.
             // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
             new_slot = slot_fetcher.next_slot() => {
-
-                if let Some(slot) = new_slot? {
-                    // Get the latest tx number after the slot
-                    if slot.batch_range.start != slot.batch_range.end {
-                        let batch_num = slot.batch_range.end - 1;
-                        match slot_fetcher.fetch_batch_without_children(batch_num).await {
-                            Ok(batch) => {
-                                if batch_num >= throughput_start_batch && num_previous_txs.is_none() {
-                                    let reference_batch = slot_fetcher
-                                        .fetch_batch_without_children(throughput_start_batch)
-                                        .await
-                                        .map_err(|e| anyhow!("failed to fetch throughput start batch {throughput_start_batch}: {e}"))?;
-                                    num_previous_txs = Some(reference_batch.tx_range.end);
-                                }
-
-                                // Count throughput from the first batch after `throughput_start_batch`.
-                                if batch_num > throughput_start_batch {
-                                    if let Some(previous_txs) = num_previous_txs {
-                                        num_soak_txs = batch.tx_range.end.saturating_sub(previous_txs);
-                                        num_soak_batches += 1;
-                                    }
-                                }
+                let Some(slot) = new_slot? else {
+                    match rollup.child.try_wait() {
+                        Ok(Some(exit_status)) => {
+                            ensure_rollup_exit_status(exit_status)?;
+                            break Ok(());
+                        }
+                        Ok(None) => {
+                            if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches)
+                            {
+                                tracing::warn!(
+                                    "Slot stream closed near expected test end while rollup manager pid={:?} was still running. Treating this as shutdown and proceeding to teardown.",
+                                    rollup.id()
+                                );
+                                break Ok(());
                             }
-                            Err(e) => {
-                                // If we're very close to the end of the test, the rollup might have shut down before we could finish querying.
-                                // The test shouldn't fail for this reason, so we just skip the batch.
-                                if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
-                                    tracing::debug!("Soak slot fetcher encountered an error near the end of the test; num_soak_batches: {num_soak_batches}, target_soak_batches: {target_soak_batches}, slot number: {}, rollup_stop_height: {rollup_stop_height}", slot.number);
-                                    tracing::warn!("Encountered an error very near the end of the test. Assuming the rollup shut down.");
-                                    break Ok(());
-                                } else {
-                                    break Err(anyhow!("Failed to fetch batch {}: {}", batch_num, e));
+                            tracing::warn!(
+                                "Slot stream closed before rollup manager exited (pid={:?})",
+                                rollup.id()
+                            );
+                            break Err(anyhow!(
+                                "Slot stream closed before rollup manager exited (pid={:?})",
+                                rollup.id()
+                            ));
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to query rollup manager status after slot stream closed (pid={:?}): {e}",
+                                rollup.id()
+                            );
+                            break Err(anyhow!(
+                                "Failed to query rollup manager status after slot stream closed (pid={:?}): {e}",
+                                rollup.id()
+                            ));
+                        }
+                    }
+                };
+
+                // Get the latest tx number after the slot
+                if slot.batch_range.start != slot.batch_range.end {
+                    let batch_num = slot.batch_range.end - 1;
+                    match slot_fetcher.fetch_batch_without_children(batch_num).await {
+                        Ok(batch) => {
+                            if batch_num >= throughput_start_batch && num_previous_txs.is_none() {
+                                let reference_batch = slot_fetcher
+                                    .fetch_batch_without_children(throughput_start_batch)
+                                    .await
+                                    .map_err(|e| anyhow!("failed to fetch throughput start batch {throughput_start_batch}: {e}"))?;
+                                num_previous_txs = Some(reference_batch.tx_range.end);
+                            }
+
+                            // Count throughput from the first batch after `throughput_start_batch`.
+                            if batch_num > throughput_start_batch {
+                                if let Some(previous_txs) = num_previous_txs {
+                                    num_soak_txs = batch.tx_range.end.saturating_sub(previous_txs);
+                                    num_soak_batches += 1;
                                 }
                             }
                         }
-                    }
-                    // If we haven't started processing any txs yet skip the rest of the loop. Don't forget to save the slot snapshot before we do though!
-                    if num_soak_batches == 0 {
-                        save_slot_snapshot_if_needed(&slot, &directories, save_slot_snapshots)?;
-                        continue;
-                    }
-
-                    // Otherwise, we need to do some accounting
-                    num_soak_slots += 1;
-                    info!("Received new slot {}, with batch {}. Rollup has processed {} txs in {} slots. Average throughput: {} txs/slot", slot.number, slot.batch_range.start, num_soak_txs, num_soak_slots, num_soak_txs as f64 / num_soak_slots as f64);
-                    // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
-                    if num_soak_slots % FULL_SLOT_SAVE_INTERVAL == 0 {
-                       match client.get_slot_by_id(&types::IntOrHash::Integer(slot.number), Some(GetSlotByIdChildren::_1)).await {
-                            Ok(full_slot) => {
-                                save_slot_snapshot_if_needed(&full_slot, &directories, save_slot_snapshots)?;
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to fetch full slot {}: {}.", slot.number, e);
-                                save_slot_snapshot_if_needed(&slot, &directories, save_slot_snapshots)?;
+                        Err(e) => {
+                            // If we're very close to the end of the test, the rollup might have shut down before we could finish querying.
+                            // The test shouldn't fail for this reason, so we just skip the batch.
+                            if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
+                                tracing::debug!("Soak slot fetcher encountered an error near the end of the test; num_soak_batches: {num_soak_batches}, target_soak_batches: {target_soak_batches}, slot number: {}, rollup_stop_height: {rollup_stop_height}", slot.number);
+                                tracing::warn!("Encountered an error very near the end of the test. Assuming the rollup shut down.");
+                                break Ok(());
+                            } else {
+                                break Err(anyhow!("Failed to fetch batch {}: {}", batch_num, e));
                             }
                         }
-                    } else {
-                        save_slot_snapshot_if_needed(&slot, &directories, save_slot_snapshots)?;
                     }
+                }
+                // If we haven't started processing any txs yet skip the rest of the loop. Don't forget to save the slot snapshot before we do though!
+                if num_soak_batches == 0 {
+                    save_slot_snapshot_if_needed(&slot, &directories, save_slot_snapshots)?;
+                    continue;
+                }
+
+                // Otherwise, we need to do some accounting
+                num_soak_slots += 1;
+                info!("Received new slot {}, with batch {}. Rollup has processed {} txs in {} slots. Average throughput: {} txs/slot", slot.number, slot.batch_range.start, num_soak_txs, num_soak_slots, num_soak_txs as f64 / num_soak_slots as f64);
+                // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
+                if num_soak_slots % FULL_SLOT_SAVE_INTERVAL == 0 {
+                   match client.get_slot_by_id(&types::IntOrHash::Integer(slot.number), Some(GetSlotByIdChildren::_1)).await {
+                        Ok(full_slot) => {
+                            save_slot_snapshot_if_needed(&full_slot, &directories, save_slot_snapshots)?;
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to fetch full slot {}: {}.", slot.number, e);
+                            save_slot_snapshot_if_needed(&slot, &directories, save_slot_snapshots)?;
+                        }
+                    }
+                } else {
+                    save_slot_snapshot_if_needed(&slot, &directories, save_slot_snapshots)?;
                 }
             }
             shutdown_reason = wait_for_shutdown(&mut shutdown_rx) => {
