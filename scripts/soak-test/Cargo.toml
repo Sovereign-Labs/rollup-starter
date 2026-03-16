@@ -37,6 +37,7 @@ celestia_da = ["rollup-starter/celestia_da", "dep:sov-celestia-adapter"]
 sp1 = ["sov-sp1-adapter", "rollup-starter/sp1"]
 risc0 = ["sov-risc0-adapter", "rollup-starter/risc0"]
 mock_zkvm = ["rollup-starter/mock_zkvm"]
+acceptance-testing = ["rollup-starter/acceptance-testing"]
 
 
 [[bin]]

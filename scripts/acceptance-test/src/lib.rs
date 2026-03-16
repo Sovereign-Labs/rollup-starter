@@ -481,9 +481,13 @@ fn is_very_close_to_soak_test_end(num_soak_batches: u64, target_soak_batches: u6
 }
 
 fn send_rollup_process_group_signal(rollup_id: u32, signal: libc::c_int, signal_name: &str) {
-    let process_group = -(rollup_id as libc::pid_t);
-    // SAFETY: `kill` is called with a negative pid to signal the entire process group whose
-    // leader pid we created when spawning the manager.
+    let rollup_pid: libc::pid_t = rollup_id
+        .try_into()
+        .expect("rollup pid must fit in libc::pid_t");
+    let process_group = -rollup_pid;
+    // SAFETY: `libc::kill` is an FFI call. We pass a valid `pid_t` derived from the child pid
+    // and a signal number from libc; any operational failure is reported via the return value and
+    // `errno`, which we handle below.
     let rc = unsafe { libc::kill(process_group, signal) };
     if rc == 0 {
         tracing::info!(
