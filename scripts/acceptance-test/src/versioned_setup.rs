@@ -1,4 +1,5 @@
 use std::fs;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -490,6 +491,9 @@ pub fn spawn_rollup_manager(
     ])
     .current_dir(&directories.rollup_root)
     .env("RUST_LOG", "info");
+    // Create a dedicated process group for manager + its rollup children so signal-based cleanup
+    // can always terminate the full subtree without orphaning the actual rollup binary.
+    cmd.process_group(0);
 
     if let Some(path) = stdout_log_path {
         if let Some(parent) = path.parent() {

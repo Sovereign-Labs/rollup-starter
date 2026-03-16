@@ -1,10 +1,10 @@
 use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
-    cleanup_postgres_container, extend_last_stop_height,
+    extend_last_stop_height,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
     generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
-    spawn_rollup_manager, start_and_wait_for_postgres_ready, write_manager_config, Directories,
-    API_URL, BLOCKS_PER_VERSION, POSTGRES_CONTAINER_NAME,
+    run_until_shutdown_signal, spawn_rollup_manager, write_manager_config, Directories,
+    PostgresContainerGuard, API_URL, BLOCKS_PER_VERSION, POSTGRES_CONTAINER_NAME,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use chrono::Utc;
@@ -30,13 +30,12 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("Starting acceptance test");
 
     // Run the test
-    let result = run_test(args.binary_cache_dir).await;
+    let result = run_until_shutdown_signal(run_test(args.binary_cache_dir)).await;
     if let Err(e) = &result {
         tracing::error!("Acceptance test failed: {}", e);
     } else {
         info!("Acceptance test completed");
     }
-    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
 
     result
 }
@@ -98,8 +97,8 @@ async fn run_test(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Error
     // Copy the persistent mock data back to mock_da.sqlite. This way we don't grow our DA files with each run.
     copy_persistent_mock_data(&directories)?;
 
-    // Start the sequencer postgres and wait for it to be ready
-    start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
+    // Start postgres and keep it alive for the test duration. Drop cleanup runs last.
+    let _postgres_guard = PostgresContainerGuard::start(POSTGRES_CONTAINER_NAME, &password)?;
 
     let plan = prepare_acceptance_run_plan(&directories, &password)?;
     let expected_setup_batches = plan

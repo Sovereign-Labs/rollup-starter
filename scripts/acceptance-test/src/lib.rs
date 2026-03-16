@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use evm_soak::{
     evm_state_consistency_worker, load_state_consistency_contracts, pinned_worker_key,
     unpinned_worker_key,
@@ -12,14 +12,16 @@ use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_manager::{run_soak_coordinator, SoakManagerConfig};
 use state_consistency::state_validation_worker;
+use std::future::Future;
 use std::path::PathBuf;
 use std::{
     env, fs,
-    process::{Child, Command, ExitStatus},
+    process::{Child, Command, ExitStatus, Output},
     thread,
     time::Duration,
 };
 use tokio::sync::{oneshot, watch};
+use tokio::task::JoinHandle;
 use tokio::task::JoinSet;
 use tracing::{debug, info};
 
@@ -45,45 +47,171 @@ const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
 pub const BLOCKS_PER_VERSION: u64 = 1000;
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
+const SOAK_COORDINATOR_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 
 type RollupWaitResult = Result<std::process::ExitStatus, std::io::Error>;
 type RollupJoinResult = Result<RollupWaitResult, tokio::task::JoinError>;
 type RollupExitReceiver = oneshot::Receiver<RollupJoinResult>;
+type SoakJoinResult = Result<(), sov_soak_manager::SoakManagerError>;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
+
+#[derive(Debug)]
+pub struct PostgresContainerGuard {
+    container_name: String,
+    cleaned_up: bool,
+}
+
+impl PostgresContainerGuard {
+    pub fn start(container_name: &str, password: &str) -> Result<Self, anyhow::Error> {
+        start_and_wait_for_postgres_ready(container_name, password)?;
+        Ok(Self {
+            container_name: container_name.to_owned(),
+            cleaned_up: false,
+        })
+    }
+
+    pub fn cleanup(&mut self) -> Result<(), anyhow::Error> {
+        if self.cleaned_up {
+            return Ok(());
+        }
+        cleanup_postgres_container(&self.container_name)?;
+        self.cleaned_up = true;
+        Ok(())
+    }
+}
+
+impl Drop for PostgresContainerGuard {
+    fn drop(&mut self) {
+        if let Err(e) = self.cleanup() {
+            tracing::warn!(
+                container = %self.container_name,
+                "Failed to cleanup postgres container during drop: {e}"
+            );
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RollupCleanupGuard {
+    rollup_id: u32,
+    exited: bool,
+}
+
+impl RollupCleanupGuard {
+    fn new(rollup_id: u32) -> Self {
+        Self {
+            rollup_id,
+            exited: false,
+        }
+    }
+
+    fn rollup_id(&self) -> u32 {
+        self.rollup_id
+    }
+
+    fn request_shutdown(&self) {
+        if !self.exited {
+            kill_rollup(self.rollup_id);
+        }
+    }
+
+    fn mark_exited(&mut self) {
+        self.exited = true;
+    }
+}
+
+impl Drop for RollupCleanupGuard {
+    fn drop(&mut self) {
+        if !self.exited {
+            kill_rollup(self.rollup_id);
+        }
+    }
+}
+
+#[derive(Debug)]
+struct SoakCoordinatorGuard {
+    shutdown_tx: Option<oneshot::Sender<()>>,
+    handle: Option<JoinHandle<SoakJoinResult>>,
+}
+
+impl SoakCoordinatorGuard {
+    fn new(shutdown_tx: oneshot::Sender<()>, handle: JoinHandle<SoakJoinResult>) -> Self {
+        Self {
+            shutdown_tx: Some(shutdown_tx),
+            handle: Some(handle),
+        }
+    }
+
+    fn request_shutdown(&mut self) {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
+    }
+
+    async fn shutdown_and_wait(&mut self, timeout: Duration) -> Result<(), anyhow::Error> {
+        self.request_shutdown();
+        let Some(mut handle) = self.handle.take() else {
+            return Ok(());
+        };
+
+        match tokio::time::timeout(timeout, &mut handle).await {
+            Ok(Ok(Ok(()))) => Ok(()),
+            Ok(Ok(Err(e))) => Err(anyhow!("soak coordinator failed: {e}")),
+            Ok(Err(e)) => Err(anyhow!("soak coordinator task panicked: {e}")),
+            Err(_) => {
+                tracing::warn!(
+                    "Timed out waiting {:?} for soak coordinator shutdown; aborting task",
+                    timeout
+                );
+                handle.abort();
+                Ok(())
+            }
+        }
+    }
+}
+
+impl Drop for SoakCoordinatorGuard {
+    fn drop(&mut self) {
+        self.request_shutdown();
+        if let Some(handle) = self.handle.take() {
+            handle.abort();
+        }
+    }
+}
 
 pub fn start_and_wait_for_postgres_ready(
     container_name: &str,
     password: &str,
 ) -> Result<(), anyhow::Error> {
+    // Remove any stale container from interrupted prior runs.
+    cleanup_postgres_container(container_name)?;
+
     info!("Starting postgres container");
     let postgres_env = format!("POSTGRES_PASSWORD={}", password);
-    let start_postgres = Command::new("docker")
-        .args([
-            "run",
-            "-d",
-            "--name",
-            "postgres-acceptance-test",
-            "-e",
-            &postgres_env,
-            "-p",
-            "5432:5432",
-            "postgres",
-        ])
-        .output()?;
-    assert!(
+    let start_postgres = docker_output(&[
+        "run",
+        "-d",
+        "--name",
+        container_name,
+        "-e",
+        &postgres_env,
+        "-p",
+        "5432:5432",
+        "postgres",
+    ])?;
+    anyhow::ensure!(
         start_postgres.status.success(),
-        "Failed to start postgres container"
+        "Failed to start postgres container {container_name}: {}",
+        String::from_utf8_lossy(&start_postgres.stderr)
     );
 
     info!("Waiting for postgres to be ready");
     let max_attempts = 30; // 30 seconds max
 
     for attempt in 0..max_attempts {
-        let ready_check = Command::new("docker")
-            .args(["exec", container_name, "pg_isready", "-U", "postgres"])
-            .output()?;
+        let ready_check = docker_output(&["exec", container_name, "pg_isready", "-U", "postgres"])?;
 
         if ready_check.status.success() {
             info!("Postgres is ready");
@@ -96,30 +224,49 @@ pub fn start_and_wait_for_postgres_ready(
         );
         thread::sleep(Duration::from_secs(1));
     }
-    Err(anyhow::anyhow!(
+
+    let _ = cleanup_postgres_container(container_name);
+    Err(anyhow!(
         "Postgres failed to become ready after {} seconds",
         max_attempts
     ))
 }
 
 pub fn cleanup_postgres_container(container_name: &str) -> Result<(), anyhow::Error> {
-    // Cleanup postgres before returning
     info!("Cleaning up postgres container");
-    let end_postgres = Command::new("docker")
-        .args(["stop", container_name])
-        .output()?;
-    anyhow::ensure!(
-        end_postgres.status.success(),
-        "Failed to stop postgres container"
-    );
-    let remove_postgres = Command::new("docker")
-        .args(["rm", "-f", container_name])
-        .output()?;
-    anyhow::ensure!(
-        remove_postgres.status.success(),
-        "Failed to remove postgres container"
-    );
+    let remove_postgres = docker_output(&["rm", "-f", container_name])?;
+    if !remove_postgres.status.success() {
+        let stderr = String::from_utf8_lossy(&remove_postgres.stderr);
+        if !stderr.contains("No such container") {
+            anyhow::bail!("Failed to remove postgres container {container_name}: {stderr}");
+        }
+    }
     Ok(())
+}
+
+fn docker_output(args: &[&str]) -> Result<Output, anyhow::Error> {
+    Command::new("docker")
+        .args(args)
+        .output()
+        .with_context(|| format!("failed to run docker {}", args.join(" ")))
+}
+
+pub async fn run_until_shutdown_signal<T, Fut>(fut: Fut) -> Result<T, anyhow::Error>
+where
+    Fut: Future<Output = Result<T, anyhow::Error>>,
+{
+    use tokio::signal::unix::{signal, SignalKind};
+
+    let mut terminate =
+        signal(SignalKind::terminate()).context("failed to register SIGTERM handler")?;
+    let mut quit = signal(SignalKind::quit()).context("failed to register SIGQUIT handler")?;
+
+    tokio::select! {
+        result = fut => result,
+        _ = tokio::signal::ctrl_c() => Err(anyhow!("Received Ctrl+C (SIGINT), shutting down")),
+        _ = terminate.recv() => Err(anyhow!("Received SIGTERM, shutting down")),
+        _ = quit.recv() => Err(anyhow!("Received SIGQUIT, shutting down")),
+    }
 }
 
 pub fn generate_postgres_password() -> Result<String, anyhow::Error> {
@@ -261,6 +408,14 @@ impl ManagedRollupProcess {
             None => Ok(None),
         }
     }
+
+    pub fn wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        let Some(mut child) = self.child.take() else {
+            return Ok(None);
+        };
+        let status = child.wait()?;
+        Ok(Some(status))
+    }
 }
 
 impl Drop for ManagedRollupProcess {
@@ -292,53 +447,52 @@ fn is_very_close_to_soak_test_end(num_soak_batches: u64, target_soak_batches: u6
     num_soak_batches.saturating_add(15) > target_soak_batches
 }
 
-/// Send SIGTERM to the rollup process to gracefully shut it down.
-/// If the process doesn't respond within 10 seconds, send SIGKILL.
+/// Send SIGTERM to the rollup manager process group to gracefully shut it down.
+/// If the process group doesn't respond within 10 seconds, send SIGKILL.
 pub fn kill_rollup(rollup_id: u32) {
-    tracing::info!("Sending SIGTERM to rollup process {}", rollup_id);
+    let process_group = format!("-{rollup_id}");
+    tracing::info!(
+        "Sending SIGTERM to rollup manager process group {} (leader pid {})",
+        process_group,
+        rollup_id
+    );
 
-    // Send SIGTERM
+    // Send SIGTERM to the full process group (manager + rollup children).
     if let Err(e) = Command::new("kill")
-        .args(["-s", "SIGTERM", &rollup_id.to_string()])
+        .args(["-s", "SIGTERM", &process_group])
         .status()
     {
         tracing::error!("Failed to send SIGTERM: {}", e);
         return;
     }
 
-    // Wait up to 10 seconds for graceful shutdown
+    // Wait up to 10 seconds for graceful shutdown.
     for _ in 0..100 {
         thread::sleep(Duration::from_millis(100));
 
-        // Check if process still exists using kill -0
-        match Command::new("kill")
-            .args(["-0", &rollup_id.to_string()])
-            .status()
-        {
+        // Check if the process group still exists using kill -0.
+        match Command::new("kill").args(["-0", &process_group]).status() {
             Ok(status) if !status.success() => {
-                // Process doesn't exist anymore
-                tracing::info!("Rollup process {rollup_id} shut down gracefully");
+                tracing::info!("Rollup process group {process_group} shut down gracefully");
                 return;
             }
             Err(_) => {
-                // Error running kill command, assume process is gone
-                tracing::info!("Unable to check rollup process {rollup_id} status; assuming it no longer exists");
+                tracing::info!(
+                    "Unable to check rollup process group {process_group} status; assuming it no longer exists"
+                );
                 return;
             }
             Ok(_) => {
-                // Process still exists, continue waiting
+                // Process group still exists, continue waiting.
             }
         }
     }
 
-    // Process didn't respond to SIGINT, force kill
+    // Process group didn't respond to SIGTERM, force kill.
     tracing::warn!(
-        "Rollup process {rollup_id} didn't respond to SIGINT after 10s, sending SIGKILL"
+        "Rollup process group {process_group} didn't respond to SIGTERM after 10s, sending SIGKILL"
     );
-    if let Err(e) = Command::new("kill")
-        .args(["-9", &rollup_id.to_string()])
-        .status()
-    {
+    if let Err(e) = Command::new("kill").args(["-9", &process_group]).status() {
         tracing::error!("Failed to send SIGKILL: {e}");
     }
 }
@@ -401,8 +555,10 @@ pub async fn run_soak(
 ) -> Result<ThroughputReport, anyhow::Error> {
     let (rollup_tx, mut rollup_rx) = oneshot::channel();
     let rollup_id = rollup.id();
+    let mut rollup_guard = RollupCleanupGuard::new(rollup_id);
     let mut rollup_exited = false;
     let target_soak_batches = rollup_stop_height.saturating_sub(throughput_start_batch);
+
     // Spawn background task to wait for rollup process
     tokio::spawn(async move {
         let result = tokio::task::spawn_blocking(move || rollup.wait()).await;
@@ -415,6 +571,7 @@ pub async fn run_soak(
         tokio::spawn(
             async move { run_soak_coordinator(&soak_config, API_URL, soak_shutdown_rx).await },
         );
+    let mut soak_guard = SoakCoordinatorGuard::new(soak_shutdown_tx, soak_handle);
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
     slot_fetcher.subscribe_slots(false).await?;
@@ -466,8 +623,9 @@ pub async fn run_soak(
     let mut num_soak_batches = 0;
     let mut num_previous_txs: Option<u64> = None;
 
-    loop {
-        tokio::select! {
+    let run_result: anyhow::Result<()> = async {
+        loop {
+            tokio::select! {
             // On each slot, we update our counters and save a snapshot of the slot.
             // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
             new_slot = slot_fetcher.next_slot() => {
@@ -500,9 +658,9 @@ pub async fn run_soak(
                                 if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
                                     tracing::debug!("Soak slot fetcher encountered an error near the end of the test; num_soak_batches: {num_soak_batches}, target_soak_batches: {target_soak_batches}, slot number: {}, rollup_stop_height: {rollup_stop_height}", slot.number);
                                     tracing::warn!("Encountered an error very near the end of the test. Assuming the rollup shut down.");
-                                    break;
+                                    break Ok(());
                                 } else {
-                                    anyhow::bail!("Failed to fetch batch {}: {}", batch_num, e);
+                                    break Err(anyhow!("Failed to fetch batch {}: {}", batch_num, e));
                                 }
                             }
                         }
@@ -534,19 +692,19 @@ pub async fn run_soak(
             }
             // Signal handlers
             _ = tokio::signal::ctrl_c() => {
-                tracing::info!("Received Ctrl+C, shutting down rollup");
-                kill_rollup(rollup_id);
-                break;
+                tracing::info!("Received Ctrl+C, initiating soak shutdown");
+                rollup_guard.request_shutdown();
+                break Err(anyhow!("Received Ctrl+C (SIGINT), shutting down soak run"));
             },
             _ = terminate.recv() => {
-                tracing::info!("Received SIGTERM, shutting down rollup");
-                kill_rollup(rollup_id);
-                break;
+                tracing::info!("Received SIGTERM, initiating soak shutdown");
+                rollup_guard.request_shutdown();
+                break Err(anyhow!("Received SIGTERM, shutting down soak run"));
             },
             _ = quit.recv() => {
-                tracing::info!("Received SIGQUIT, shutting down rollup");
-                kill_rollup(rollup_id);
-                break;
+                tracing::info!("Received SIGQUIT, initiating soak shutdown");
+                rollup_guard.request_shutdown();
+                break Err(anyhow!("Received SIGQUIT, shutting down soak run"));
             },
             // Rollup shutdown
             rollup_result = &mut rollup_rx => {
@@ -555,12 +713,13 @@ pub async fn run_soak(
                         ensure_rollup_exit_result(rollup_result)?;
                         tracing::info!("Rollup process finished with successful status");
                         rollup_exited = true;
+                        rollup_guard.mark_exited();
                     },
                     Err(e) => {
-                        return Err(anyhow::anyhow!("Failed to receive rollup process result: {e}"));
+                        break Err(anyhow!("Failed to receive rollup process result: {e}"));
                     },
                 }
-                break;
+                break Ok(());
             }
             // Worker task failure
             Some(worker_result) = worker_set.join_next() => {
@@ -574,21 +733,25 @@ pub async fn run_soak(
                             tracing::warn!("Worker task failed very near the end of the test. Assuming the rollup shut down.");
                         } else {
                             tracing::error!("Worker task failed: {}", e);
-                            kill_rollup(rollup_id);
-                            return Err(e);
+                            rollup_guard.request_shutdown();
+                            break Err(e);
                         }
                     }
                     Err(e) => {
                         tracing::error!("Worker task panicked: {}", e);
-                        kill_rollup(rollup_id);
-                        return Err(e.into());
+                        rollup_guard.request_shutdown();
+                        break Err(e.into());
                     }
                 }
             }
         }
+        }
     }
+    .await;
 
-    let _ = soak_shutdown_tx.send(());
+    let mut final_error = run_result.err();
+
+    soak_guard.request_shutdown();
 
     if tx.send(true).is_err() {
         debug!("Soak worker channel closed; workers already shut down");
@@ -609,32 +772,45 @@ pub async fn run_soak(
         }
     }
 
-    match tokio::time::timeout(Duration::from_secs(10), soak_handle).await {
-        Ok(Ok(Ok(()))) => {
-            debug!("Soak coordinator exited cleanly");
-        }
-        Ok(Ok(Err(e))) => {
-            kill_rollup(rollup_id);
-            return Err(anyhow!("soak coordinator failed: {e}"));
-        }
-        Ok(Err(e)) => {
-            kill_rollup(rollup_id);
-            return Err(anyhow!("soak coordinator task panicked: {e}"));
-        }
-        Err(_) => {
-            tracing::warn!("Timed out waiting for soak coordinator to stop");
+    if let Err(e) = soak_guard
+        .shutdown_and_wait(SOAK_COORDINATOR_SHUTDOWN_TIMEOUT)
+        .await
+    {
+        if final_error.is_none() {
+            final_error = Some(e);
+        } else {
+            tracing::warn!("Ignoring soak coordinator shutdown failure: {e}");
         }
     }
 
-    // Make sure the rollup process has fully exited before allowing postgres cleanup.
     if !rollup_exited {
-        wait_for_rollup_exit_with_timeout(rollup_id, &mut rollup_rx).await?;
+        match wait_for_rollup_exit_with_timeout(rollup_guard.rollup_id(), &mut rollup_rx).await {
+            Ok(()) => {
+                rollup_guard.mark_exited();
+            }
+            Err(e) => {
+                if final_error.is_none() {
+                    final_error = Some(e);
+                } else {
+                    tracing::warn!("Ignoring additional rollup shutdown failure: {e}");
+                }
+            }
+        }
     }
+
+    if let Some(err) = final_error {
+        return Err(err);
+    }
+
+    let average_throughput = if num_soak_slots == 0 {
+        0.0
+    } else {
+        num_soak_txs as f64 / num_soak_slots as f64
+    };
+
     info!(
         "Rollup process finished. Processed {} txs in  {} slots. Average throughput: {} txs/slot",
-        num_soak_txs,
-        num_soak_slots,
-        num_soak_txs as f64 / num_soak_slots as f64
+        num_soak_txs, num_soak_slots, average_throughput
     );
     Ok(ThroughputReport {
         num_txs: num_soak_txs,

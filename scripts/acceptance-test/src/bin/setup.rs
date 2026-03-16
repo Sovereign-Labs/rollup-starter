@@ -5,9 +5,9 @@ use acceptance_test::evm_soak::{
 };
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
-    cleanup_postgres_container, generate_postgres_password, get_rollup_client, kill_rollup,
-    prepare_acceptance_run_plan, run_soak, spawn_rollup_manager, start_and_wait_for_postgres_ready,
-    wait_for_sequencer_ready, write_manager_config, Directories, Runtime, Spec, ThroughputReport,
+    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
+    run_until_shutdown_signal, spawn_rollup_manager, wait_for_sequencer_ready,
+    write_manager_config, Directories, PostgresContainerGuard, Runtime, Spec, ThroughputReport,
     API_URL, POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
 };
 use base64::prelude::BASE64_STANDARD;
@@ -118,12 +118,16 @@ async fn main() -> Result<(), anyhow::Error> {
         .init();
 
     let args = Args::parse();
+    run_until_shutdown_signal(run_setup(args.binary_cache_dir)).await
+}
+
+async fn run_setup(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Error> {
     let mut directories = Directories::new()?;
-    if let Some(binary_cache_dir) = args.binary_cache_dir {
+    if let Some(binary_cache_dir) = binary_cache_dir {
         directories.set_rollup_build_cache_dir(binary_cache_dir)?;
     }
     let password = generate_postgres_password()?;
-    start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
+    let _postgres_guard = PostgresContainerGuard::start(POSTGRES_CONTAINER_NAME, &password)?;
     ensure_evm_pinned_cache_config(&directories)?;
     let plan = prepare_acceptance_run_plan(&directories, &password)?;
     let manager_config_path = directories.output_dir.join("setup_manager_config.json");
@@ -154,7 +158,7 @@ async fn main() -> Result<(), anyhow::Error> {
     )?;
 
     // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
-    // If manual setup fails, skip soak and stop the rollup process so cleanup can proceed.
+    // If manual setup fails, skip soak run and let Drop clean up the manager process.
     let res = match do_manual_setup(directories.clone()).await {
         Ok(()) => {
             run_soak(
@@ -171,14 +175,9 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Err(err) => {
             warn!("Manual setup failed, skipping soak run: {err}");
-            kill_rollup(rollup.id());
-            if let Some(Err(wait_err)) = rollup.into_child().map(|mut c| c.wait()) {
-                warn!("Failed to wait for rollup process after manual setup failure: {wait_err}");
-            }
             Err(err)
         }
     };
-    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
     match res {
         Ok(throughput_report) => {
             let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
