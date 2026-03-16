@@ -204,9 +204,9 @@ fn flatten_top_level_task_result<T>(
 
 pub async fn run_until_shutdown_signal<T, F, Fut>(run: F) -> Result<T, anyhow::Error>
 where
-    T: 'static,
+    T: Send + 'static,
     F: FnOnce(ShutdownReceiver) -> Fut,
-    Fut: Future<Output = Result<T, anyhow::Error>> + 'static,
+    Fut: Future<Output = Result<T, anyhow::Error>> + Send + 'static,
 {
     use tokio::signal::unix::{signal, SignalKind};
 
@@ -216,7 +216,7 @@ where
     let mut hup = signal(SignalKind::hangup()).context("failed to register SIGHUP handler")?;
 
     let (shutdown_tx, shutdown_rx) = watch::channel(None);
-    let mut run_handle = tokio::task::spawn_local(run(shutdown_rx));
+    let mut run_handle = tokio::spawn(run(shutdown_rx));
 
     let shutdown_reason = tokio::select! {
         result = &mut run_handle => return flatten_top_level_task_result(result),
@@ -392,7 +392,9 @@ impl ManagedRollupProcess {
                 Some(rollup_id) => Err(anyhow!(
                     "Failed to wait for rollup process {rollup_id}: {e}"
                 )),
-                None => Err(anyhow!("Failed to wait for already-exited rollup process: {e}")),
+                None => Err(anyhow!(
+                    "Failed to wait for already-exited rollup process: {e}"
+                )),
             },
             Err(_) => Ok(None),
         }

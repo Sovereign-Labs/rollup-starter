@@ -7,8 +7,9 @@ use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
     generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
     run_until_shutdown_signal, spawn_rollup_manager, wait_for_sequencer_ready,
-    write_manager_config, Directories, PostgresContainerGuard, Runtime, ShutdownReceiver, Spec,
-    ThroughputReport, API_URL, POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
+    write_manager_config, AcceptanceRunPlan, Directories, PostgresContainerGuard, Runtime,
+    ShutdownReceiver, Spec, ThroughputReport, API_URL, POSTGRES_CONTAINER_NAME,
+    SETUP_THROUGHPUT_FILE,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -35,6 +36,12 @@ struct Args {
     /// Directory used to cache commit-built binaries across runs.
     #[arg(long)]
     binary_cache_dir: Option<PathBuf>,
+}
+
+struct PreparedSetupRun {
+    directories: Directories,
+    password: String,
+    plan: AcceptanceRunPlan,
 }
 
 /// Returns true if the new throughput report should overwrite the existing one.
@@ -117,26 +124,35 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .init();
 
-    let binary_cache_dir = Args::parse().binary_cache_dir;
-    tokio::task::LocalSet::new()
-        .run_until(run_until_shutdown_signal(move |shutdown_rx| {
-            run_setup(binary_cache_dir, shutdown_rx)
-        }))
-        .await
+    let prepared = prepare_setup_run(Args::parse().binary_cache_dir)?;
+    run_until_shutdown_signal(move |shutdown_rx| run_setup(prepared, shutdown_rx)).await
 }
 
-async fn run_setup(
-    binary_cache_dir: Option<PathBuf>,
-    mut shutdown_rx: ShutdownReceiver,
-) -> Result<(), anyhow::Error> {
+fn prepare_setup_run(binary_cache_dir: Option<PathBuf>) -> Result<PreparedSetupRun, anyhow::Error> {
     let mut directories = Directories::new()?;
     if let Some(binary_cache_dir) = binary_cache_dir {
         directories.set_rollup_build_cache_dir(binary_cache_dir)?;
     }
-    let password = generate_postgres_password()?;
-    let _postgres_guard = PostgresContainerGuard::start(POSTGRES_CONTAINER_NAME, &password)?;
     ensure_evm_pinned_cache_config(&directories)?;
+    let password = generate_postgres_password()?;
     let plan = prepare_acceptance_run_plan(&directories, &password)?;
+    Ok(PreparedSetupRun {
+        directories,
+        password,
+        plan,
+    })
+}
+
+async fn run_setup(
+    prepared: PreparedSetupRun,
+    mut shutdown_rx: ShutdownReceiver,
+) -> Result<(), anyhow::Error> {
+    let PreparedSetupRun {
+        directories,
+        password,
+        plan,
+    } = prepared;
+    let _postgres_guard = PostgresContainerGuard::start(POSTGRES_CONTAINER_NAME, &password)?;
     let manager_config_path = directories.output_dir.join("setup_manager_config.json");
     write_manager_config(&manager_config_path, &plan.manager_versions)?;
 
@@ -310,7 +326,7 @@ async fn do_manual_setup(
     info!("Next batch posted, fetching and comparing slots");
 
     let last_slot = slot_monitor.prev_slot_with_children.as_ref().unwrap();
-    let slot_fetcher = SlotFetcher::new(client, &directories);
+    let mut slot_fetcher = SlotFetcher::new(client, &directories);
     for slotnum in 0..first_subscribed_slot_number {
         let _slot = slot_fetcher
             .fetch_and_compare_slot(slotnum, GetItemBehavior::SaveSnapshot)

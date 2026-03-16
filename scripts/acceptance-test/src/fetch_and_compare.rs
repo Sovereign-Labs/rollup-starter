@@ -1,6 +1,6 @@
 use sov_api_spec::types::{self, GetBatchByIdChildren, GetSlotByIdChildren, LedgerBatch, Slot};
 
-use futures::stream::Stream;
+use futures::stream::BoxStream;
 use serde_json::Value;
 use sov_rollup_interface::node::ledger_api::IncludeChildren;
 use std::path::PathBuf;
@@ -138,10 +138,10 @@ pub enum GetItemBehavior {
     CheckAgainstSnapshot,
 }
 pub struct SlotMonitor {
-    slots: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
-    slots_with_children: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
-    finalized_slots: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
-    finalized_slots_with_children: Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>,
+    slots: BoxStream<'static, Result<Slot, anyhow::Error>>,
+    slots_with_children: BoxStream<'static, Result<Slot, anyhow::Error>>,
+    finalized_slots: BoxStream<'static, Result<Slot, anyhow::Error>>,
+    finalized_slots_with_children: BoxStream<'static, Result<Slot, anyhow::Error>>,
     pub prev_slot_with_children: Option<Slot>,
     snapshots_dir: PathBuf,
     expected_slot_number: Option<u64>,
@@ -162,10 +162,10 @@ impl SlotMonitor {
             .await?;
 
         Ok(Self {
-            slots: Box::new(slots),
-            slots_with_children: Box::new(slots_with_children),
-            finalized_slots: Box::new(finalized_slots),
-            finalized_slots_with_children: Box::new(finalized_slots_with_children),
+            slots,
+            slots_with_children,
+            finalized_slots,
+            finalized_slots_with_children,
             prev_slot_with_children: None,
             snapshots_dir: directories.snapshots_dir.clone(),
             expected_slot_number: None,
@@ -273,7 +273,7 @@ impl SlotMonitor {
 pub struct SlotFetcher {
     client: sov_api_spec::Client,
     output_dir: PathBuf,
-    stream: Option<Box<dyn Stream<Item = Result<Slot, anyhow::Error>> + Unpin>>,
+    stream: Option<BoxStream<'static, Result<Slot, anyhow::Error>>>,
 }
 
 impl SlotFetcher {
@@ -290,7 +290,7 @@ impl SlotFetcher {
             .client
             .subscribe_slots_with_children(IncludeChildren::new(include_children))
             .await?;
-        self.stream = Some(Box::new(stream));
+        self.stream = Some(stream);
         Ok(())
     }
 
@@ -299,7 +299,7 @@ impl SlotFetcher {
     }
 
     pub async fn fetch_batch_without_children(
-        &self,
+        &mut self,
         batch_number: u64,
     ) -> Result<LedgerBatch, anyhow::Error> {
         Ok(self
@@ -310,7 +310,7 @@ impl SlotFetcher {
     }
 
     pub async fn fetch_and_compare_batch(
-        &self,
+        &mut self,
         batch_number: u64,
     ) -> Result<LedgerBatch, anyhow::Error> {
         let batch = self.fetch_batch_without_children(batch_number).await?;
@@ -353,7 +353,7 @@ impl SlotFetcher {
     }
 
     pub async fn fetch_and_compare_slot(
-        &self,
+        &mut self,
         slot_number: u64,
         behavior: GetItemBehavior,
     ) -> Result<Slot, anyhow::Error> {

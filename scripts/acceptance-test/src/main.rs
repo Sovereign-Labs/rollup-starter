@@ -4,8 +4,8 @@ use acceptance_test::{
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
     generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
     run_until_shutdown_signal, shutdown_error, sleep_or_shutdown, spawn_rollup_manager,
-    wait_for_shutdown, write_manager_config, Directories, PostgresContainerGuard, ShutdownReceiver,
-    API_URL, BLOCKS_PER_VERSION, POSTGRES_CONTAINER_NAME,
+    wait_for_shutdown, write_manager_config, AcceptanceRunPlan, Directories,
+    PostgresContainerGuard, ShutdownReceiver, API_URL, BLOCKS_PER_VERSION, POSTGRES_CONTAINER_NAME,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use chrono::Utc;
@@ -16,6 +16,12 @@ use tracing::info;
 
 // After resync completes, continue running the rollup for this many blocks.
 const NUM_SOAK_BATCHES: u64 = BLOCKS_PER_VERSION;
+
+struct PreparedTestRun {
+    directories: Directories,
+    password: String,
+    plan: AcceptanceRunPlan,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -30,14 +36,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Starting acceptance test");
 
-    // Run the test
-    let binary_cache_dir = args.binary_cache_dir;
-    let local = tokio::task::LocalSet::new();
-    let result = local
-        .run_until(run_until_shutdown_signal(move |shutdown_rx| {
-            run_test(binary_cache_dir, shutdown_rx)
-        }))
-        .await;
+    let prepared = prepare_test_run(args.binary_cache_dir)?;
+    let result =
+        run_until_shutdown_signal(move |shutdown_rx| run_test(prepared, shutdown_rx)).await;
     if let Err(e) = &result {
         tracing::error!("Acceptance test failed: {}", e);
     } else {
@@ -87,16 +88,29 @@ fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Er
     Ok(())
 }
 
-async fn run_test(
-    binary_cache_dir: Option<PathBuf>,
-    mut shutdown_rx: ShutdownReceiver,
-) -> Result<(), anyhow::Error> {
-    // Generate a config file with our db password and all paths set relative to the workspace root
+fn prepare_test_run(binary_cache_dir: Option<PathBuf>) -> Result<PreparedTestRun, anyhow::Error> {
     let password = generate_postgres_password()?;
     let mut directories = Directories::new()?;
     if let Some(binary_cache_dir) = binary_cache_dir {
         directories.set_rollup_build_cache_dir(binary_cache_dir)?;
     }
+    let plan = prepare_acceptance_run_plan(&directories, &password)?;
+    Ok(PreparedTestRun {
+        directories,
+        password,
+        plan,
+    })
+}
+
+async fn run_test(
+    prepared: PreparedTestRun,
+    mut shutdown_rx: ShutdownReceiver,
+) -> Result<(), anyhow::Error> {
+    let PreparedTestRun {
+        directories,
+        password,
+        plan,
+    } = prepared;
 
     tracing::info!(
         "Removing rollup data path: {}",
@@ -109,8 +123,6 @@ async fn run_test(
 
     // Start postgres and keep it alive for the test duration. Drop cleanup runs last.
     let _postgres_guard = PostgresContainerGuard::start(POSTGRES_CONTAINER_NAME, &password)?;
-
-    let plan = prepare_acceptance_run_plan(&directories, &password)?;
     let expected_setup_batches = plan
         .manager_versions
         .last()
