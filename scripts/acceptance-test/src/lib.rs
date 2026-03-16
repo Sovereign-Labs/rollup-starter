@@ -42,9 +42,9 @@ pub const API_ADDR: &str = "127.0.0.1:12348";
 pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 
 // Save a full snapshot of the slot every N slots
-const FULL_SLOT_SAVE_INTERVAL: u64 = 5;
+const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
 // Run each version of a multi-version rollup for this many blocks.
-pub const BLOCKS_PER_VERSION: u64 = 25;
+pub const BLOCKS_PER_VERSION: u64 = 1000;
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 const TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT: Duration = Duration::from_secs(90);
