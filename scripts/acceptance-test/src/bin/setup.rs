@@ -146,7 +146,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     info!("Starting rollup through sov-rollup-manager");
-    let mut rollup = spawn_rollup_manager(
+    let rollup = spawn_rollup_manager(
         &plan.manager_binary,
         &manager_config_path,
         &directories,
@@ -172,7 +172,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Err(err) => {
             warn!("Manual setup failed, skipping soak run: {err}");
             kill_rollup(rollup.id());
-            if let Err(wait_err) = rollup.wait() {
+            if let Some(Err(wait_err)) = rollup.into_child().map(|mut c| c.wait()) {
                 warn!("Failed to wait for rollup process after manual setup failure: {wait_err}");
             }
             Err(err)
