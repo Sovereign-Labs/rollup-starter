@@ -19,7 +19,7 @@ edition = "2021"
 license = "Sovereign Permissionless Commercial License"
 authors = ["Sovereign Labs <info@sovereign.xyz>"]
 publish = false
-rust-version = "1.88"
+rust-version = "1.93"
 
 [workspace.dependencies]
 sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "1cb7b418cdc054c22743a186140ef5f2720848d5", features = [
