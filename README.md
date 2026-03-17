@@ -17,7 +17,7 @@ It includes everything you need to create a rollup with customizable modules, RE
 
 Before you begin, ensure you have the following installed:
 
-- **Rust**: 1.88.0 or later
+- **Rust**: 1.93.0 or later
   - Install via [rustup](https://rustup.rs/): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
   - The project will automatically install the correct version via `rust-toolchain.toml`
 - **Node.js**: 20.0 or later (for TypeScript client)
@@ -274,7 +274,7 @@ With this change, the gas cost of each transaction will be covered by the sender
 
 **Rollup node crashes on startup**
 - Try cleaning the database with `make clean-db` and restart
-- Verify you're using the correct Rust version (1.88.0 or later)
+- Verify you're using the correct Rust version (1.93.0 or later)
 
 **Rollup crashed with `buckets exhausted` error**
 - Increase parameter `storage.user_hashtable_buckets`
