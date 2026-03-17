@@ -21,6 +21,18 @@ pub const VERSION_CONFIG_TEMPLATE_PATH: &str = "scripts/acceptance-test/rollup_c
 pub const SOAK_NUM_WORKERS: u32 = 20;
 pub const SOAK_SALT: u32 = 0;
 pub const SOAK_SAFETY_STOP_BLOCKS: u64 = 5;
+const ACCEPTANCE_TEST_FEATURES: [&str; 3] = ["acceptance-testing", "mock_da", "mock_zkvm"];
+
+fn acceptance_test_features() -> Vec<String> {
+    ACCEPTANCE_TEST_FEATURES
+        .iter()
+        .map(|feature| feature.to_string())
+        .collect()
+}
+
+fn acceptance_test_feature_list() -> String {
+    ACCEPTANCE_TEST_FEATURES.join(",")
+}
 
 #[derive(Debug, Clone)]
 enum VersionSource {
@@ -61,11 +73,13 @@ pub struct AcceptanceRunPlan {
 
 fn default_build_targets() -> BuildTargets {
     let mut targets = BuildTargets::upgrade_simulator_defaults();
-    targets.rollup.features = vec![
-        "acceptance-testing".to_string(),
-        "mock_da".to_string(),
-        "mock_zkvm".to_string(),
-    ];
+    // The soak binary signs transactions using Runtime::CHAIN_HASH, so it must be built with the
+    // exact same runtime-shaping features as the rollup binary.
+    targets.rollup.features = acceptance_test_features();
+    if let Some(soak) = targets.soak.as_mut() {
+        soak.no_default_features = true;
+        soak.features = acceptance_test_features();
+    }
     targets.mock_da = None;
     targets
 }
@@ -153,6 +167,8 @@ fn load_version_sources(directories: &Directories) -> Result<Vec<ResolvedVersion
 }
 
 fn build_local_head_binaries(rollup_root: &Path) -> Result<(PathBuf, PathBuf), anyhow::Error> {
+    let feature_list = acceptance_test_feature_list();
+
     tracing::info!("Building rollup at local HEAD...");
     run_checked(
         Command::new("cargo").current_dir(rollup_root).args([
@@ -164,7 +180,7 @@ fn build_local_head_binaries(rollup_root: &Path) -> Result<(PathBuf, PathBuf), a
             "rollup",
             "--no-default-features",
             "--features",
-            "acceptance-testing,mock_da,mock_zkvm",
+            &feature_list,
         ]),
         "build local head rollup binary",
     )?;
@@ -178,6 +194,9 @@ fn build_local_head_binaries(rollup_root: &Path) -> Result<(PathBuf, PathBuf), a
             "rollup-starter-soak-test",
             "--bin",
             "rollup-starter-soak-test",
+            "--no-default-features",
+            "--features",
+            &feature_list,
         ]),
         "build local head soak binary",
     )?;
