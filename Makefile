@@ -35,8 +35,8 @@ install-risc0-toolchain: ## Install correct version of RISC0 toolchain
 
 
 install-sp1-toolchain: ## Install correct version of SP1 toolchain
-	curl -L https://raw.githubusercontent.com/succinctlabs/sp1/main/sp1up/install | bash
-	~/.sp1/bin/sp1up $${GITHUB_TOKEN:+--token "$$GITHUB_TOKEN"} --version 5.0.8 --c-toolchain
+	curl -L https://sp1up.succinct.xyz | bash
+	~/.sp1/bin/sp1up $${GITHUB_TOKEN:+--token "$$GITHUB_TOKEN"} --version 6.0.2
 	~/.sp1/bin/cargo-prove prove --version
 	~/.sp1/bin/cargo-prove prove install-toolchain
 	@echo "SP1 toolchain version:"
