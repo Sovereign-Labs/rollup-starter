@@ -92,7 +92,7 @@ async fn query_state_value<T: DeserializeOwned>(
 /// This is updated in `synchronize_chain()` at the START of slot processing.
 async fn query_true_slot_number(client: &sov_api_spec::Client) -> reqwest::Result<u64> {
     let true_slot_url = format!("{}/modules/chain-state/state/true-slot-number/", API_URL);
-    query_state_value::<u64>(&client, &true_slot_url).await
+    query_state_value::<u64>(client, &true_slot_url).await
 }
 
 /// Query current_heights (RollupHeight, VisibleSlotNumber) from ChainState module.
@@ -100,7 +100,7 @@ async fn query_true_slot_number(client: &sov_api_spec::Client) -> reqwest::Resul
 /// so if this has the new values, the hooks have definitely executed.
 async fn query_current_heights(client: &sov_api_spec::Client) -> reqwest::Result<(u64, u64)> {
     let current_heights_url = format!("{}/modules/chain-state/state/current-heights/", API_URL);
-    query_state_value::<(u64, u64)>(&client, &current_heights_url).await
+    query_state_value::<(u64, u64)>(client, &current_heights_url).await
 }
 
 async fn query_state_root(client: &sov_api_spec::Client) -> reqwest::Result<StateRootResponse> {
@@ -108,7 +108,7 @@ async fn query_state_root(client: &sov_api_spec::Client) -> reqwest::Result<Stat
         "{}/modules/state-consistency/state/latest-state-root/",
         API_URL
     );
-    query_state_value::<StateRootResponse>(&client, &state_root_url).await
+    query_state_value::<StateRootResponse>(client, &state_root_url).await
 }
 
 /// Polls until the new slot's begin_block_hook has ran and the API state has been updated.
@@ -140,8 +140,8 @@ async fn poll_for_api_state_update(
 
     let heights_at_block_start = loop {
         let (true_slot, heights) =
-            tokio::join!(async { query_true_slot_number(&client).await }, async {
-                query_current_heights(&client).await
+            tokio::join!(async { query_true_slot_number(client).await }, async {
+                query_current_heights(client).await
             });
         let true_slot = true_slot?;
         let heights = heights?;
@@ -166,7 +166,7 @@ async fn poll_for_api_state_update(
     attempt = 0;
 
     loop {
-        let heights = query_current_heights(&client).await?;
+        let heights = query_current_heights(client).await?;
 
         if heights.0 > heights_at_block_start.0 {
             return Ok(heights);
@@ -275,7 +275,7 @@ fn is_too_late_error(
 
     // Parse the error string to extract the actual rollup height
     // Pattern: "Block state assertion failed at rollup height <actual_height>."
-    let actual_height = match extract_rollup_height_from_error(&error_str) {
+    let actual_height = match extract_rollup_height_from_error(error_str) {
         Some(h) => h,
         None => return false,
     };

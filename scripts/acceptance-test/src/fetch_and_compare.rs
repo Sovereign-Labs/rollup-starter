@@ -3,7 +3,7 @@ use sov_api_spec::types::{self, GetBatchByIdChildren, GetSlotByIdChildren, Ledge
 use futures::stream::BoxStream;
 use serde_json::Value;
 use sov_rollup_interface::node::ledger_api::IncludeChildren;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio_stream::StreamExt;
 
 use crate::Directories;
@@ -92,7 +92,7 @@ pub fn compare_against_snapshot(
     Ok(())
 }
 
-pub fn save_slot_snapshot(slot: &Slot, output_dir: &PathBuf) -> Result<(), anyhow::Error> {
+pub fn save_slot_snapshot(slot: &Slot, output_dir: &Path) -> Result<(), anyhow::Error> {
     let json = slot_to_json(slot, false)?;
     let snapshot_json = serde_json::to_string_pretty(&json)?;
     let filename = format!("slot_{:04}_with_children.json", slot.number);
@@ -113,7 +113,7 @@ pub enum ValidationError {
 
 pub fn load_snapshot_json(
     slot_number: u64,
-    output_dir: &PathBuf,
+    output_dir: &Path,
 ) -> Result<serde_json::Value, std::io::Error> {
     let filename = format!("slot_{:04}_with_children.json", slot_number);
     let filepath = output_dir.join(&filename);
@@ -123,11 +123,11 @@ pub fn load_snapshot_json(
 
 pub fn validate_against_snapshot(
     slot: &Slot,
-    output_dir: &PathBuf,
+    output_dir: &Path,
     description: &str,
 ) -> Result<(), ValidationError> {
-    let json = load_snapshot_json(slot.number, output_dir)
-        .map_err(|e| ValidationError::MissingSnapshot(e))?;
+    let json =
+        load_snapshot_json(slot.number, output_dir).map_err(ValidationError::MissingSnapshot)?;
 
     compare_against_snapshot(slot, json, description, false)
 }
@@ -295,7 +295,7 @@ impl SlotFetcher {
     }
 
     pub async fn next_slot(&mut self) -> Result<Option<Slot>, anyhow::Error> {
-        Ok(self.stream.as_mut().unwrap().next().await.transpose()?)
+        self.stream.as_mut().unwrap().next().await.transpose()
     }
 
     pub async fn fetch_batch_without_children(

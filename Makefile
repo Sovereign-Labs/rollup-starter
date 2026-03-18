@@ -13,11 +13,11 @@ check: ## Run cargo check here and in for all ZKVM Provers. Useful for updating 
 
 lint: ## Run fmt, check and clippy with the most important feature combinations
 	SKIP_GUEST_BUILD=1 cargo fmt --all -- --check
-	SKIP_GUEST_BUILD=1 cargo check
+	SKIP_GUEST_BUILD=1 cargo check --workspace
 	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features risc0 --no-default-features
 	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features sp1 --no-default-features
 	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features mock_zkvm --no-default-features
-	SKIP_GUEST_BUILD=1 cargo clippy
+	SKIP_GUEST_BUILD=1 cargo clippy --workspace
 	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features risc0 --no-default-features
 	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features sp1 --no-default-features
 	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features mock_zkvm --no-default-features
@@ -49,6 +49,8 @@ clean: ## Clean all builds and artifacts and databases
 	@cargo clean --manifest-path crates/provers/risc0/guest-mock/Cargo.toml
 	@cargo clean --manifest-path crates/provers/sp1/guest-celestia/Cargo.toml
 	@cargo clean --manifest-path crates/provers/sp1/guest-mock/Cargo.toml
+	@cargo clean --manifest-path scripts/acceptance-test/Cargo.toml
+	@cargo clean --manifest-path scripts/soak-test/Cargo.toml
 	rm -rf examples/starter-js/node_modules
 	rm -rf examples/privy/node_modules
 	rm -f crates/stf/runtime_call.json

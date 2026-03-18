@@ -266,9 +266,9 @@ async fn do_manual_setup(
             first_subscribed_slot_number = next_slot.number;
         }
 
-        if next_slot_with_children.batches.len() > 0 {
+        if !next_slot_with_children.batches.is_empty() {
             let batch = &next_slot_with_children.batches[0];
-            if batch.txs.len() > 0 {
+            if !batch.txs.is_empty() {
                 first_non_empty_slot_number = next_slot.number;
                 assert_eq!(batch.txs[0].events.len(), 1);
                 assert_eq!(batch.txs[0].events[0], response.events[0]);
@@ -312,7 +312,7 @@ async fn do_manual_setup(
             .get_next_slot(GetItemBehavior::SaveSnapshot)
             .await?;
 
-        if finalized_next_slot_with_children.batches.len() > 0 {
+        if !finalized_next_slot_with_children.batches.is_empty() {
             let batch = &finalized_next_slot_with_children.batches[0];
             let last_tx = batch.txs.iter().find(|tx| tx.number == 2);
             if let Some(last_tx) = last_tx {
@@ -525,8 +525,8 @@ async fn get_supply_archival(
     };
     let supply = supply["amount"]
         .as_str()
-        .expect(&format!("Supply not found in {}", supply.to_string()));
-    let supply = u128::from_str_radix(supply, 10)?;
+        .unwrap_or_else(|| panic!("Supply not found in {}", supply));
+    let supply = supply.parse::<u128>()?;
     Ok(Amount::new(supply))
 }
 
@@ -545,6 +545,6 @@ async fn get(client: &reqwest::Client, url: &str) -> anyhow::Result<Option<serde
     } else if response.status() == reqwest::StatusCode::NOT_FOUND {
         Ok(None)
     } else {
-        return Err(anyhow::anyhow!("Failed to get {}", url));
+        Err(anyhow::anyhow!("Failed to get {}", url))
     }
 }
