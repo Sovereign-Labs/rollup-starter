@@ -18,7 +18,7 @@ use tokio::task::JoinSet;
 use tracing::{debug, info};
 
 use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
-mod evm_contracts;
+pub mod evm_contracts;
 pub mod evm_soak;
 pub mod fetch_and_compare;
 mod state_consistency;

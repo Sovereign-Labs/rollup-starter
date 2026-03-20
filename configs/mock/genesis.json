@@ -29,6 +29,10 @@
           "1000000000000000000000000000000000"
         ],
         [
+          "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+          "1000000000000000000"
+        ],
+        [
           "0x23B6445f524daDee9fb576627740AaD23Afbe8b7",
           "1000000000"
         ],
@@ -78,7 +82,7 @@
     "tokens": []
   },
   "chain_state": {
-    "current_time": 0,
+    "current_time": 1756684800,
     "operating_mode": "operator",
     "inner_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
     "outer_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
