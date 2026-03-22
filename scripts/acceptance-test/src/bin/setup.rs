@@ -7,8 +7,8 @@ use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
     generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
     run_until_shutdown_signal, spawn_rollup_manager, wait_for_sequencer_ready,
-    write_manager_config, Directories, PostgresContainerGuard, Runtime, Spec, ThroughputReport,
-    API_URL, POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
+    write_manager_config, Directories, PostgresContainerGuard, Runtime, ShutdownReceiver, Spec,
+    ThroughputReport, API_URL, POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -117,11 +117,18 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .init();
 
-    let args = Args::parse();
-    run_until_shutdown_signal(run_setup(args.binary_cache_dir)).await
+    let binary_cache_dir = Args::parse().binary_cache_dir;
+    tokio::task::LocalSet::new()
+        .run_until(run_until_shutdown_signal(move |shutdown_rx| {
+            run_setup(binary_cache_dir, shutdown_rx)
+        }))
+        .await
 }
 
-async fn run_setup(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Error> {
+async fn run_setup(
+    binary_cache_dir: Option<PathBuf>,
+    mut shutdown_rx: ShutdownReceiver,
+) -> Result<(), anyhow::Error> {
     let mut directories = Directories::new()?;
     if let Some(binary_cache_dir) = binary_cache_dir {
         directories.set_rollup_build_cache_dir(binary_cache_dir)?;
@@ -159,7 +166,7 @@ async fn run_setup(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Erro
 
     // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
     // If manual setup fails, skip soak run and let Drop clean up the manager process.
-    let res = match do_manual_setup(directories.clone()).await {
+    let res = match do_manual_setup(directories.clone(), &mut shutdown_rx).await {
         Ok(()) => {
             run_soak(
                 directories.clone(),
@@ -170,6 +177,7 @@ async fn run_setup(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Erro
                 throughput_start_batch,
                 stop_at_height,
                 true,
+                shutdown_rx.clone(),
             )
             .await
         }
@@ -193,9 +201,12 @@ async fn run_setup(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Erro
 
 /// Runs a sequence of two batches, one with a create token, and one with a mint and transfer.
 /// Since we know exactly what state will be generated, we can make fine-grained assertions about the state using this manual setup.
-async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> {
+async fn do_manual_setup(
+    directories: Directories,
+    shutdown_rx: &mut ShutdownReceiver,
+) -> Result<(), anyhow::Error> {
     info!("Rollup started, waiting for sequencer to be ready");
-    wait_for_sequencer_ready().await?;
+    wait_for_sequencer_ready(shutdown_rx).await?;
     info!("Sequencer is ready, sending txs");
 
     // Send the known good txs: Create token, mint token, transfer token

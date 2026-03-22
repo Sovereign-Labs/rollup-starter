@@ -1,4 +1,5 @@
 use std::fs;
+use std::io;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -494,6 +495,26 @@ pub fn spawn_rollup_manager(
     // Create a dedicated process group for manager + its rollup children so signal-based cleanup
     // can always terminate the full subtree without orphaning the actual rollup binary.
     cmd.process_group(0);
+    #[cfg(target_os = "linux")]
+    {
+        let parent_pid = std::process::id();
+        // SAFETY: `pre_exec` runs in the freshly forked child before `exec`, so it must only call
+        // async-signal-safe operations. `prctl` and `getppid` satisfy that requirement here.
+        unsafe {
+            cmd.pre_exec(move || {
+                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                if libc::getppid() as u32 != parent_pid {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Interrupted,
+                        "acceptance-test parent exited before manager exec",
+                    ));
+                }
+                Ok(())
+            });
+        }
+    }
 
     if let Some(path) = stdout_log_path {
         if let Some(parent) = path.parent() {

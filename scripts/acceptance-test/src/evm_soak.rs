@@ -12,7 +12,6 @@ use std::fs;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio::sync::watch;
 
 const STATE_CONSISTENCY_METADATA: &str = "state_consistency_contracts.json";
 pub const NUM_PINNED_CONTRACTS: usize = 5;
@@ -344,7 +343,6 @@ pub async fn evm_state_consistency_worker(
     contract_address: Address,
     signer_key: String,
     label: &'static str,
-    rx: watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
     let rpc = RpcClient::new(&signer_key, evm_rpc_addr()).await;
     let from = rpc.address();
@@ -363,7 +361,7 @@ pub async fn evm_state_consistency_worker(
         "EVM state consistency worker started"
     );
 
-    while !*rx.borrow() {
+    loop {
         let (tx_count, sleep_ms) = {
             let mut rng = rand::thread_rng();
             let sleep_ms = rng.gen_range(25..100);
@@ -394,7 +392,4 @@ pub async fn evm_state_consistency_worker(
             }
         }
     }
-
-    tracing::info!("EVM state consistency worker shutting down");
-    Ok(())
 }

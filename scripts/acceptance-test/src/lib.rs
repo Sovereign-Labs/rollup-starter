@@ -12,16 +12,15 @@ use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use sov_soak_manager::{run_soak_coordinator, SoakManagerConfig};
 use state_consistency::state_validation_worker;
-use std::future::Future;
 use std::path::PathBuf;
 use std::{
     env, fs,
-    process::{Child, Command, ExitStatus, Output},
+    process::{Child, Command, Output},
     thread,
     time::Duration,
 };
+use std::{fmt, future::Future};
 use tokio::sync::{oneshot, watch};
-use tokio::task::JoinHandle;
 use tokio::task::JoinSet;
 use tracing::{debug, info};
 
@@ -47,20 +46,42 @@ const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
 pub const BLOCKS_PER_VERSION: u64 = 1000;
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
-const SOAK_COORDINATOR_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
+const TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT: Duration = Duration::from_secs(90);
 
 type RollupWaitResult = Result<std::process::ExitStatus, std::io::Error>;
 type RollupJoinResult = Result<RollupWaitResult, tokio::task::JoinError>;
 type RollupExitReceiver = oneshot::Receiver<RollupJoinResult>;
-type SoakJoinResult = Result<(), sov_soak_manager::SoakManagerError>;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
+pub type ShutdownReceiver = watch::Receiver<Option<ShutdownReason>>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShutdownReason {
+    SigInt,
+    SigTerm,
+    SigQuit,
+    SigHup,
+}
+
+impl fmt::Display for ShutdownReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::SigInt => "Ctrl+C (SIGINT)",
+            Self::SigTerm => "SIGTERM",
+            Self::SigQuit => "SIGQUIT",
+            Self::SigHup => "SIGHUP",
+        })
+    }
+}
+
+pub fn shutdown_error(reason: ShutdownReason) -> anyhow::Error {
+    anyhow!("Received {reason}, shutting down")
+}
 
 #[derive(Debug)]
 pub struct PostgresContainerGuard {
     container_name: String,
-    cleaned_up: bool,
 }
 
 impl PostgresContainerGuard {
@@ -68,23 +89,13 @@ impl PostgresContainerGuard {
         start_and_wait_for_postgres_ready(container_name, password)?;
         Ok(Self {
             container_name: container_name.to_owned(),
-            cleaned_up: false,
         })
-    }
-
-    pub fn cleanup(&mut self) -> Result<(), anyhow::Error> {
-        if self.cleaned_up {
-            return Ok(());
-        }
-        cleanup_postgres_container(&self.container_name)?;
-        self.cleaned_up = true;
-        Ok(())
     }
 }
 
 impl Drop for PostgresContainerGuard {
     fn drop(&mut self) {
-        if let Err(e) = self.cleanup() {
+        if let Err(e) = cleanup_postgres_container(&self.container_name) {
             tracing::warn!(
                 container = %self.container_name,
                 "Failed to cleanup postgres container during drop: {e}"
@@ -126,57 +137,6 @@ impl Drop for RollupCleanupGuard {
     fn drop(&mut self) {
         if !self.exited {
             kill_rollup(self.rollup_id);
-        }
-    }
-}
-
-#[derive(Debug)]
-struct SoakCoordinatorGuard {
-    shutdown_tx: Option<oneshot::Sender<()>>,
-    handle: Option<JoinHandle<SoakJoinResult>>,
-}
-
-impl SoakCoordinatorGuard {
-    fn new(shutdown_tx: oneshot::Sender<()>, handle: JoinHandle<SoakJoinResult>) -> Self {
-        Self {
-            shutdown_tx: Some(shutdown_tx),
-            handle: Some(handle),
-        }
-    }
-
-    fn request_shutdown(&mut self) {
-        if let Some(tx) = self.shutdown_tx.take() {
-            let _ = tx.send(());
-        }
-    }
-
-    async fn shutdown_and_wait(&mut self, timeout: Duration) -> Result<(), anyhow::Error> {
-        self.request_shutdown();
-        let Some(mut handle) = self.handle.take() else {
-            return Ok(());
-        };
-
-        match tokio::time::timeout(timeout, &mut handle).await {
-            Ok(Ok(Ok(()))) => Ok(()),
-            Ok(Ok(Err(e))) => Err(anyhow!("soak coordinator failed: {e}")),
-            Ok(Err(e)) => Err(anyhow!("soak coordinator task panicked: {e}")),
-            Err(_) => {
-                tracing::warn!(
-                    "Timed out waiting {:?} for soak coordinator shutdown; aborting task",
-                    timeout
-                );
-                handle.abort();
-                Ok(())
-            }
-        }
-    }
-}
-
-impl Drop for SoakCoordinatorGuard {
-    fn drop(&mut self) {
-        self.request_shutdown();
-        if let Some(handle) = self.handle.take() {
-            handle.abort();
         }
     }
 }
@@ -251,21 +211,87 @@ fn docker_output(args: &[&str]) -> Result<Output, anyhow::Error> {
         .with_context(|| format!("failed to run docker {}", args.join(" ")))
 }
 
-pub async fn run_until_shutdown_signal<T, Fut>(fut: Fut) -> Result<T, anyhow::Error>
+pub async fn wait_for_shutdown(shutdown_rx: &mut ShutdownReceiver) -> ShutdownReason {
+    loop {
+        if let Some(reason) = *shutdown_rx.borrow() {
+            return reason;
+        }
+        shutdown_rx
+            .changed()
+            .await
+            .expect("shutdown sender dropped unexpectedly");
+    }
+}
+
+pub async fn sleep_or_shutdown(
+    duration: Duration,
+    shutdown_rx: &mut ShutdownReceiver,
+) -> Result<(), anyhow::Error> {
+    tokio::select! {
+        _ = tokio::time::sleep(duration) => Ok(()),
+        reason = wait_for_shutdown(shutdown_rx) => Err(shutdown_error(reason)),
+    }
+}
+
+fn flatten_top_level_task_result<T>(
+    result: Result<Result<T, anyhow::Error>, tokio::task::JoinError>,
+) -> Result<T, anyhow::Error> {
+    match result {
+        Ok(result) => result,
+        Err(e) => Err(anyhow!("acceptance test task panicked: {e}")),
+    }
+}
+
+pub async fn run_until_shutdown_signal<T, F, Fut>(run: F) -> Result<T, anyhow::Error>
 where
-    Fut: Future<Output = Result<T, anyhow::Error>>,
+    T: 'static,
+    F: FnOnce(ShutdownReceiver) -> Fut,
+    Fut: Future<Output = Result<T, anyhow::Error>> + 'static,
 {
     use tokio::signal::unix::{signal, SignalKind};
 
     let mut terminate =
         signal(SignalKind::terminate()).context("failed to register SIGTERM handler")?;
     let mut quit = signal(SignalKind::quit()).context("failed to register SIGQUIT handler")?;
+    let mut hup = signal(SignalKind::hangup()).context("failed to register SIGHUP handler")?;
 
-    tokio::select! {
-        result = fut => result,
-        _ = tokio::signal::ctrl_c() => Err(anyhow!("Received Ctrl+C (SIGINT), shutting down")),
-        _ = terminate.recv() => Err(anyhow!("Received SIGTERM, shutting down")),
-        _ = quit.recv() => Err(anyhow!("Received SIGQUIT, shutting down")),
+    let (shutdown_tx, shutdown_rx) = watch::channel(None);
+    let mut run_handle = tokio::task::spawn_local(run(shutdown_rx));
+
+    let shutdown_reason = tokio::select! {
+        result = &mut run_handle => return flatten_top_level_task_result(result),
+        _ = tokio::signal::ctrl_c() => ShutdownReason::SigInt,
+        _ = terminate.recv() => ShutdownReason::SigTerm,
+        _ = quit.recv() => ShutdownReason::SigQuit,
+        _ = hup.recv() => ShutdownReason::SigHup,
+    };
+
+    tracing::info!("Received {shutdown_reason}, requesting graceful shutdown");
+    let _ = shutdown_tx.send(Some(shutdown_reason));
+
+    match tokio::time::timeout(TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT, &mut run_handle).await {
+        Ok(result) => {
+            let run_result = flatten_top_level_task_result(result);
+            match run_result {
+                Ok(_) => Err(shutdown_error(shutdown_reason)),
+                Err(e) => Err(e),
+            }
+        }
+        Err(_) => {
+            tracing::warn!(
+                "Timed out waiting {:?} for top-level shutdown after {shutdown_reason}; aborting task",
+                TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT
+            );
+            run_handle.abort();
+            match run_handle.await {
+                Ok(Ok(_)) => Err(shutdown_error(shutdown_reason)),
+                Ok(Err(e)) => Err(e),
+                Err(e) if e.is_cancelled() => Err(shutdown_error(shutdown_reason)),
+                Err(e) => Err(anyhow!(
+                    "acceptance test task panicked during shutdown: {e}"
+                )),
+            }
+        }
     }
 }
 
@@ -349,7 +375,9 @@ pub fn get_rollup_client() -> Result<sov_api_spec::Client, anyhow::Error> {
     Ok(client)
 }
 
-pub async fn wait_for_sequencer_ready() -> Result<(), anyhow::Error> {
+pub async fn wait_for_sequencer_ready(
+    shutdown_rx: &mut ShutdownReceiver,
+) -> Result<(), anyhow::Error> {
     // Wait up to a minute for the sequencer to be ready
     for _ in 0..600 {
         if let Ok(response) = reqwest::get(format!("{}/sequencer/ready", API_URL)).await {
@@ -357,7 +385,7 @@ pub async fn wait_for_sequencer_ready() -> Result<(), anyhow::Error> {
                 break;
             }
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        sleep_or_shutdown(Duration::from_millis(100), shutdown_rx).await?;
     }
     Ok(())
 }
@@ -383,38 +411,8 @@ impl ManagedRollupProcess {
         Self { child: Some(child) }
     }
 
-    pub fn id(&self) -> u32 {
-        self.child
-            .as_ref()
-            .expect("managed rollup process child is missing")
-            .id()
-    }
-
     pub fn into_child(mut self) -> Option<Child> {
         self.child.take()
-    }
-
-    pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
-        let Some(child) = self.child.as_mut() else {
-            return Ok(None);
-        };
-
-        match child.try_wait()? {
-            Some(status) => {
-                // Child has exited and was reaped by try_wait.
-                self.child.take();
-                Ok(Some(status))
-            }
-            None => Ok(None),
-        }
-    }
-
-    pub fn wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
-        let Some(mut child) = self.child.take() else {
-            return Ok(None);
-        };
-        let status = child.wait()?;
-        Ok(Some(status))
     }
 }
 
@@ -552,6 +550,7 @@ pub async fn run_soak(
     throughput_start_batch: u64,
     rollup_stop_height: u64,
     save_slot_snapshots: bool,
+    mut shutdown_rx: ShutdownReceiver,
 ) -> Result<ThroughputReport, anyhow::Error> {
     let (rollup_tx, mut rollup_rx) = oneshot::channel();
     let rollup_id = rollup.id();
@@ -565,67 +564,75 @@ pub async fn run_soak(
         let _ = rollup_tx.send(result);
     });
 
-    // Start soak manager process orchestration.
-    let (soak_shutdown_tx, soak_shutdown_rx) = oneshot::channel();
-    let soak_handle =
-        tokio::spawn(
-            async move { run_soak_coordinator(&soak_config, API_URL, soak_shutdown_rx).await },
-        );
-    let mut soak_guard = SoakCoordinatorGuard::new(soak_shutdown_tx, soak_handle);
-
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
     slot_fetcher.subscribe_slots(false).await?;
-    let (tx, _rx) = watch::channel(false);
-    let mut worker_set = JoinSet::new();
+    let mut background_tasks = JoinSet::new();
+
+    // Keep the sender alive so the coordinator's shutdown receiver stays pending until the task
+    // is aborted during teardown.
+    let (_soak_shutdown_tx, soak_shutdown_rx) = oneshot::channel();
+    background_tasks.spawn(async move {
+        run_soak_coordinator(&soak_config, API_URL, soak_shutdown_rx)
+            .await
+            .map_err(|e| anyhow!("background soak coordinator failed: {e}"))
+    });
 
     // Start state validation worker
     let state_validator_client = get_rollup_client()?;
-    let state_validator_rx = tx.subscribe();
-    worker_set.spawn(state_validation_worker(
+    background_tasks.spawn(state_validation_worker(
         state_validator_client,
         rollup_stop_height,
-        state_validator_rx,
     ));
 
     let evm_contracts = load_state_consistency_contracts(&directories)?;
     for (idx, address) in evm_contracts.pinned.into_iter().enumerate() {
-        let evm_worker_rx = tx.subscribe();
         let worker_key = pinned_worker_key(idx)?;
-        worker_set.spawn(evm_state_consistency_worker(
-            address,
-            worker_key,
-            "pinned",
-            evm_worker_rx,
-        ));
+        background_tasks.spawn(evm_state_consistency_worker(address, worker_key, "pinned"));
     }
 
     for (idx, address) in evm_contracts.unpinned.into_iter().enumerate() {
-        let evm_worker_rx = tx.subscribe();
         let worker_key = unpinned_worker_key(idx)?;
-        worker_set.spawn(evm_state_consistency_worker(
-            address,
-            worker_key,
-            "unpinned",
-            evm_worker_rx,
+        background_tasks.spawn(evm_state_consistency_worker(
+            address, worker_key, "unpinned",
         ));
     }
 
-    use tokio::signal::unix::SignalKind;
-    let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())
-        .expect("Failed to set up SIGTERM handler");
-    let mut quit =
-        tokio::signal::unix::signal(SignalKind::quit()).expect("Failed to set up SIGQUIT handler");
     let client = get_rollup_client()?;
 
-    tracing::info!("Workers started. Listening for slots");
+    tracing::info!("Background tasks started. Listening for slots");
     let mut num_soak_txs = 0;
     let mut num_soak_slots = 0;
     let mut num_soak_batches = 0;
     let mut num_previous_txs: Option<u64> = None;
+    let mut shutdown_requested = false;
 
     let run_result: anyhow::Result<()> = async {
         loop {
             tokio::select! {
+            biased;
+            // Background task failure
+            Some(task_result) = background_tasks.join_next() => {
+                match task_result {
+                    Ok(Ok(())) => {
+                        // Background task completed successfully, continue monitoring.
+                    }
+                    Ok(Err(e)) => {
+                        if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
+                            tracing::debug!("Background task failed near the end of the test; num_soak_batches: {num_soak_batches}, target_soak_batches: {target_soak_batches}, rollup_stop_height: {rollup_stop_height}, err: {e}");
+                            tracing::warn!("Background task failed very near the end of the test. Assuming the rollup shut down.");
+                        } else {
+                            tracing::error!("Background task failed: {}", e);
+                            rollup_guard.request_shutdown();
+                            break Err(e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Background task panicked: {}", e);
+                        rollup_guard.request_shutdown();
+                        break Err(e.into());
+                    }
+                }
+            }
             // On each slot, we update our counters and save a snapshot of the slot.
             // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
             new_slot = slot_fetcher.next_slot() => {
@@ -690,21 +697,11 @@ pub async fn run_soak(
                     }
                 }
             }
-            // Signal handlers
-            _ = tokio::signal::ctrl_c() => {
-                tracing::info!("Received Ctrl+C, initiating soak shutdown");
+            shutdown_reason = wait_for_shutdown(&mut shutdown_rx) => {
+                tracing::info!("Received {shutdown_reason}, initiating soak shutdown");
+                shutdown_requested = true;
                 rollup_guard.request_shutdown();
-                break Err(anyhow!("Received Ctrl+C (SIGINT), shutting down soak run"));
-            },
-            _ = terminate.recv() => {
-                tracing::info!("Received SIGTERM, initiating soak shutdown");
-                rollup_guard.request_shutdown();
-                break Err(anyhow!("Received SIGTERM, shutting down soak run"));
-            },
-            _ = quit.recv() => {
-                tracing::info!("Received SIGQUIT, initiating soak shutdown");
-                rollup_guard.request_shutdown();
-                break Err(anyhow!("Received SIGQUIT, shutting down soak run"));
+                break Err(shutdown_error(shutdown_reason));
             },
             // Rollup shutdown
             rollup_result = &mut rollup_rx => {
@@ -721,29 +718,6 @@ pub async fn run_soak(
                 }
                 break Ok(());
             }
-            // Worker task failure
-            Some(worker_result) = worker_set.join_next() => {
-                match worker_result {
-                    Ok(Ok(())) => {
-                        // Worker completed successfully, continue monitoring
-                    }
-                    Ok(Err(e)) => {
-                        if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
-                            tracing::debug!("Worker task failed near the end of the test; num_soak_batches: {num_soak_batches}, target_soak_batches: {target_soak_batches}, rollup_stop_height: {rollup_stop_height}, err: {e}");
-                            tracing::warn!("Worker task failed very near the end of the test. Assuming the rollup shut down.");
-                        } else {
-                            tracing::error!("Worker task failed: {}", e);
-                            rollup_guard.request_shutdown();
-                            break Err(e);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Worker task panicked: {}", e);
-                        rollup_guard.request_shutdown();
-                        break Err(e.into());
-                    }
-                }
-            }
         }
         }
     }
@@ -751,35 +725,36 @@ pub async fn run_soak(
 
     let mut final_error = run_result.err();
 
-    soak_guard.request_shutdown();
-
-    if tx.send(true).is_err() {
-        debug!("Soak worker channel closed; workers already shut down");
-    }
-    let worker_errors: Vec<_> = worker_set
-        .join_all()
-        .await
-        .into_iter()
-        .filter_map(Result::err)
-        .collect();
-    if !worker_errors.is_empty() {
-        for (idx, err) in worker_errors.iter().enumerate() {
-            tracing::warn!(
-                "Ignoring worker task failure during shutdown ({}): {}",
-                idx + 1,
-                err
-            );
-        }
-    }
-
-    if let Err(e) = soak_guard
-        .shutdown_and_wait(SOAK_COORDINATOR_SHUTDOWN_TIMEOUT)
-        .await
-    {
-        if final_error.is_none() {
-            final_error = Some(e);
-        } else {
-            tracing::warn!("Ignoring soak coordinator shutdown failure: {e}");
+    background_tasks.abort_all();
+    while let Some(task_result) = background_tasks.join_next().await {
+        match task_result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
+                    tracing::warn!(
+                        "Ignoring background task failure during shutdown very near the end of the test: {e}"
+                    );
+                } else if final_error.is_none() || shutdown_requested {
+                    final_error = Some(e);
+                    shutdown_requested = false;
+                } else {
+                    tracing::warn!(
+                        "Ignoring additional background task failure during shutdown: {e}"
+                    );
+                }
+            }
+            Err(e) if e.is_cancelled() => {}
+            Err(e) => {
+                let err = anyhow!("Background task panicked during shutdown: {e}");
+                if final_error.is_none() || shutdown_requested {
+                    final_error = Some(err);
+                    shutdown_requested = false;
+                } else {
+                    tracing::warn!(
+                        "Ignoring additional background task panic during shutdown: {e}"
+                    );
+                }
+            }
         }
     }
 

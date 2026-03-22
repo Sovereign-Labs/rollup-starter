@@ -9,7 +9,6 @@ use sov_modules_api::{DispatchCall, PrivateKey, Runtime as RuntimeTrait};
 use sov_rollup_interface::node::ledger_api::IncludeChildren;
 use sov_test_utils::{TransactionType, TEST_DEFAULT_MAX_FEE, TEST_DEFAULT_MAX_PRIORITY_FEE};
 use std::collections::HashMap;
-use tokio::sync::watch;
 use tokio_stream::StreamExt;
 
 #[derive(serde::Deserialize, Debug)]
@@ -303,7 +302,6 @@ fn extract_rollup_height_from_error(error_str: &str) -> Option<u64> {
 pub async fn state_validation_worker(
     client: sov_api_spec::Client,
     rollup_stop_height: u64,
-    rx: watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
     // Subscribe to slots
     let mut slot_stream = client
@@ -312,7 +310,7 @@ pub async fn state_validation_worker(
 
     tracing::info!("State validation worker started");
 
-    while !*rx.borrow() {
+    loop {
         let Some(latest_slot) = drain_slot_stream(&mut slot_stream).await? else {
             break; // Stream closed
         };

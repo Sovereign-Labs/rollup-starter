@@ -42,6 +42,7 @@ futures = "0.3.31"
 thiserror = "2.0.14"
 serde.workspace = true
 serde_yaml = "0.9"
+libc = "0.2"
 sov-rollup-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "dd0e4ac1586ee5e852078209afcb295bb888a44f" }
 sov-soak-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "dd0e4ac1586ee5e852078209afcb295bb888a44f" }
 sov-versioned-artifact-builder = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "dd0e4ac1586ee5e852078209afcb295bb888a44f" }

@@ -17,6 +17,7 @@ dependencies = [
  "clap",
  "futures",
  "hex",
+ "libc",
  "rand 0.8.5",
  "reqwest",
  "rollup-starter",
