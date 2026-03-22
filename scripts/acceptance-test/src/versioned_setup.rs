@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context};
 use sov_rollup_manager::{ManagerConfig, RollupVersion};
 use sov_soak_manager::{SoakManagerConfig, SoakWorkerConfig};
 use sov_versioned_artifact_builder::{
-    prepare_artifacts, BuildRequest, BuildSpec, BuildTargets, VersionBuildSpec,
+    prepare_artifacts, BuildRequest, BuildSpec, BuildTargets, RollupBuilder, VersionBuildSpec,
 };
 use tracing::info;
 
@@ -86,40 +86,6 @@ fn run_checked(cmd: &mut Command, context: &str) -> Result<(), anyhow::Error> {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     ))
-}
-
-fn read_text_checked(cmd: &mut Command, context: &str) -> Result<String, anyhow::Error> {
-    let output = cmd.output().with_context(|| format!("{context}: spawn"))?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "{context} failed with status {:?}\nstdout:\n{}\nstderr:\n{}",
-            output.status,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-    String::from_utf8(output.stdout).with_context(|| format!("{context}: invalid utf8"))
-}
-
-fn ensure_template_repo(cache_dir: &Path) -> Result<PathBuf, anyhow::Error> {
-    let repo_dir = cache_dir.join("config-template-repo");
-    if !repo_dir.exists() {
-        fs::create_dir_all(cache_dir)?;
-        let repo_dir_arg = repo_dir.to_string_lossy().to_string();
-        run_checked(
-            Command::new("git").args(["clone", ROLLUP_REPO_URL, &repo_dir_arg]),
-            "clone rollup repo for config templates",
-        )?;
-    } else {
-        run_checked(
-            Command::new("git")
-                .current_dir(&repo_dir)
-                .args(["fetch", "--all"]),
-            "fetch rollup repo for config templates",
-        )?;
-    }
-
-    Ok(repo_dir)
 }
 
 fn load_version_sources(directories: &Directories) -> Result<Vec<ResolvedVersion>, anyhow::Error> {
@@ -265,35 +231,6 @@ fn render_config_template(
         )
 }
 
-fn maybe_materialize_remote_file(
-    repo_dir: &Path,
-    commit: &str,
-    source_path: &Path,
-    output_path: &Path,
-) -> Result<PathBuf, anyhow::Error> {
-    let spec = format!("{}:{}", commit, source_path.to_string_lossy());
-    let content = read_text_checked(
-        Command::new("git")
-            .current_dir(repo_dir)
-            .args(["show", &spec]),
-        &format!("git show {}", spec),
-    )?;
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(output_path, content)?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(output_path)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(output_path, perms)?;
-    }
-
-    Ok(output_path.to_path_buf())
-}
-
 fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, anyhow::Error> {
     if manager_build_root.exists() {
         fs::remove_dir_all(manager_build_root)?;
@@ -351,7 +288,7 @@ pub fn prepare_acceptance_run_plan(
         })
         .collect();
 
-    let (mut remote_artifacts, template_repo) = if remote_commits.is_empty() {
+    let (mut remote_artifacts, template_reader) = if remote_commits.is_empty() {
         (None, None)
     } else {
         let build_spec = BuildSpec {
@@ -373,16 +310,17 @@ pub fn prepare_acceptance_run_plan(
         let prepared_artifacts = prepare_artifacts(&build_spec, &build_request)?;
         (
             Some(prepared_artifacts.versions.into_iter()),
-            Some(ensure_template_repo(binary_cache_dir)?),
+            Some(RollupBuilder::with_repo_url(
+                binary_cache_dir.to_path_buf(),
+                ROLLUP_REPO_URL.to_string(),
+            )),
         )
     };
 
     let (local_rollup_bin, local_soak_bin) = build_local_head_binaries(&directories.rollup_root)?;
 
     let versioned_configs_dir = directories.output_dir.join("versioned-configs");
-    let versioned_migrations_dir = directories.output_dir.join("versioned-migrations");
     fs::create_dir_all(&versioned_configs_dir)?;
-    fs::create_dir_all(&versioned_migrations_dir)?;
 
     let mut manager_versions = Vec::with_capacity(resolved_versions.len());
     let mut soak_versions = Vec::with_capacity(resolved_versions.len());
@@ -404,37 +342,25 @@ pub fn prepare_acceptance_run_plan(
                         .ok_or_else(|| {
                             anyhow!("missing prepared artifacts for remote commit {}", commit)
                         })?;
-                    let template_repo = template_repo.as_ref().ok_or_else(|| {
-                        anyhow!("missing template repo for remote commit {}", commit)
+                    let template_reader = template_reader.as_ref().ok_or_else(|| {
+                        anyhow!("missing template reader for remote commit {}", commit)
                     })?;
                     let soak_binary = artifacts.soak_binary.ok_or_else(|| {
                         anyhow!("missing soak binary artifact for remote commit {}", commit)
                     })?;
 
-                    let config_template = read_text_checked(
-                        Command::new("git").current_dir(&template_repo).args([
-                            "show",
-                            &format!("{}:{}", commit, VERSION_CONFIG_TEMPLATE_PATH),
-                        ]),
-                        &format!("load config template for {}", commit),
+                    let config_template = template_reader.read_text_file_at_commit(
+                        commit,
+                        Path::new(VERSION_CONFIG_TEMPLATE_PATH),
                     )?;
 
-                    let migration_path = if let Some(source_path) = &resolved_version.migration_path
-                    {
-                        let output_path = versioned_migrations_dir.join(format!(
-                            "v{}_{}",
-                            idx,
-                            source_path
-                                .file_name()
-                                .map(|x| x.to_string_lossy().to_string())
-                                .unwrap_or_else(|| "migration".to_string())
-                        ));
-                        Some(maybe_materialize_remote_file(
-                            &template_repo,
-                            commit,
-                            source_path,
-                            &output_path,
-                        )?)
+                    let migration_path = if let Some(path) = &resolved_version.migration_path {
+                        let migration_path = if path.is_absolute() {
+                            path.clone()
+                        } else {
+                            directories.rollup_root.join(path)
+                        };
+                        Some(migration_path.canonicalize()?)
                     } else {
                         None
                     };
