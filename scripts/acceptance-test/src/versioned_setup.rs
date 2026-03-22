@@ -98,7 +98,7 @@ fn run_checked(cmd: &mut Command, context: &str) -> Result<(), anyhow::Error> {
     ))
 }
 
-fn load_version_sources(directories: &Directories) -> Result<Vec<ResolvedVersion>, anyhow::Error> {
+fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<ResolvedVersion>> {
     let spec_path = directories.rollup_root.join(VERSION_SPEC_FILE);
     if !spec_path.exists() {
         info!(
