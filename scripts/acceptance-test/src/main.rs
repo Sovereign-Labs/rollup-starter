@@ -1,22 +1,24 @@
 use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
-    build_rollup, wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE,
-};
-use acceptance_test::{
-    cleanup_postgres_container,
+    cleanup_postgres_container, default_binary_cache_dir, extend_last_stop_height,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
-    generate_postgres_password, get_rollup_client, interpolate_config, run_soak,
-    start_and_wait_for_postgres_ready, Directories, API_URL, NUM_SOAK_BATCHES,
-    POSTGRES_CONTAINER_NAME,
+    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
+    spawn_rollup_manager, start_and_wait_for_postgres_ready, write_manager_config, Directories,
+    API_URL, BLOCKS_PER_VERSION, POSTGRES_CONTAINER_NAME,
 };
+use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use chrono::Utc;
 use clap::Parser;
 use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
-use std::{process::Command, time::Duration};
+use std::{path::PathBuf, time::Duration};
 use tracing::info;
+
+// After resync completes, continue running the rollup for this many blocks.
+const NUM_SOAK_BATCHES: u64 = BLOCKS_PER_VERSION;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    let args = Args::parse();
     // Initialize tracing subscriber with RUST_LOG environment variable, fallback to info
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -28,7 +30,7 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("Starting acceptance test");
 
     // Run the test
-    let result = run_test().await;
+    let result = run_test(args.binary_cache_dir).await;
     if let Err(e) = &result {
         tracing::error!("Acceptance test failed: {}", e);
     } else {
@@ -79,11 +81,12 @@ fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Er
     Ok(())
 }
 
-async fn run_test() -> Result<(), anyhow::Error> {
+async fn run_test(binary_cache_dir: Option<PathBuf>) -> Result<(), anyhow::Error> {
     // Generate a config file with our db password and all paths set relative to the workspace root
     let password = generate_postgres_password()?;
     let directories = Directories::new()?;
-    interpolate_config(&password, &directories)?;
+    let binary_cache_dir =
+        binary_cache_dir.unwrap_or_else(|| default_binary_cache_dir(&directories));
 
     tracing::info!(
         "Removing rollup data path: {}",
@@ -97,46 +100,34 @@ async fn run_test() -> Result<(), anyhow::Error> {
     // Start the sequencer postgres and wait for it to be ready
     start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
 
-    info!("Building rollup...");
-    if let Err(e) = build_rollup(directories.rollup_root.clone()) {
-        cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
-        anyhow::bail!(e);
-    }
+    let plan = prepare_acceptance_run_plan(&directories, &password, &binary_cache_dir)?;
+    let expected_setup_batches = plan
+        .manager_versions
+        .last()
+        .expect("Acceptance testing must have at least one rollup version")
+        .stop_height
+        .expect("Acceptance testing last rollup version must have stop height")
+        // Genesis doesn't have a batch; this has the result that batch numbers lag 1 behind the
+        // rollup height.
+        .saturating_sub(1);
+    let manager_versions = extend_last_stop_height(&plan.manager_versions, NUM_SOAK_BATCHES);
+    let manager_config_path = directories
+        .output_dir
+        .join("acceptance_manager_config.json");
+    write_manager_config(&manager_config_path, &manager_versions)?;
 
     // Start the rollup. Run for 10 seconds
-    info!(
-        "Starting rollup from rollup workspace root: {}",
-        directories.rollup_root.display()
-    );
-
-    let stop_at_height = NUM_SOAK_BATCHES * 2 + 10;
-
-    let rollup = Command::new("cargo")
-        .args([
-            "run",
-            "--release",
-            "--features",
-            "acceptance-testing",
-            "--",
-            "--rollup-config-path",
-            &directories
-                .output_dir
-                .join("config.toml")
-                .display()
-                .to_string(),
-            "--genesis-path",
-            &directories
-                .acceptance_test_dir
-                .join("genesis.json")
-                .display()
-                .to_string(),
-            "--stop-at-rollup-height",
-            &(stop_at_height.to_string()),
-        ])
-        .current_dir(directories.rollup_root.clone())
-        .env("RUST_LOG", "info")
-        .spawn()
-        .expect("Failed to start rollup");
+    info!("Starting rollup through sov-rollup-manager");
+    let stop_at_height = manager_versions
+        .last()
+        .and_then(|version| version.stop_height)
+        .unwrap_or_default();
+    let rollup = spawn_rollup_manager(
+        &plan.manager_binary,
+        &manager_config_path,
+        &directories,
+        None,
+    )?;
 
     // Wait up to 60s for the rollup to be ready
     for _ in 0..120 {
@@ -163,10 +154,10 @@ async fn run_test() -> Result<(), anyhow::Error> {
                 // If the slot number is less than 10, just ignore the missing snapshot.
                 if slot_number < 10 {
                     continue;
-                } else if latest_batch_num < NUM_SOAK_BATCHES {
+                } else if latest_batch_num < expected_setup_batches {
                     panic!("Missing snapshot for slot {}", slot_number);
                 } else {
-                    // Once we've passed NUM_SOAK_BATCHES, and we find the first missing snapshot, we're done
+                    // Once we've passed the setup batch count and we find the first missing snapshot, we're done.
                     tracing::info!(
                         "Missing snapshot found at slot {}. Finished resyncing.",
                         slot_number
@@ -202,9 +193,15 @@ async fn run_test() -> Result<(), anyhow::Error> {
     // Wait for the sequencer to resync to the empty DA slots
     wait_for_sequencer_ready().await?;
 
+    let resync_soak_config = plan
+        .soak_config
+        .for_resync(NUM_SOAK_BATCHES)
+        .ok_or_else(|| anyhow::anyhow!("failed to create soak resync config"))?;
+
     let new_throughput_report = run_soak(
         directories.clone(),
         rollup,
+        resync_soak_config,
         latest_batch_num,
         stop_at_height,
         false,
@@ -232,16 +229,7 @@ async fn run_test() -> Result<(), anyhow::Error> {
 
 #[derive(Parser)]
 struct Args {
-    #[arg(short, long, default_value = "http://localhost:12346")]
-    /// The URL of the rollup node to connect to. Defaults to http://localhost:12346.
-    api_url: String,
-
-    #[arg(short, long, default_value = "5")]
-    /// The number of workers to spawn - this controls the number of concurrent transactions. Defaults to 5.
-    num_workers: u32,
-
-    #[arg(short, long, default_value = "0")]
-    /// The salt to use for RNG. Use this value if you're restarting the generator and want to ensure that the generated
-    /// transactions don't overlap with the previous run.
-    salt: u32,
+    /// Directory used to cache commit-built binaries across runs.
+    #[arg(long)]
+    binary_cache_dir: Option<PathBuf>,
 }

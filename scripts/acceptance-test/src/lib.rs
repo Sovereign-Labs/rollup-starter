@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use evm_soak::{
     evm_state_consistency_worker, load_state_consistency_contracts, pinned_worker_key,
     unpinned_worker_key,
@@ -9,7 +10,7 @@ use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
-use sov_soak_testing_lib::{SoakTestRunner, ValidityProfile};
+use sov_soak_manager::{run_soak_coordinator, SoakManagerConfig};
 use state_consistency::state_validation_worker;
 use std::path::PathBuf;
 use std::{env, fs, process::Command, thread, time::Duration};
@@ -22,6 +23,11 @@ mod evm_contracts;
 pub mod evm_soak;
 pub mod fetch_and_compare;
 mod state_consistency;
+mod versioned_setup;
+pub use versioned_setup::{
+    default_binary_cache_dir, extend_last_stop_height, prepare_acceptance_run_plan,
+    spawn_rollup_manager, write_manager_config, AcceptanceRunPlan,
+};
 
 pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
 pub const API_URL: &str = "http://127.0.0.1:12348";
@@ -166,31 +172,6 @@ impl Directories {
     }
 }
 
-pub fn interpolate_config(password: &str, directories: &Directories) -> Result<(), anyhow::Error> {
-    // Read and interpolate config file
-    let config_path = directories.acceptance_test_dir.join("rollup_config.toml");
-    info!("Reading config from: {}", config_path.display());
-    let config_content = fs::read_to_string(config_path)?;
-
-    // Make sqlite path absolute
-    let sqlite_path = directories.output_dir.join("mock_da.sqlite");
-    let sqlite_connection_string = format!("sqlite://{}?mode=rwc", sqlite_path.display());
-
-    let interpolated_config = config_content
-        .replace("{password}", &password)
-        .replace("{sqlite_connection_string}", &sqlite_connection_string)
-        .replace(
-            "{rollup_data_path}",
-            &directories.rollup_data_path.display().to_string(),
-        );
-
-    // Write interpolated config to new file
-    let output_path = directories.output_dir.join("config.toml");
-    info!("Writing interpolated config to: {}", output_path.display());
-    fs::write(output_path, interpolated_config)?;
-    Ok(())
-}
-
 pub fn get_rollup_client() -> Result<sov_api_spec::Client, anyhow::Error> {
     let reqwest_client = reqwest::ClientBuilder::new()
         .timeout(Duration::from_secs(600))
@@ -212,54 +193,6 @@ pub async fn wait_for_sequencer_ready() -> Result<(), anyhow::Error> {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     Ok(())
-}
-
-async fn worker_task(
-    client: sov_api_spec::Client,
-    rx: watch::Receiver<bool>,
-    worker_id: u128,
-    num_workers: u32,
-) -> anyhow::Result<()> {
-    // TODO: Add synthetic load txs
-    let runner = SoakTestRunner::<Runtime, Spec>::new()
-        .with_bank()
-        .with_state_consistency();
-    runner
-        .run(
-            client,
-            rx,
-            worker_id,
-            num_workers,
-            ValidityProfile::Clean.get_validity(),
-            None,
-        )
-        .await
-}
-
-fn start_workers(
-    salt: u32,
-) -> Result<
-    (
-        tokio::sync::watch::Sender<bool>,
-        JoinSet<Result<(), anyhow::Error>>,
-    ),
-    anyhow::Error,
-> {
-    tracing::info!("Starting {} workers", NUM_WORKERS);
-    const NUM_WORKERS: u32 = 20;
-    let mut worker_set = JoinSet::new();
-    let (tx, rx) = tokio::sync::watch::channel(false);
-    let client = get_rollup_client()?;
-
-    for i in 0..NUM_WORKERS {
-        worker_set.spawn(worker_task(
-            client.clone(),
-            rx.clone(),
-            (i + salt) as u128,
-            NUM_WORKERS,
-        ));
-    }
-    Ok((tx, worker_set))
 }
 
 fn save_slot_snapshot_if_needed(
@@ -285,25 +218,8 @@ impl ThroughputReport {
     }
 }
 
-pub fn build_rollup(root_dir: PathBuf) -> anyhow::Result<()> {
-    let build_status = Command::new("cargo")
-        .args(["build", "--release", "--features", "acceptance-testing"])
-        .current_dir(root_dir)
-        .status()
-        .expect("Failed to execute cargo build");
-
-    if build_status.success() {
-        Ok(())
-    } else {
-        Err(anyhow::anyhow!(
-            "Failed to build rollup with exit code: {:?}",
-            build_status.code()
-        ))
-    }
-}
-
-fn is_very_close_to_soak_test_end(num_soak_batches: u64) -> bool {
-    num_soak_batches.saturating_add(15) > NUM_SOAK_BATCHES
+fn is_very_close_to_soak_test_end(num_soak_batches: u64, target_soak_batches: u64) -> bool {
+    num_soak_batches.saturating_add(15) > target_soak_batches
 }
 
 /// Send SIGINT to the rollup process to gracefully shut it down.
@@ -408,22 +324,32 @@ async fn wait_for_rollup_exit_with_timeout(
 pub async fn run_soak(
     directories: Directories,
     mut rollup: std::process::Child,
-    num_previous_batches: u64,
+    soak_config: SoakManagerConfig,
+    throughput_start_batch: u64,
     rollup_stop_height: u64,
     save_slot_snapshots: bool,
 ) -> Result<ThroughputReport, anyhow::Error> {
     let (rollup_tx, mut rollup_rx) = oneshot::channel();
     let rollup_id = rollup.id();
     let mut rollup_exited = false;
+    let target_soak_batches = rollup_stop_height.saturating_sub(throughput_start_batch);
     // Spawn background task to wait for rollup process
     tokio::spawn(async move {
         let result = tokio::task::spawn_blocking(move || rollup.wait()).await;
         let _ = rollup_tx.send(result);
     });
 
+    // Start soak manager process orchestration.
+    let (soak_shutdown_tx, soak_shutdown_rx) = oneshot::channel();
+    let soak_handle =
+        tokio::spawn(
+            async move { run_soak_coordinator(&soak_config, API_URL, soak_shutdown_rx).await },
+        );
+
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
     slot_fetcher.subscribe_slots(false).await?;
-    let (tx, mut worker_set) = start_workers(num_previous_batches as u32)?;
+    let (tx, _rx) = watch::channel(false);
+    let mut worker_set = JoinSet::new();
 
     // Start state validation worker
     let state_validator_client = get_rollup_client()?;
@@ -468,12 +394,7 @@ pub async fn run_soak(
     let mut num_soak_txs = 0;
     let mut num_soak_slots = 0;
     let mut num_soak_batches = 0;
-    let num_previous_txs = slot_fetcher
-        .fetch_batch_without_children(num_previous_batches)
-        .await
-        .expect("Failed to fetch previous batch")
-        .tx_range
-        .end;
+    let mut num_previous_txs: Option<u64> = None;
 
     loop {
         tokio::select! {
@@ -487,17 +408,27 @@ pub async fn run_soak(
                         let batch_num = slot.batch_range.end - 1;
                         match slot_fetcher.fetch_batch_without_children(batch_num).await {
                             Ok(batch) => {
-                                num_soak_txs = batch.tx_range.end.saturating_sub(num_previous_txs);
-                                // If the slot contains a batch (checked above) and we're into new batches, increment the counter
-                                if slot.batch_range.end > num_previous_batches {
-                                    num_soak_batches += 1;
+                                if batch_num >= throughput_start_batch && num_previous_txs.is_none() {
+                                    let reference_batch = slot_fetcher
+                                        .fetch_batch_without_children(throughput_start_batch)
+                                        .await
+                                        .map_err(|e| anyhow!("failed to fetch throughput start batch {throughput_start_batch}: {e}"))?;
+                                    num_previous_txs = Some(reference_batch.tx_range.end);
+                                }
+
+                                // Count throughput from the first batch after `throughput_start_batch`.
+                                if batch_num > throughput_start_batch {
+                                    if let Some(previous_txs) = num_previous_txs {
+                                        num_soak_txs = batch.tx_range.end.saturating_sub(previous_txs);
+                                        num_soak_batches += 1;
+                                    }
                                 }
                             }
                             Err(e) => {
                                 // If we're very close to the end of the test, the rollup might have shut down before we could finish querying.
                                 // The test shouldn't fail for this reason, so we just skip the batch.
-                                if is_very_close_to_soak_test_end(num_soak_batches) {
-                                    tracing::debug!("Soak slot fetcher encountered an error near the end of the test; num_soak_batches: {num_soak_batches}, NUM_SOAK_BATCHES: {NUM_SOAK_BATCHES}, slot number: {}, rollup_stop_height: {rollup_stop_height}", slot.number);
+                                if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
+                                    tracing::debug!("Soak slot fetcher encountered an error near the end of the test; num_soak_batches: {num_soak_batches}, target_soak_batches: {target_soak_batches}, slot number: {}, rollup_stop_height: {rollup_stop_height}", slot.number);
                                     tracing::warn!("Encountered an error very near the end of the test. Assuming the rollup shut down.");
                                     break;
                                 } else {
@@ -514,7 +445,7 @@ pub async fn run_soak(
 
                     // Otherwise, we need to do some accounting
                     num_soak_slots += 1;
-                    info!("Received new slot. Rollup has processed {} txs in {} slots. Average throughput: {} txs/slot", num_soak_txs, num_soak_slots, num_soak_txs as f64 / num_soak_slots as f64);
+                    info!("Received new slot {}, with batch {}. Rollup has processed {} txs in {} slots. Average throughput: {} txs/slot", slot.number, slot.batch_range.start, num_soak_txs, num_soak_slots, num_soak_txs as f64 / num_soak_slots as f64);
                     // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
                     if num_soak_slots % FULL_SLOT_SAVE_INTERVAL == 0 {
                        match client.get_slot_by_id(&types::IntOrHash::Integer(slot.number), Some(GetSlotByIdChildren::_1)).await {
@@ -568,8 +499,8 @@ pub async fn run_soak(
                         // Worker completed successfully, continue monitoring
                     }
                     Ok(Err(e)) => {
-                        if is_very_close_to_soak_test_end(num_soak_batches) {
-                            tracing::debug!("Worker task failed near the end of the test; num_soak_batches: {num_soak_batches}, NUM_SOAK_BATCHES: {NUM_SOAK_BATCHES}, rollup_stop_height: {rollup_stop_height}, err: {e}");
+                        if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
+                            tracing::debug!("Worker task failed near the end of the test; num_soak_batches: {num_soak_batches}, target_soak_batches: {target_soak_batches}, rollup_stop_height: {rollup_stop_height}, err: {e}");
                             tracing::warn!("Worker task failed very near the end of the test. Assuming the rollup shut down.");
                         } else {
                             tracing::error!("Worker task failed: {}", e);
@@ -587,6 +518,8 @@ pub async fn run_soak(
         }
     }
 
+    let _ = soak_shutdown_tx.send(());
+
     if tx.send(true).is_err() {
         debug!("Soak worker channel closed; workers already shut down");
     }
@@ -603,6 +536,23 @@ pub async fn run_soak(
                 idx + 1,
                 err
             );
+        }
+    }
+
+    match tokio::time::timeout(Duration::from_secs(10), soak_handle).await {
+        Ok(Ok(Ok(()))) => {
+            debug!("Soak coordinator exited cleanly");
+        }
+        Ok(Ok(Err(e))) => {
+            kill_rollup(rollup_id);
+            return Err(anyhow!("soak coordinator failed: {e}"));
+        }
+        Ok(Err(e)) => {
+            kill_rollup(rollup_id);
+            return Err(anyhow!("soak coordinator task panicked: {e}"));
+        }
+        Err(_) => {
+            tracing::warn!("Timed out waiting for soak coordinator to stop");
         }
     }
 
