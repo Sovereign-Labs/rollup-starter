@@ -7,7 +7,7 @@ services:
     # uncomment to provide amount of celestia nodes to provision (default: 5)
     # command: [ "/opt/entrypoint.sh", "2" ]
     ports:
-      - "127.0.0.1:${CELESTIA_PORT:-9091}:9090"
+      - "127.0.0.1:${CELESTIA_GRPC_PORT:-9091}:9090"
     volumes:
       - type: bind
         source: ./credentials
@@ -24,7 +24,7 @@ services:
     # uncomment to provide the id of the sequencer (default: 0)
     # command: ["/opt/entrypoint.sh", "0"]
     ports:
-      - "127.0.0.1:${CELESTIA_PORT:-26658}:26658"
+      - "127.0.0.1:${CELESTIA_RPC_PORT:-26658}:26658"
     volumes:
       - type: bind
         source: ./credentials
