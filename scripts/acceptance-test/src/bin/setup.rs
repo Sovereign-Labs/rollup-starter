@@ -1,17 +1,19 @@
-use std::process::Command;
+use std::path::PathBuf;
 
 use acceptance_test::evm_soak::{
     ensure_evm_pinned_cache_config, setup_state_consistency_contracts,
 };
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
-    build_rollup, cleanup_postgres_container, generate_postgres_password, get_rollup_client,
-    interpolate_config, kill_rollup, run_soak, start_and_wait_for_postgres_ready,
-    wait_for_sequencer_ready, Directories, Runtime, Spec, ThroughputReport, API_URL,
-    NUM_SOAK_BATCHES, POSTGRES_CONTAINER_NAME, SETUP_THROUGHPUT_FILE,
+    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
+    run_until_shutdown_signal, spawn_rollup_manager, wait_for_sequencer_ready,
+    write_manager_config, AcceptanceRunPlan, Directories, PostgresContainerGuard, Runtime,
+    ShutdownReceiver, Spec, ThroughputReport, API_URL, POSTGRES_CONTAINER_NAME,
+    SETUP_THROUGHPUT_FILE,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
+use clap::Parser;
 use sov_api_spec::types::{self, AcceptTxBody};
 
 use acceptance_test::fetch_and_compare::SlotMonitor;
@@ -28,6 +30,19 @@ use stf_starter::RuntimeCall;
 use tokio_stream::StreamExt;
 
 use tracing::{info, warn};
+
+#[derive(Parser, Debug)]
+struct Args {
+    /// Directory used to cache commit-built binaries across runs.
+    #[arg(long)]
+    binary_cache_dir: Option<PathBuf>,
+}
+
+struct PreparedSetupRun {
+    directories: Directories,
+    password: String,
+    plan: AcceptanceRunPlan,
+}
 
 /// Returns true if the new throughput report should overwrite the existing one.
 /// Only overwrites if no existing file, file is invalid, or new throughput is better.
@@ -109,81 +124,103 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .init();
 
-    let directories = Directories::new()?;
-    let password = generate_postgres_password()?;
-    start_and_wait_for_postgres_ready(POSTGRES_CONTAINER_NAME, &password)?;
-    interpolate_config(&password, &directories)?;
-    ensure_evm_pinned_cache_config(&directories)?;
-    info!("Building rollup...");
-    if let Err(e) = build_rollup(directories.rollup_root.clone()) {
-        cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
-        anyhow::bail!(e);
+    let prepared = prepare_setup_run(Args::parse().binary_cache_dir)?;
+    run_until_shutdown_signal(move |shutdown_rx| run_setup(prepared, shutdown_rx)).await
+}
+
+fn prepare_setup_run(binary_cache_dir: Option<PathBuf>) -> Result<PreparedSetupRun, anyhow::Error> {
+    let mut directories = Directories::new()?;
+    if let Some(binary_cache_dir) = binary_cache_dir {
+        directories.set_rollup_build_cache_dir(binary_cache_dir)?;
     }
+    ensure_evm_pinned_cache_config(&directories)?;
+    let password = generate_postgres_password()?;
+    let plan = prepare_acceptance_run_plan(&directories, &password)?;
+    Ok(PreparedSetupRun {
+        directories,
+        password,
+        plan,
+    })
+}
 
-    let stop_at_height = NUM_SOAK_BATCHES + 10;
+async fn run_setup(
+    prepared: PreparedSetupRun,
+    mut shutdown_rx: ShutdownReceiver,
+) -> Result<(), anyhow::Error> {
+    let PreparedSetupRun {
+        directories,
+        password,
+        plan,
+    } = prepared;
+    let _postgres_guard = PostgresContainerGuard::start(POSTGRES_CONTAINER_NAME, &password)?;
+    let manager_config_path = directories.output_dir.join("setup_manager_config.json");
+    write_manager_config(&manager_config_path, &plan.manager_versions)?;
 
+    let stop_at_height = plan
+        .manager_versions
+        .last()
+        .and_then(|version| version.stop_height)
+        .unwrap_or_default();
+    let throughput_start_batch = plan
+        .manager_versions
+        .last()
+        .and_then(|version| version.start_height)
+        .map(|start_height| start_height.saturating_sub(1))
+        .unwrap_or(3);
     info!(
-        "Starting rollup from rollup workspace root: {}",
-        directories.rollup_root.display()
+        "Setup throughput measurement will start after batch {}",
+        throughput_start_batch
     );
-    let mut rollup = Command::new("cargo")
-        .args([
-            "run",
-            "--release",
-            "--features",
-            "acceptance-testing",
-            "--",
-            "--rollup-config-path",
-            &directories
-                .output_dir
-                .join("config.toml")
-                .display()
-                .to_string(),
-            "--genesis-path",
-            &directories
-                .acceptance_test_dir
-                .join("genesis.json")
-                .display()
-                .to_string(),
-            "--stop-at-rollup-height",
-            &stop_at_height.to_string(),
-        ])
-        .current_dir(directories.rollup_root.clone())
-        .stdout(std::fs::File::create(
-            directories.output_dir.join("rollup.log"),
-        )?)
-        .spawn()
-        .expect("Failed to start rollup");
+
+    info!("Starting rollup through sov-rollup-manager");
+    let rollup = spawn_rollup_manager(
+        &plan.manager_binary,
+        &manager_config_path,
+        &directories,
+        Some(&directories.output_dir.join("rollup.log")),
+    )?;
 
     // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
-    // If manual setup fails, skip soak and stop the rollup process so cleanup can proceed.
-    let res = match do_manual_setup(directories.clone()).await {
-        Ok(()) => run_soak(directories.clone(), rollup, 3, stop_at_height, true).await,
+    // If manual setup fails, skip soak run and let Drop clean up the manager process.
+    let res = match do_manual_setup(directories.clone(), &mut shutdown_rx).await {
+        Ok(()) => {
+            run_soak(
+                directories.clone(),
+                rollup,
+                plan.soak_config.clone(),
+                throughput_start_batch,
+                stop_at_height,
+                true,
+                shutdown_rx.clone(),
+            )
+            .await
+        }
         Err(err) => {
             warn!("Manual setup failed, skipping soak run: {err}");
-            kill_rollup(rollup.id());
-            if let Err(wait_err) = rollup.wait() {
-                warn!("Failed to wait for rollup process after manual setup failure: {wait_err}");
-            }
             Err(err)
         }
     };
-    cleanup_postgres_container(POSTGRES_CONTAINER_NAME)?;
-    if let Ok(throughput_report) = res {
-        let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
-        if should_overwrite_throughput(&throughput_path, &throughput_report) {
-            std::fs::write(&throughput_path, serde_json::to_string(&throughput_report)?)?;
+    match res {
+        Ok(throughput_report) => {
+            let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
+            if should_overwrite_throughput(&throughput_path, &throughput_report) {
+                std::fs::write(&throughput_path, serde_json::to_string(&throughput_report)?)?;
+            }
+            save_mock_data(directories.clone())?;
+            Ok(())
         }
-        save_mock_data(directories.clone())?;
+        Err(e) => Err(e),
     }
-    Ok(())
 }
 
 /// Runs a sequence of two batches, one with a create token, and one with a mint and transfer.
 /// Since we know exactly what state will be generated, we can make fine-grained assertions about the state using this manual setup.
-async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> {
+async fn do_manual_setup(
+    directories: Directories,
+    shutdown_rx: &mut ShutdownReceiver,
+) -> Result<(), anyhow::Error> {
     info!("Rollup started, waiting for sequencer to be ready");
-    wait_for_sequencer_ready().await?;
+    wait_for_sequencer_ready(shutdown_rx).await?;
     info!("Sequencer is ready, sending txs");
 
     // Send the known good txs: Create token, mint token, transfer token
@@ -289,7 +326,7 @@ async fn do_manual_setup(directories: Directories) -> Result<(), anyhow::Error> 
     info!("Next batch posted, fetching and comparing slots");
 
     let last_slot = slot_monitor.prev_slot_with_children.as_ref().unwrap();
-    let slot_fetcher = SlotFetcher::new(client, &directories);
+    let mut slot_fetcher = SlotFetcher::new(client, &directories);
     for slotnum in 0..first_subscribed_slot_number {
         let _slot = slot_fetcher
             .fetch_and_compare_slot(slotnum, GetItemBehavior::SaveSnapshot)

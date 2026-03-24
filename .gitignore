@@ -27,5 +27,7 @@ scripts/rollup-starter-celestia.sh
 # Acceptance test data isn't committed to git
 scripts/acceptance-test/acceptance-test-data*
 scripts/acceptance-test/acceptance-throughput/*
+scripts/acceptance-test/rollup-manager-build/*
+scripts/acceptance-test/rollup-build-cache/*
 
 **/rustc-ice-*.txt
