@@ -14,7 +14,7 @@ dotenv.config();
 const paymasterUpdateCall: RuntimeCall = {
     paymaster: {
         update_policy: {
-			payer:   '0x8a7a1774229CDcdE36b1E4A2321e702F25788698', // .01 ETH
+			payer:   '0x8a7a1774229CDcdE36b1E4A2321e702F25788698', 
             update: {
                 default_policy:  null,
                 sequencer_update: null,
@@ -39,6 +39,7 @@ const paymasterUpdateCall: RuntimeCall = {
                     ["0x9bee034fb873496ade3d654ac59c3b9c8513749e", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     ["0xED1ce6bc5964ff4529A593Bf3ebab2Caf73c31dE", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     ["0x8a7a1774229CDcdE36b1E4A2321e702F25788698", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0xeE1Bdc7095BD0bE36De7b33b9a32D5aFE86Ff36a", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                 ]
             }
         }
@@ -80,7 +81,7 @@ const rollup = await createStandardRollup({
 console.log("Rollup client initialized");
 
 try {
-    console.log("Depositing sequencer funds...");
+    console.log("Setting paymaster policy...");
     const response = await rollup.call(paymasterUpdateCall, {signer});
     console.log("Full response:");
     console.log(JSON.stringify(response.response));
