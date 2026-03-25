@@ -7,7 +7,9 @@ soak test for a fixed length of time and ensure that (1) there are no errors and
 is within the expected range.
 
 To run the test simply `cargo run --bin acceptance-test`. All data should have been prepopulated.
-`build.rs` compiles the EVM state consistency contract via `solc` at build time, so ensure it is available on PATH.
+`build.rs` copies checked-in EVM contract artifacts into `OUT_DIR` by default. If the Solidity source changes
+and the checked-in artifacts are stale or missing, it will regenerate them via `solc`, so `solc` is only needed
+when updating the contract itself.
 
 The test is meant to be idempotent. It deletes any possible leftover files at the beginning of each run.
 However, in case of errors it can sometimes be the case that docker containers haven't been shut down 
