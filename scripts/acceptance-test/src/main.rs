@@ -6,7 +6,7 @@ use acceptance_test::{
     prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, shutdown_error,
     sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown, write_manager_config,
     AcceptanceRunPlan, CommonArgs, Directories, PostgresContainerGuard, ResolvedRunSettings,
-    ShutdownReceiver, API_URL,
+    ShutdownReceiver, SoakRunOptions, API_URL,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use chrono::Utc;
@@ -230,10 +230,12 @@ async fn run_test(
         directories.clone(),
         rollup,
         resync_soak_config,
-        latest_batch_num,
-        stop_at_height,
-        settings.full_slot_save_interval,
-        false,
+        SoakRunOptions {
+            throughput_start_batch: latest_batch_num,
+            rollup_stop_height: stop_at_height,
+            full_slot_save_interval: settings.full_slot_save_interval,
+            save_slot_snapshots: false,
+        },
         shutdown_rx.clone(),
     )
     .await?;

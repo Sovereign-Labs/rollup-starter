@@ -521,6 +521,14 @@ impl ThroughputReport {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct SoakRunOptions {
+    pub throughput_start_batch: u64,
+    pub rollup_stop_height: u64,
+    pub full_slot_save_interval: u64,
+    pub save_slot_snapshots: bool,
+}
+
 fn is_very_close_to_soak_test_end(num_soak_batches: u64, target_soak_batches: u64) -> bool {
     num_soak_batches.saturating_add(15) > target_soak_batches
 }
@@ -600,12 +608,15 @@ pub async fn run_soak(
     directories: Directories,
     mut rollup: ManagedRollupProcess,
     soak_config: SoakManagerConfig,
-    throughput_start_batch: u64,
-    rollup_stop_height: u64,
-    full_slot_save_interval: u64,
-    save_slot_snapshots: bool,
+    options: SoakRunOptions,
     mut shutdown_rx: ShutdownReceiver,
 ) -> Result<ThroughputReport, anyhow::Error> {
+    let SoakRunOptions {
+        throughput_start_batch,
+        rollup_stop_height,
+        full_slot_save_interval,
+        save_slot_snapshots,
+    } = options;
     let target_soak_batches = rollup_stop_height.saturating_sub(throughput_start_batch);
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);

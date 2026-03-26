@@ -7,7 +7,7 @@ use acceptance_test::{
     prepare_acceptance_run_plan, prepare_rollup_state_dir, run_soak, run_until_shutdown_signal,
     spawn_rollup_manager, wait_for_sequencer_ready, write_manager_config, AcceptanceRunPlan,
     CommonArgs, Directories, PostgresContainerGuard, ResolvedRunSettings, Runtime,
-    ShutdownReceiver, Spec, ThroughputReport, API_URL, SETUP_THROUGHPUT_FILE,
+    ShutdownReceiver, SoakRunOptions, Spec, ThroughputReport, API_URL, SETUP_THROUGHPUT_FILE,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -191,10 +191,12 @@ async fn run_setup(
                 directories.clone(),
                 rollup,
                 plan.soak_config.clone(),
-                throughput_start_batch,
-                stop_at_height,
-                settings.full_slot_save_interval,
-                true,
+                SoakRunOptions {
+                    throughput_start_batch,
+                    rollup_stop_height: stop_at_height,
+                    full_slot_save_interval: settings.full_slot_save_interval,
+                    save_slot_snapshots: true,
+                },
                 shutdown_rx.clone(),
             )
             .await
