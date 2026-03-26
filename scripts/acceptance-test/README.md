@@ -11,8 +11,11 @@ To run the test simply `cargo run --bin acceptance-test`. All data should have b
 and the checked-in artifacts are stale or missing, it will regenerate them via `solc`, so `solc` is only needed
 when updating the contract itself.
 
-The test is meant to be idempotent. It deletes any possible leftover files at the beginning of each run.
-However, in case of errors it can sometimes be the case that docker containers haven't been shut down 
+The test is conservative by default: if the configured rollup state directory already contains data,
+it exits with an error instead of deleting it. To clear the existing state automatically, pass
+`--on-existing-rollup-state=clobber`.
+
+However, in case of errors it can sometimes be the case that docker containers haven't been shut down
 from the previous run. To fix, simply `docker rm -f postgres-acceptance-test`.
 
 The binaries support a default `full` profile and an optional `--short` profile. `full` uses
@@ -30,8 +33,9 @@ subdirectories or regenerate it with `cargo run --bin setup`.
 Useful examples:
 
 - `cargo run --bin setup -- --short`
+- `cargo run --bin setup -- --on-existing-rollup-state=clobber`
 - `cargo run --bin acceptance-test -- --short --no-throughput-check`
-- `cargo run --bin acceptance-test -- --acceptance-data-dir /tmp/acceptance-data --on-existing-rollup-state=error`
+- `cargo run --bin acceptance-test -- --acceptance-data-dir /tmp/acceptance-data`
 
 ### Resetting the Test
 

@@ -277,21 +277,38 @@ pub struct Directories {
 
 impl Directories {
     pub fn from_settings(settings: &ResolvedRunSettings) -> Result<Self, anyhow::Error> {
+        let cwd = std::env::current_dir()?;
         let acceptance_test_dir = env::var("CARGO_MANIFEST_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("."));
-        Self::from_settings_with_acceptance_dir(settings, acceptance_test_dir)
+        Self::from_settings_with_acceptance_dir_and_cwd(settings, acceptance_test_dir, cwd)
     }
 
     pub fn from_settings_with_acceptance_dir(
         settings: &ResolvedRunSettings,
         acceptance_test_dir: PathBuf,
     ) -> Result<Self, anyhow::Error> {
-        let acceptance_test_dir = if acceptance_test_dir.is_absolute() {
-            acceptance_test_dir
-        } else {
-            std::env::current_dir()?.join(acceptance_test_dir)
-        };
+        let cwd = std::env::current_dir()?;
+        Self::from_settings_with_acceptance_dir_and_cwd(settings, acceptance_test_dir, cwd)
+    }
+
+    fn from_settings_with_acceptance_dir_and_cwd(
+        settings: &ResolvedRunSettings,
+        acceptance_test_dir: PathBuf,
+        cwd: PathBuf,
+    ) -> Result<Self, anyhow::Error> {
+        let acceptance_test_dir = absolutize_from_cwd(acceptance_test_dir, &cwd);
+        let acceptance_test_metadata = fs::metadata(&acceptance_test_dir).with_context(|| {
+            format!(
+                "acceptance test directory {} does not exist",
+                acceptance_test_dir.display()
+            )
+        })?;
+        anyhow::ensure!(
+            acceptance_test_metadata.is_dir(),
+            "acceptance test path {} is not a directory",
+            acceptance_test_dir.display()
+        );
 
         let rollup_root = acceptance_test_dir
             .parent()
@@ -300,30 +317,34 @@ impl Directories {
             .unwrap()
             .to_path_buf();
 
-        let rollup_build_cache_dir = settings
-            .binary_cache_dir
-            .clone()
-            .unwrap_or_else(|| acceptance_test_dir.join("rollup-build-cache"));
+        let rollup_build_cache_dir = if let Some(path) = settings.binary_cache_dir.clone() {
+            absolutize_from_cwd(path, &cwd)
+        } else {
+            acceptance_test_dir.join("rollup-build-cache")
+        };
         fs::create_dir_all(&rollup_build_cache_dir)?;
         let manager_build_dir = acceptance_test_dir.join("rollup-manager-build");
 
-        let output_root = settings
-            .acceptance_data_dir
-            .clone()
-            .unwrap_or_else(|| acceptance_test_dir.join("acceptance-test-data"));
+        let output_root = if let Some(path) = settings.acceptance_data_dir.clone() {
+            absolutize_from_cwd(path, &cwd)
+        } else {
+            acceptance_test_dir.join("acceptance-test-data")
+        };
         let output_dir = output_root.join(settings.profile.subdir());
         fs::create_dir_all(&output_dir)?;
-        let rollup_data_path = settings
-            .rollup_state_dir
-            .clone()
-            .unwrap_or_else(|| output_dir.join("rollup-starter-data"));
+        let rollup_data_path = if let Some(path) = settings.rollup_state_dir.clone() {
+            absolutize_from_cwd(path, &cwd)
+        } else {
+            output_dir.join("rollup-starter-data")
+        };
         let snapshots_dir = output_dir.join("snapshots");
         fs::create_dir_all(&snapshots_dir)?;
 
-        let throughput_root = settings
-            .acceptance_throughput_dir
-            .clone()
-            .unwrap_or_else(|| acceptance_test_dir.join("acceptance-throughput"));
+        let throughput_root = if let Some(path) = settings.acceptance_throughput_dir.clone() {
+            absolutize_from_cwd(path, &cwd)
+        } else {
+            acceptance_test_dir.join("acceptance-throughput")
+        };
         let throughput_dir = throughput_root.join(settings.profile.subdir());
         fs::create_dir_all(&throughput_dir)?;
 
@@ -337,6 +358,14 @@ impl Directories {
             snapshots_dir,
             throughput_dir,
         })
+    }
+}
+
+fn absolutize_from_cwd(path: PathBuf, cwd: &std::path::Path) -> PathBuf {
+    if path.is_absolute() {
+        path
+    } else {
+        cwd.join(path)
     }
 }
 
@@ -867,5 +896,39 @@ mod tests {
             Directories::from_settings_with_acceptance_dir(&settings, acceptance_test_dir).unwrap();
 
         assert_eq!(directories.rollup_data_path, explicit_state_dir);
+    }
+
+    #[test]
+    fn relative_user_paths_are_resolved_against_invocation_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        let cwd = temp.path().join("invocation");
+        let acceptance_test_dir = temp.path().join("repo/scripts/acceptance-test");
+        fs::create_dir_all(&cwd).unwrap();
+        fs::create_dir_all(&acceptance_test_dir).unwrap();
+
+        let settings = ResolvedRunSettings::from_common_args(CommonArgs {
+            acceptance_data_dir: Some(PathBuf::from("acceptance-data")),
+            acceptance_throughput_dir: Some(PathBuf::from("throughput-data")),
+            rollup_state_dir: Some(PathBuf::from("rollup-state")),
+            binary_cache_dir: Some(PathBuf::from("binary-cache")),
+            ..CommonArgs::default()
+        });
+        let directories = Directories::from_settings_with_acceptance_dir_and_cwd(
+            &settings,
+            acceptance_test_dir,
+            cwd.clone(),
+        )
+        .unwrap();
+
+        assert_eq!(directories.rollup_build_cache_dir, cwd.join("binary-cache"));
+        assert_eq!(
+            directories.output_dir,
+            cwd.join("acceptance-data").join("full")
+        );
+        assert_eq!(directories.rollup_data_path, cwd.join("rollup-state"));
+        assert_eq!(
+            directories.throughput_dir,
+            cwd.join("throughput-data").join("full")
+        );
     }
 }

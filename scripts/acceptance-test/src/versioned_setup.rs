@@ -446,14 +446,15 @@ pub fn prepare_acceptance_run_plan(
 pub fn extend_last_stop_height(
     versions: &[RollupVersion],
     extra_blocks: u64,
-    default_stop_height: u64,
 ) -> Vec<RollupVersion> {
     if extra_blocks == 0 {
         return versions.to_vec();
     }
     let mut extended = versions.to_vec();
     if let Some(last) = extended.last_mut() {
-        let current_stop = last.stop_height.unwrap_or(default_stop_height);
+        let current_stop = last
+            .stop_height
+            .expect("acceptance-test rollup versions must have a stop height");
         last.stop_height = Some(current_stop + extra_blocks);
     }
     extended

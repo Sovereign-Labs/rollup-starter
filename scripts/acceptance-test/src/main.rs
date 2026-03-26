@@ -134,11 +134,8 @@ async fn run_test(
         // Genesis doesn't have a batch; this has the result that batch numbers lag 1 behind the
         // rollup height.
         .saturating_sub(1);
-    let manager_versions = extend_last_stop_height(
-        &plan.manager_versions,
-        settings.blocks_per_version,
-        settings.blocks_per_version,
-    );
+    let manager_versions =
+        extend_last_stop_height(&plan.manager_versions, settings.blocks_per_version);
     let manager_config_path = directories
         .output_dir
         .join("acceptance_manager_config.json");

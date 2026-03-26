@@ -26,8 +26,8 @@ impl RunProfile {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
 pub enum ExistingRollupState {
-    #[default]
     Clobber,
+    #[default]
     Error,
     Ignore,
 }
@@ -51,7 +51,7 @@ pub struct CommonArgs {
     pub rollup_state_dir: Option<PathBuf>,
 
     /// How to handle an existing rollup state directory before running.
-    #[arg(long, value_enum, default_value_t = ExistingRollupState::Clobber)]
+    #[arg(long, value_enum, default_value_t = ExistingRollupState::Error)]
     pub on_existing_rollup_state: ExistingRollupState,
 
     /// Name of the postgres docker container used during the run.
@@ -186,7 +186,7 @@ mod tests {
         );
         assert_eq!(
             resolved.on_existing_rollup_state,
-            ExistingRollupState::Clobber
+            ExistingRollupState::Error
         );
     }
 
@@ -214,6 +214,17 @@ mod tests {
         assert_eq!(
             parsed.common.on_existing_rollup_state,
             ExistingRollupState::Ignore
+        );
+    }
+
+    #[test]
+    fn parser_defaults_existing_state_policy_to_error() {
+        let parsed =
+            TestParser::try_parse_from(["acceptance-test"]).expect("parser should use defaults");
+
+        assert_eq!(
+            parsed.common.on_existing_rollup_state,
+            ExistingRollupState::Error
         );
     }
 
