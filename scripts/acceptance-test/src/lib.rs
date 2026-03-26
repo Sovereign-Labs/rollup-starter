@@ -26,25 +26,24 @@ use tokio::task::JoinSet;
 use tracing::{debug, info};
 
 use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
+mod config;
 mod evm_contracts;
 pub mod evm_soak;
 pub mod fetch_and_compare;
 mod state_consistency;
 mod versioned_setup;
+pub use config::{
+    prepare_rollup_state_dir, CommonArgs, ExistingRollupState, ResolvedRunSettings, RunProfile,
+    DEFAULT_BLOCKS_PER_VERSION, DEFAULT_FULL_SLOT_SAVE_INTERVAL, DEFAULT_POSTGRES_CONTAINER_NAME,
+};
 pub use versioned_setup::{
     extend_last_stop_height, prepare_acceptance_run_plan, spawn_rollup_manager,
     write_manager_config, AcceptanceRunPlan,
 };
 
-pub const POSTGRES_CONTAINER_NAME: &str = "postgres-acceptance-test";
 pub const API_URL: &str = "http://127.0.0.1:12348";
 pub const API_ADDR: &str = "127.0.0.1:12348";
 pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
-
-// Save a full snapshot of the slot every N slots
-const FULL_SLOT_SAVE_INTERVAL: u64 = 25;
-// Run each version of a multi-version rollup for this many blocks.
-pub const BLOCKS_PER_VERSION: u64 = 1000;
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 const TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT: Duration = Duration::from_secs(90);
@@ -277,10 +276,22 @@ pub struct Directories {
 }
 
 impl Directories {
-    pub fn new() -> Result<Self, anyhow::Error> {
+    pub fn from_settings(settings: &ResolvedRunSettings) -> Result<Self, anyhow::Error> {
         let acceptance_test_dir = env::var("CARGO_MANIFEST_DIR")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("."));
+        Self::from_settings_with_acceptance_dir(settings, acceptance_test_dir)
+    }
+
+    pub fn from_settings_with_acceptance_dir(
+        settings: &ResolvedRunSettings,
+        acceptance_test_dir: PathBuf,
+    ) -> Result<Self, anyhow::Error> {
+        let acceptance_test_dir = if acceptance_test_dir.is_absolute() {
+            acceptance_test_dir
+        } else {
+            std::env::current_dir()?.join(acceptance_test_dir)
+        };
 
         let rollup_root = acceptance_test_dir
             .parent()
@@ -289,22 +300,32 @@ impl Directories {
             .unwrap()
             .to_path_buf();
 
-        let rollup_build_cache_dir = acceptance_test_dir.join("rollup-build-cache");
+        let rollup_build_cache_dir = settings
+            .binary_cache_dir
+            .clone()
+            .unwrap_or_else(|| acceptance_test_dir.join("rollup-build-cache"));
         fs::create_dir_all(&rollup_build_cache_dir)?;
         let manager_build_dir = acceptance_test_dir.join("rollup-manager-build");
 
-        let output_dir = acceptance_test_dir.join("acceptance-test-data");
+        let output_root = settings
+            .acceptance_data_dir
+            .clone()
+            .unwrap_or_else(|| acceptance_test_dir.join("acceptance-test-data"));
+        let output_dir = output_root.join(settings.profile.subdir());
         fs::create_dir_all(&output_dir)?;
-        let rollup_data_path = output_dir.join("rollup-starter-data");
-        fs::create_dir_all(&rollup_data_path)?;
+        let rollup_data_path = settings
+            .rollup_state_dir
+            .clone()
+            .unwrap_or_else(|| output_dir.join("rollup-starter-data"));
         let snapshots_dir = output_dir.join("snapshots");
-        std::fs::create_dir_all(&snapshots_dir).ok();
+        fs::create_dir_all(&snapshots_dir)?;
 
-        let throughput_dir = acceptance_test_dir.join("acceptance-throughput");
-        // Only create throughput_dir if it doesn't exist - this directory persists across runs
-        if !throughput_dir.exists() {
-            fs::create_dir_all(&throughput_dir)?;
-        }
+        let throughput_root = settings
+            .acceptance_throughput_dir
+            .clone()
+            .unwrap_or_else(|| acceptance_test_dir.join("acceptance-throughput"));
+        let throughput_dir = throughput_root.join(settings.profile.subdir());
+        fs::create_dir_all(&throughput_dir)?;
 
         Ok(Self {
             rollup_root,
@@ -316,12 +337,6 @@ impl Directories {
             snapshots_dir,
             throughput_dir,
         })
-    }
-
-    pub fn set_rollup_build_cache_dir(&mut self, path: PathBuf) -> Result<(), anyhow::Error> {
-        fs::create_dir_all(&path)?;
-        self.rollup_build_cache_dir = path;
-        Ok(())
     }
 }
 
@@ -557,6 +572,7 @@ pub async fn run_soak(
     soak_config: SoakManagerConfig,
     throughput_start_batch: u64,
     rollup_stop_height: u64,
+    full_slot_save_interval: u64,
     save_slot_snapshots: bool,
     mut shutdown_rx: ShutdownReceiver,
 ) -> Result<ThroughputReport, anyhow::Error> {
@@ -720,7 +736,7 @@ pub async fn run_soak(
                 num_soak_slots += 1;
                 info!("Received new slot {}, with batch {}. Rollup has processed {} txs in {} slots. Average throughput: {} txs/slot", slot.number, slot.batch_range.start, num_soak_txs, num_soak_slots, num_soak_txs as f64 / num_soak_slots as f64);
                 // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
-                if num_soak_slots % FULL_SLOT_SAVE_INTERVAL == 0 {
+                if num_soak_slots % full_slot_save_interval == 0 {
                    match client.get_slot_by_id(&types::IntOrHash::Integer(slot.number), Some(GetSlotByIdChildren::_1)).await {
                         Ok(full_slot) => {
                             save_slot_snapshot_if_needed(&full_slot, &directories, save_slot_snapshots)?;
@@ -797,4 +813,59 @@ pub async fn run_soak(
         num_txs: num_soak_txs,
         num_slots: num_soak_slots,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn directories_use_profile_subdirectories() {
+        let temp = tempfile::tempdir().unwrap();
+        let acceptance_test_dir = temp.path().join("scripts/acceptance-test");
+        fs::create_dir_all(&acceptance_test_dir).unwrap();
+
+        let settings = ResolvedRunSettings::from_common_args(CommonArgs {
+            short: true,
+            ..CommonArgs::default()
+        });
+        let directories =
+            Directories::from_settings_with_acceptance_dir(&settings, acceptance_test_dir.clone())
+                .unwrap();
+
+        assert_eq!(
+            directories.output_dir,
+            acceptance_test_dir
+                .join("acceptance-test-data")
+                .join("short")
+        );
+        assert_eq!(
+            directories.throughput_dir,
+            acceptance_test_dir
+                .join("acceptance-throughput")
+                .join("short")
+        );
+        assert_eq!(
+            directories.rollup_data_path,
+            directories.output_dir.join("rollup-starter-data")
+        );
+    }
+
+    #[test]
+    fn explicit_rollup_state_dir_is_used_literally() {
+        let temp = tempfile::tempdir().unwrap();
+        let acceptance_test_dir = temp.path().join("scripts/acceptance-test");
+        fs::create_dir_all(&acceptance_test_dir).unwrap();
+        let explicit_state_dir = temp.path().join("custom-state");
+
+        let settings = ResolvedRunSettings::from_common_args(CommonArgs {
+            short: true,
+            rollup_state_dir: Some(explicit_state_dir.clone()),
+            ..CommonArgs::default()
+        });
+        let directories =
+            Directories::from_settings_with_acceptance_dir(&settings, acceptance_test_dir).unwrap();
+
+        assert_eq!(directories.rollup_data_path, explicit_state_dir);
+    }
 }

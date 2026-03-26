@@ -12,7 +12,7 @@ use sov_versioned_artifact_builder::{
 use tokio::process::Command as TokioCommand;
 use tracing::info;
 
-use crate::{Directories, ManagedRollupProcess, BLOCKS_PER_VERSION};
+use crate::{Directories, ManagedRollupProcess};
 
 pub const ROLLUP_REPO_URL: &str = "https://github.com/Sovereign-Labs/rollup-starter.git";
 pub const ROLLUP_MANAGER_REPO_URL: &str = "https://github.com/Sovereign-Labs/sov-rollup-manager";
@@ -292,6 +292,7 @@ fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, any
 pub fn prepare_acceptance_run_plan(
     directories: &Directories,
     password: &str,
+    blocks_per_version: u64,
 ) -> Result<AcceptanceRunPlan, anyhow::Error> {
     let binary_cache_dir = &directories.rollup_build_cache_dir;
     fs::create_dir_all(binary_cache_dir)?;
@@ -343,11 +344,11 @@ pub fn prepare_acceptance_run_plan(
     let mut soak_versions = Vec::with_capacity(resolved_versions.len());
 
     for (idx, resolved_version) in resolved_versions.iter().enumerate() {
-        let stop_height = ((idx as u64) + 1) * BLOCKS_PER_VERSION;
+        let stop_height = ((idx as u64) + 1) * blocks_per_version;
         let start_height = if idx == 0 {
             None
         } else {
-            Some((idx as u64 * BLOCKS_PER_VERSION) + 1)
+            Some((idx as u64 * blocks_per_version) + 1)
         };
 
         let (rollup_binary, soak_binary, config_template_content, migration_path) =
@@ -445,13 +446,14 @@ pub fn prepare_acceptance_run_plan(
 pub fn extend_last_stop_height(
     versions: &[RollupVersion],
     extra_blocks: u64,
+    default_stop_height: u64,
 ) -> Vec<RollupVersion> {
     if extra_blocks == 0 {
         return versions.to_vec();
     }
     let mut extended = versions.to_vec();
     if let Some(last) = extended.last_mut() {
-        let current_stop = last.stop_height.unwrap_or(BLOCKS_PER_VERSION);
+        let current_stop = last.stop_height.unwrap_or(default_stop_height);
         last.stop_height = Some(current_stop + extra_blocks);
     }
     extended

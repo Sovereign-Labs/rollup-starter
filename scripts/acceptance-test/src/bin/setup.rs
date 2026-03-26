@@ -1,15 +1,13 @@
-use std::path::PathBuf;
-
 use acceptance_test::evm_soak::{
     ensure_evm_pinned_cache_config, setup_state_consistency_contracts,
 };
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
-    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
-    run_until_shutdown_signal, spawn_rollup_manager, wait_for_sequencer_ready,
-    write_manager_config, AcceptanceRunPlan, Directories, PostgresContainerGuard, Runtime,
-    ShutdownReceiver, Spec, ThroughputReport, API_URL, POSTGRES_CONTAINER_NAME,
-    SETUP_THROUGHPUT_FILE,
+    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan,
+    prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, spawn_rollup_manager,
+    wait_for_sequencer_ready, write_manager_config, AcceptanceRunPlan, CommonArgs, Directories,
+    PostgresContainerGuard, ResolvedRunSettings, Runtime, ShutdownReceiver, Spec, ThroughputReport,
+    API_URL, SETUP_THROUGHPUT_FILE,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -33,15 +31,15 @@ use tracing::{info, warn};
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// Directory used to cache commit-built binaries across runs.
-    #[arg(long)]
-    binary_cache_dir: Option<PathBuf>,
+    #[command(flatten)]
+    common: CommonArgs,
 }
 
 struct PreparedSetupRun {
     directories: Directories,
     password: String,
     plan: AcceptanceRunPlan,
+    settings: ResolvedRunSettings,
 }
 
 /// Returns true if the new throughput report should overwrite the existing one.
@@ -124,22 +122,25 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .init();
 
-    let prepared = prepare_setup_run(Args::parse().binary_cache_dir)?;
+    let prepared = prepare_setup_run(Args::parse())?;
     run_until_shutdown_signal(move |shutdown_rx| run_setup(prepared, shutdown_rx)).await
 }
 
-fn prepare_setup_run(binary_cache_dir: Option<PathBuf>) -> Result<PreparedSetupRun, anyhow::Error> {
-    let mut directories = Directories::new()?;
-    if let Some(binary_cache_dir) = binary_cache_dir {
-        directories.set_rollup_build_cache_dir(binary_cache_dir)?;
-    }
+fn prepare_setup_run(args: Args) -> Result<PreparedSetupRun, anyhow::Error> {
+    let settings = ResolvedRunSettings::from_common_args(args.common);
+    let directories = Directories::from_settings(&settings)?;
+    prepare_rollup_state_dir(
+        &directories.rollup_data_path,
+        settings.on_existing_rollup_state,
+    )?;
     ensure_evm_pinned_cache_config(&directories)?;
     let password = generate_postgres_password()?;
-    let plan = prepare_acceptance_run_plan(&directories, &password)?;
+    let plan = prepare_acceptance_run_plan(&directories, &password, settings.blocks_per_version)?;
     Ok(PreparedSetupRun {
         directories,
         password,
         plan,
+        settings,
     })
 }
 
@@ -151,8 +152,10 @@ async fn run_setup(
         directories,
         password,
         plan,
+        settings,
     } = prepared;
-    let _postgres_guard = PostgresContainerGuard::start(POSTGRES_CONTAINER_NAME, &password)?;
+    let _postgres_guard =
+        PostgresContainerGuard::start(&settings.postgres_docker_container_name, &password)?;
     let manager_config_path = directories.output_dir.join("setup_manager_config.json");
     write_manager_config(&manager_config_path, &plan.manager_versions)?;
 
@@ -190,6 +193,7 @@ async fn run_setup(
                 plan.soak_config.clone(),
                 throughput_start_batch,
                 stop_at_height,
+                settings.full_slot_save_interval,
                 true,
                 shutdown_rx.clone(),
             )
