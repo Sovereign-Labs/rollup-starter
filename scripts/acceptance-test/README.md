@@ -11,9 +11,16 @@ To run the test simply `cargo run --bin acceptance-test`. All data should have b
 and the checked-in artifacts are stale or missing, it will regenerate them via `solc`, so `solc` is only needed
 when updating the contract itself.
 
-The test is conservative by default: if the configured rollup state directory already contains data,
-it exits with an error instead of deleting it. To clear the existing state automatically, pass
+The default rollup state directory is treated as transient. After a successful `setup` or
+`acceptance-test` run it is emptied automatically, so repeated runs work without extra flags.
+
+If you provide an explicit `--rollup-state-dir`, the binaries preserve it by default and will exit
+if it is non-empty on the next run. To clear an existing state directory automatically, pass
 `--on-existing-rollup-state=clobber`.
+
+If your local default state dir is already populated from an older run, clear it once with
+`cargo run --bin setup -- --on-existing-rollup-state=clobber` or remove
+`acceptance-test-data/<profile>/rollup-starter-data` manually.
 
 However, in case of errors it can sometimes be the case that docker containers haven't been shut down
 from the previous run. To fix, simply `docker rm -f postgres-acceptance-test`.

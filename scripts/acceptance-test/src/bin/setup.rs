@@ -3,11 +3,11 @@ use acceptance_test::evm_soak::{
 };
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
-    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan,
-    prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, spawn_rollup_manager,
-    wait_for_sequencer_ready, write_manager_config, AcceptanceRunPlan, CommonArgs, Directories,
-    PostgresContainerGuard, ResolvedRunSettings, Runtime, ShutdownReceiver, Spec, ThroughputReport,
-    API_URL, SETUP_THROUGHPUT_FILE,
+    cleanup_rollup_state_dir, generate_postgres_password, get_rollup_client,
+    prepare_acceptance_run_plan, prepare_rollup_state_dir, run_soak, run_until_shutdown_signal,
+    spawn_rollup_manager, wait_for_sequencer_ready, write_manager_config, AcceptanceRunPlan,
+    CommonArgs, Directories, PostgresContainerGuard, ResolvedRunSettings, Runtime,
+    ShutdownReceiver, Spec, ThroughputReport, API_URL, SETUP_THROUGHPUT_FILE,
 };
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
@@ -211,6 +211,13 @@ async fn run_setup(
                 std::fs::write(&throughput_path, serde_json::to_string(&throughput_report)?)?;
             }
             save_mock_data(directories.clone())?;
+            if settings.cleanup_rollup_state_on_success() {
+                cleanup_rollup_state_dir(&directories.rollup_data_path)?;
+                info!(
+                    "Cleaned transient rollup state directory {}",
+                    directories.rollup_data_path.display()
+                );
+            }
             Ok(())
         }
         Err(e) => Err(e),

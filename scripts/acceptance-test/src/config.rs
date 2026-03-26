@@ -103,6 +103,10 @@ impl ResolvedRunSettings {
             binary_cache_dir: args.binary_cache_dir,
         }
     }
+
+    pub fn cleanup_rollup_state_on_success(&self) -> bool {
+        self.rollup_state_dir.is_none()
+    }
 }
 
 pub fn prepare_rollup_state_dir(
@@ -133,6 +137,23 @@ pub fn prepare_rollup_state_dir(
 
     fs::create_dir_all(path)?;
     Ok(())
+}
+
+pub fn cleanup_rollup_state_dir(path: &Path) -> Result<(), anyhow::Error> {
+    match fs::metadata(path) {
+        Ok(metadata) => {
+            if !metadata.is_dir() {
+                bail!(
+                    "Rollup state path {} exists and is not a directory",
+                    path.display()
+                );
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e.into()),
+    }
+
+    clear_directory(path)
 }
 
 fn clear_directory(path: &Path) -> Result<(), anyhow::Error> {
@@ -281,5 +302,45 @@ mod tests {
         prepare_rollup_state_dir(&path, ExistingRollupState::Ignore).unwrap();
 
         assert!(path.join("leftover").exists());
+    }
+
+    #[test]
+    fn cleanup_rollup_state_dir_empties_existing_directory() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("state");
+        fs::create_dir_all(path.join("nested")).unwrap();
+        fs::write(path.join("leftover"), b"stale").unwrap();
+        fs::write(path.join("nested/leftover"), b"stale").unwrap();
+
+        cleanup_rollup_state_dir(&path).unwrap();
+
+        assert_eq!(fs::read_dir(&path).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn cleanup_rollup_state_dir_ignores_missing_directory() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("state");
+
+        cleanup_rollup_state_dir(&path).unwrap();
+
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn explicit_rollup_state_dir_is_preserved_on_success() {
+        let resolved = ResolvedRunSettings::from_common_args(CommonArgs {
+            rollup_state_dir: Some(PathBuf::from("/tmp/custom-state")),
+            ..CommonArgs::default()
+        });
+
+        assert!(!resolved.cleanup_rollup_state_on_success());
+    }
+
+    #[test]
+    fn default_rollup_state_dir_is_cleaned_on_success() {
+        let resolved = ResolvedRunSettings::from_common_args(CommonArgs::default());
+
+        assert!(resolved.cleanup_rollup_state_on_success());
     }
 }

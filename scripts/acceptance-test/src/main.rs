@@ -1,6 +1,6 @@
 use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
-    extend_last_stop_height,
+    cleanup_rollup_state_dir, extend_last_stop_height,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
     generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan,
     prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, shutdown_error,
@@ -256,6 +256,13 @@ async fn run_test(
         serde_json::to_string(&new_throughput_report)?,
     )?;
     info!("Saved throughput report to {}", throughput_filename);
+    if settings.cleanup_rollup_state_on_success() {
+        cleanup_rollup_state_dir(&directories.rollup_data_path)?;
+        info!(
+            "Cleaned transient rollup state directory {}",
+            directories.rollup_data_path.display()
+        );
+    }
     Ok(())
 }
 

@@ -33,8 +33,9 @@ pub mod fetch_and_compare;
 mod state_consistency;
 mod versioned_setup;
 pub use config::{
-    prepare_rollup_state_dir, CommonArgs, ExistingRollupState, ResolvedRunSettings, RunProfile,
-    DEFAULT_BLOCKS_PER_VERSION, DEFAULT_FULL_SLOT_SAVE_INTERVAL, DEFAULT_POSTGRES_CONTAINER_NAME,
+    cleanup_rollup_state_dir, prepare_rollup_state_dir, CommonArgs, ExistingRollupState,
+    ResolvedRunSettings, RunProfile, DEFAULT_BLOCKS_PER_VERSION, DEFAULT_FULL_SLOT_SAVE_INTERVAL,
+    DEFAULT_POSTGRES_CONTAINER_NAME,
 };
 pub use versioned_setup::{
     extend_last_stop_height, prepare_acceptance_run_plan, spawn_rollup_manager,
