@@ -32,6 +32,8 @@ BATCH_NAMESPACE = { byte_string = "test_1xx-b" }
 # Should be 10 bytes long for Celestia
 PROOF_NAMESPACE = { byte_string = "test_1xx-p" }
 
+# The number of bytes a transaction can have.
+MAX_TX_SIZE=1_048_576
 EVM_GAS_METERING_MODE = "Rollup"
 # We will keep only this many blocks in the EVM module.
 EVM_BLOCK_PRUNING_THRESHOLD = 1000000000
