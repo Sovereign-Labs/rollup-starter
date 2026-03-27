@@ -50,6 +50,9 @@ sov-rollup-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manag
 sov-soak-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "dd0e4ac1586ee5e852078209afcb295bb888a44f" }
 sov-versioned-artifact-builder = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "dd0e4ac1586ee5e852078209afcb295bb888a44f" }
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [[bin]]
 name = "acceptance-test"
 path = "src/main.rs"

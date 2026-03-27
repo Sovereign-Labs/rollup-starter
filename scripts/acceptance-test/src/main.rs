@@ -1,26 +1,26 @@
 use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
-    extend_last_stop_height,
+    cleanup_rollup_state_dir, extend_last_stop_height,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
-    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan, run_soak,
-    run_until_shutdown_signal, shutdown_error, sleep_or_shutdown, spawn_rollup_manager,
-    wait_for_shutdown, write_manager_config, AcceptanceRunPlan, Directories,
-    PostgresContainerGuard, ShutdownReceiver, API_URL, BLOCKS_PER_VERSION, POSTGRES_CONTAINER_NAME,
+    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan,
+    prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, shutdown_error,
+    sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown, write_manager_config,
+    AcceptanceRunPlan, CommonArgs, Directories, PostgresContainerGuard, ResolvedRunSettings,
+    ShutdownReceiver, SoakRunOptions, API_URL,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use chrono::Utc;
 use clap::Parser;
 use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 use tracing::info;
-
-// After resync completes, continue running the rollup for this many blocks.
-const NUM_SOAK_BATCHES: u64 = BLOCKS_PER_VERSION;
 
 struct PreparedTestRun {
     directories: Directories,
     password: String,
     plan: AcceptanceRunPlan,
+    settings: ResolvedRunSettings,
+    throughput_check: bool,
 }
 
 #[tokio::main]
@@ -36,7 +36,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Starting acceptance test");
 
-    let prepared = prepare_test_run(args.binary_cache_dir)?;
+    let prepared = prepare_test_run(args)?;
     let result =
         run_until_shutdown_signal(move |shutdown_rx| run_test(prepared, shutdown_rx)).await;
     if let Err(e) = &result {
@@ -88,17 +88,22 @@ fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Er
     Ok(())
 }
 
-fn prepare_test_run(binary_cache_dir: Option<PathBuf>) -> Result<PreparedTestRun, anyhow::Error> {
+fn prepare_test_run(args: Args) -> Result<PreparedTestRun, anyhow::Error> {
+    let throughput_check = throughput_check_enabled(&args);
+    let settings = ResolvedRunSettings::from_common_args(args.common);
     let password = generate_postgres_password()?;
-    let mut directories = Directories::new()?;
-    if let Some(binary_cache_dir) = binary_cache_dir {
-        directories.set_rollup_build_cache_dir(binary_cache_dir)?;
-    }
-    let plan = prepare_acceptance_run_plan(&directories, &password)?;
+    let directories = Directories::from_settings(&settings)?;
+    prepare_rollup_state_dir(
+        &directories.rollup_data_path,
+        settings.on_existing_rollup_state,
+    )?;
+    let plan = prepare_acceptance_run_plan(&directories, &password, settings.blocks_per_version)?;
     Ok(PreparedTestRun {
         directories,
         password,
         plan,
+        settings,
+        throughput_check,
     })
 }
 
@@ -110,19 +115,16 @@ async fn run_test(
         directories,
         password,
         plan,
+        settings,
+        throughput_check,
     } = prepared;
-
-    tracing::info!(
-        "Removing rollup data path: {}",
-        directories.rollup_data_path.display()
-    );
-    std::fs::remove_dir_all(&directories.rollup_data_path)?;
 
     // Copy the persistent mock data back to mock_da.sqlite. This way we don't grow our DA files with each run.
     copy_persistent_mock_data(&directories)?;
 
     // Start postgres and keep it alive for the test duration. Drop cleanup runs last.
-    let _postgres_guard = PostgresContainerGuard::start(POSTGRES_CONTAINER_NAME, &password)?;
+    let _postgres_guard =
+        PostgresContainerGuard::start(&settings.postgres_docker_container_name, &password)?;
     let expected_setup_batches = plan
         .manager_versions
         .last()
@@ -132,7 +134,8 @@ async fn run_test(
         // Genesis doesn't have a batch; this has the result that batch numbers lag 1 behind the
         // rollup height.
         .saturating_sub(1);
-    let manager_versions = extend_last_stop_height(&plan.manager_versions, NUM_SOAK_BATCHES);
+    let manager_versions =
+        extend_last_stop_height(&plan.manager_versions, settings.blocks_per_version);
     let manager_config_path = directories
         .output_dir
         .join("acceptance_manager_config.json");
@@ -220,26 +223,31 @@ async fn run_test(
 
     let resync_soak_config = plan
         .soak_config
-        .for_resync(NUM_SOAK_BATCHES)
+        .for_resync(settings.blocks_per_version)
         .ok_or_else(|| anyhow::anyhow!("failed to create soak resync config"))?;
 
     let new_throughput_report = run_soak(
         directories.clone(),
         rollup,
         resync_soak_config,
-        latest_batch_num,
-        stop_at_height,
-        false,
+        SoakRunOptions {
+            throughput_start_batch: latest_batch_num,
+            rollup_stop_height: stop_at_height,
+            full_slot_save_interval: settings.full_slot_save_interval,
+            save_slot_snapshots: false,
+        },
         shutdown_rx.clone(),
     )
     .await?;
-    let previous_throughput_report: ThroughputReport = serde_json::from_str::<ThroughputReport>(
-        &std::fs::read_to_string(directories.throughput_dir.join(SETUP_THROUGHPUT_FILE))?,
-    )?;
-    let previous_throughput = previous_throughput_report.throughput();
-    let new_throughput = new_throughput_report.throughput();
-    if new_throughput < (previous_throughput * 0.9) {
-        anyhow::bail!("Throughput is less than 90% of the previous throughput. This is likely due to a bug in the rollup. Old throughput: {:.2} txs/slot, new throughput: {:.2} txs/slot", previous_throughput, new_throughput);
+    if throughput_check {
+        let previous_throughput_report: ThroughputReport = serde_json::from_str::<ThroughputReport>(
+            &std::fs::read_to_string(directories.throughput_dir.join(SETUP_THROUGHPUT_FILE))?,
+        )?;
+        let previous_throughput = previous_throughput_report.throughput();
+        let new_throughput = new_throughput_report.throughput();
+        if new_throughput < (previous_throughput * 0.9) {
+            anyhow::bail!("Throughput is less than 90% of the previous throughput. This is likely due to a bug in the rollup. Old throughput: {:.2} txs/slot, new throughput: {:.2} txs/slot", previous_throughput, new_throughput);
+        }
     }
 
     // Save throughput report with timestamp to keep a record of test runs
@@ -250,12 +258,45 @@ async fn run_test(
         serde_json::to_string(&new_throughput_report)?,
     )?;
     info!("Saved throughput report to {}", throughput_filename);
+    if settings.cleanup_rollup_state_on_success() {
+        cleanup_rollup_state_dir(&directories.rollup_data_path)?;
+        info!(
+            "Cleaned transient rollup state directory {}",
+            directories.rollup_data_path.display()
+        );
+    }
     Ok(())
 }
 
-#[derive(Parser)]
+fn throughput_check_enabled(args: &Args) -> bool {
+    !args.no_throughput_check
+}
+
+#[derive(Parser, Debug)]
 struct Args {
-    /// Directory used to cache commit-built binaries across runs.
+    #[command(flatten)]
+    common: CommonArgs,
+
+    /// Disable the throughput regression check.
     #[arg(long)]
-    binary_cache_dir: Option<PathBuf>,
+    no_throughput_check: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn throughput_check_defaults_to_enabled() {
+        let args = Args::try_parse_from(["acceptance-test"]).unwrap();
+
+        assert!(throughput_check_enabled(&args));
+    }
+
+    #[test]
+    fn no_throughput_check_disables_check() {
+        let args = Args::try_parse_from(["acceptance-test", "--no-throughput-check"]).unwrap();
+
+        assert!(!throughput_check_enabled(&args));
+    }
 }

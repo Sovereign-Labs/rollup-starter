@@ -11,13 +11,42 @@ To run the test simply `cargo run --bin acceptance-test`. All data should have b
 and the checked-in artifacts are stale or missing, it will regenerate them via `solc`, so `solc` is only needed
 when updating the contract itself.
 
-The test is meant to be idempotent. It deletes any possible leftover files at the beginning of each run.
-However, in case of errors it can sometimes be the case that docker containers haven't been shut down 
+The default rollup state directory is treated as transient. After a successful `setup` or
+`acceptance-test` run it is emptied automatically, so repeated runs work without extra flags.
+
+If you provide an explicit `--rollup-state-dir`, the binaries preserve it by default and will exit
+if it is non-empty on the next run. To clear an existing state directory automatically, pass
+`--on-existing-rollup-state=clobber`.
+
+If your local default state dir is already populated from an older run, clear it once with
+`cargo run --bin setup -- --on-existing-rollup-state=clobber` or remove
+`acceptance-test-data/<profile>/rollup-starter-data` manually.
+
+However, in case of errors it can sometimes be the case that docker containers haven't been shut down
 from the previous run. To fix, simply `docker rm -f postgres-acceptance-test`.
 
+The binaries support a default `full` profile and an optional `--short` profile. `full` uses
+`blocks-per-version=1000` and `full-slot-save-interval=25`; `short` uses
+`blocks-per-version=30` and `full-slot-save-interval=5`.
+
+The acceptance data and throughput roots are profile-scoped. By default they are stored under:
+
+- `acceptance-test-data/full` or `acceptance-test-data/short`
+- `acceptance-throughput/full` or `acceptance-throughput/short`
+
+If you already have an older local dataset in the legacy flat layout, move it into the `full`
+subdirectories or regenerate it with `cargo run --bin setup`.
+
+Useful examples:
+
+- `cargo run --bin setup -- --short`
+- `cargo run --bin setup -- --on-existing-rollup-state=clobber`
+- `cargo run --bin acceptance-test -- --short --no-throughput-check`
+- `cargo run --bin acceptance-test -- --acceptance-data-dir /tmp/acceptance-data`
 
 ### Resetting the Test
 
-If you need to generate a new test, simply run `rm -r acceptance-test-data && cargo run --bin setup`. This will generate all of the 
-needed files, including a fresh mockDA. Note that setup may take an hour or more to run, since we have to generate a full history
-for the rollup.
+If you need to generate a new test, simply run
+`rm -r acceptance-test-data acceptance-throughput && cargo run --bin setup`.
+This will generate all of the needed files, including a fresh mockDA. Note that setup may take an
+hour or more to run, since we have to generate a full history for the rollup.
