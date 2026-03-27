@@ -1,5 +1,4 @@
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 
@@ -503,11 +502,11 @@ pub fn spawn_rollup_manager(
         unsafe {
             cmd.pre_exec(move || {
                 if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
-                    return Err(io::Error::last_os_error());
+                    return Err(std::io::Error::last_os_error());
                 }
                 if libc::getppid() as u32 != parent_pid {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Interrupted,
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::Interrupted,
                         "acceptance-test parent exited before manager exec",
                     ));
                 }
