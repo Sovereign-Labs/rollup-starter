@@ -80,11 +80,11 @@ node-discovery = { path = "./crates/utils/node-discovery", default-features = fa
 value-setter = { path = "./examples/value-setter" }
 strum = { version = "0.26.3", features = ["derive"] }
 
-alloy = { version = "1.0.37", default-features = false, features = ["std", "essentials"] }
-alloy-consensus = { version = "1.0.37", default-features = false }
-alloy-primitives = { version = "1.4.0", default-features = false }
-alloy-rpc-types = { version = "1.0.37", default-features = false, features = ["eth"] }
-alloy-sol-types = { version = "1.4.0", default-features = false }
+alloy = { version = "1.0.41", default-features = false, features = ["std", "essentials"] }
+alloy-consensus = { version = "1.1.0", default-features = false }
+alloy-primitives = { version = "1.4.1", default-features = false }
+alloy-rpc-types = { version = "1.0.41", default-features = false, features = ["eth"] }
+alloy-sol-types = { version = "1.4.1", default-features = false }
 axum = { version = "0.7.9", default-features = false }
 serde = { version = "1.0.192", features = ["derive", "rc"] }
 serde_json = { version = "1.0" }
