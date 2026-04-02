@@ -43,7 +43,7 @@ pub fn main() {
     let storage = ZkStorage::new();
     let stf: StfBlueprint<RollupSpec, Runtime<_>> = StfBlueprint::new();
 
-    let stf_verifier = StfVerifier::<_, _, _, _, _>::new(
+    let stf_verifier = StfVerifier::new(
         stf,
         CelestiaVerifier::new(RollupParams {
             rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,

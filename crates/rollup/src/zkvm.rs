@@ -72,9 +72,9 @@ mod sp1 {
         }
 
         if cfg!(feature = "celestia_da") {
-            Arc::new(&sp1_starter::SP1_GUEST_CELESTIA_ELF)
+            Arc::new(*sp1_starter::SP1_GUEST_CELESTIA_ELF)
         } else if cfg!(feature = "mock_da") {
-            Arc::new(&sp1_starter::SP1_GUEST_MOCK_ELF)
+            Arc::new(*sp1_starter::SP1_GUEST_MOCK_ELF)
         } else {
             panic!("No DA feature enabled");
         }
