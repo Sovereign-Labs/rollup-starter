@@ -24,6 +24,8 @@ BATCH_NAMESPACE = { byte_string = "relay-dev1" }
 # Should be 10 bytes long for Celestia
 PROOF_NAMESPACE = { byte_string = "sov-p-dev8" }
 
+# The number of bytes a transaction can have.
+MAX_TX_SIZE=1_048_576
 EVM_GAS_METERING_MODE = "Rollup"
 # We will keep only this many blocks in the EVM module.
 EVM_BLOCK_PRUNING_THRESHOLD = 1000000000
@@ -151,6 +153,9 @@ FIXED_GAS_TO_CHARGE_PER_PROOF = [100, 100]
 # --- Gas fee adjustment parameters: See https://eips.ethereum.org/EIPS/eip-1559 for a detailed description ---
 # The initial gas limit of the rollup.
 INITIAL_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
+UPDATED_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
+CHANGE_GAS_LIMIT_AFTER_HEIGHT = 9223372036854775807
+
 # The initial "base fee" that every transaction emits when executed.
 INITIAL_BASE_FEE_PER_GAS = [10, 10]
 # The maximum change denominator of the base fee.
