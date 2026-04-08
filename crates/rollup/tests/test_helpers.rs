@@ -47,6 +47,7 @@ pub async fn start_rollup(
                 .expect("Prover address is not valid"),
             max_number_of_transitions_in_db: NonZeroU64::new(100).unwrap(),
             max_number_of_transitions_in_memory: NonZeroU64::new(20).unwrap(),
+            eager_proof_submission: true,
         },
         sequencer: SequencerConfig {
             max_allowed_node_distance_behind: 10,
