@@ -15,8 +15,7 @@ use sov_mock_zkvm::MockCodeCommitment;
 use sov_modules_api::capabilities::TransactionAuthenticator;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
 use sov_modules_api::rest::StateUpdateReceiver;
-use sov_modules_api::ZkVerifier;
-use sov_modules_api::{RawTx, Spec};
+use sov_modules_api::{CodeCommitmentHash, RawTx, SequencerType, Spec, ZkVerifier};
 use sov_modules_rollup_blueprint::pluggable_traits::PluggableSpec;
 use sov_modules_rollup_blueprint::proof_sender::SovApiProofSender;
 use sov_modules_rollup_blueprint::{FullNodeBlueprint, RollupBlueprint, SequencerCreationReceipt};
@@ -29,7 +28,6 @@ use std::net::SocketAddr;
 
 use sov_rollup_interface::execution_mode::Native;
 use sov_rollup_interface::node::SyncStatus;
-use sov_rollup_interface::zk::aggregated_proof::CodeCommitment;
 use sov_sequencer::{ProofBlobSender, SeqConfigExtension, Sequencer, TxStatus};
 use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
@@ -144,7 +142,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
             outer_vm,
             da_verifier,
             prover_config_disc,
-            CodeCommitment::default(),
+            CodeCommitmentHash::default(),
             rollup_config.proof_manager.prover_address,
         )
     }
@@ -170,6 +168,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         sequencer: Seq,
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
         shutdown_receiver: tokio::sync::watch::Receiver<()>,
+        sequencer_da_address: <<Self::Spec as Spec>::Da as sov_rollup_interface::da::DaSpec>::Address,
     ) -> anyhow::Result<sov_modules_api::NodeEndpoints>
     where
         Seq: Sequencer<Spec = Self::Spec, Rt = Self::Runtime, Da = Self::DaService>,
@@ -180,6 +179,9 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
                 max_log_limit: config.max_log_limit,
                 response_size_limit: config.response_size_limit, // Limit our response size to 1MB, leaving 30kb for headers, overhead, and misestimation.
             },
+            sequencer_rollup_address: rollup_config.sequencer.rollup_address,
+            sequencer_da_address,
+            sequencer_type: SequencerType::Preferred,
             shutdown_receiver,
         };
 

@@ -11,5 +11,4 @@ use sov_rollup_interface::stf::StateTransitionVerifier;
 pub extern crate sov_modules_api;
 
 /// Alias for StateTransitionVerifier.
-pub type StfVerifier<DA, ZkSpec, RT, InnerVm, OuterVm> =
-    StateTransitionVerifier<StfBlueprint<ZkSpec, RT>, DA, InnerVm, OuterVm>;
+pub type StfVerifier<DA, ZkSpec, RT> = StateTransitionVerifier<StfBlueprint<ZkSpec, RT>, DA>;
