@@ -29,7 +29,6 @@ use std::net::SocketAddr;
 
 use sov_rollup_interface::execution_mode::Native;
 use sov_rollup_interface::node::SyncStatus;
-use sov_rollup_interface::zk::aggregated_proof::CodeCommitmentHash;
 use sov_sequencer::{ProofBlobSender, SeqConfigExtension, Sequencer, TxStatus};
 use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
@@ -144,7 +143,6 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
             outer_vm,
             da_verifier,
             prover_config_disc,
-            CodeCommitmentHash::default(),
             rollup_config.proof_manager.prover_address,
         )
     }
