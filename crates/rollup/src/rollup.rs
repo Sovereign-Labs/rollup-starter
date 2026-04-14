@@ -15,7 +15,7 @@ use sov_mock_zkvm::MockCodeCommitment;
 use sov_modules_api::capabilities::TransactionAuthenticator;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
 use sov_modules_api::rest::StateUpdateReceiver;
-use sov_modules_api::{CodeCommitmentHash, RawTx, SequencerType, Spec, ZkVerifier};
+use sov_modules_api::{RawTx, SequencerType, Spec, ZkVerifier};
 use sov_modules_rollup_blueprint::pluggable_traits::PluggableSpec;
 use sov_modules_rollup_blueprint::proof_sender::SovApiProofSender;
 use sov_modules_rollup_blueprint::{FullNodeBlueprint, RollupBlueprint, SequencerCreationReceipt};
@@ -142,7 +142,6 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
             outer_vm,
             da_verifier,
             prover_config_disc,
-            CodeCommitmentHash::default(),
             rollup_config.proof_manager.prover_address,
         )
     }
