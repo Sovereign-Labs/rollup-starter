@@ -82,9 +82,9 @@ mod sp1 {
 
     pub fn create_inner_vm_from_config(
         prover_config: sov_stf_runner::processes::RollupProverConfig<Zkvm>,
-    ) -> ZkvmHost<'static> {
+    ) -> ZkvmHost {
         let (elf, _) = prover_config.split();
-        ZkvmHost::new(*elf)
+        ZkvmHost::new(*elf).expect("Failed to create SP1 host")
     }
 }
 
