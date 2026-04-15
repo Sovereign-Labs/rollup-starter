@@ -29,7 +29,6 @@ jobs:
       # Lints native project, but also compiles guests on bare metal.
       # This to enforce update of Cargo.lock fo guests
       command: "make lint && make check"
-      setup-zepter: true
       check-dirty-tree: true
     secrets: inherit
 
@@ -38,9 +37,6 @@ jobs:
     with:
       job-name: "Test"
       command: "cargo nextest run"
-      setup-sp1: true
-      setup-risc0: true
-      setup-nextest: true
       check-dirty-tree: true
     secrets: inherit
 
@@ -51,7 +47,6 @@ jobs:
       env-vars: "SKIP_GUEST_BUILD=risc0 RUSTFLAGS='-D warnings'"
       command: "cargo build --no-default-features --features celestia_da,sp1"
       cache-tag: 'celestia-sp1'
-      setup-sp1: true
       check-dirty-tree: true
     secrets: inherit
 
@@ -62,7 +57,6 @@ jobs:
       env-vars: "SKIP_GUEST_BUILD=sp1 RUSTFLAGS='-D warnings'"
       command: "cargo build --no-default-features --features celestia_da,risc0"
       cache-tag: 'celestia-risc0'
-      setup-risc0: true
       check-dirty-tree: true
     secrets: inherit
 

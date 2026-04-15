@@ -9,22 +9,6 @@ on:
       command:
         required: true
         type: string
-      setup-sp1:
-        required: false
-        type: boolean
-        default: false
-      setup-risc0:
-        required: false
-        type: boolean
-        default: false
-      setup-nextest:
-        required: false
-        type: boolean
-        default: false
-      setup-zepter:
-        required: false
-        type: boolean
-        default: false
       env-vars:
         required: false
         type: string
@@ -47,8 +31,10 @@ jobs:
 
       - uses: namespacelabs/nscloud-cache-action@v1
         with:
-          # TODO: Add NPM with locations
           cache: rust
+          path: |
+            ~/.npm
+            examples/starter-js/node_modules
 
       - name: Run command
         env:
