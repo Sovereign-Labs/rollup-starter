@@ -22,24 +22,17 @@ concurrency:
 jobs:
   build-rollup:
     name: "Build Rollup"
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-sov-ubuntu-24-04-amd64-16x64-test-300gb-1-93;container.privileged=true;container.host-pid-namespace=true;overrides.cache-tag=starter-e2e-frontend
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - uses: namespacelabs/nscloud-cache-action@v1
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          cache: rust
 
       - name: Build rollup
+        env:
+          SKIP_GUEST_BUILD: "1"
         run: cargo build
 
       - name: Upload rollup binary
@@ -71,7 +64,7 @@ jobs:
           chmod +x ./bin/rollup
           ./bin/rollup &
           for i in {1..30}; do
-            curl -sf http://localhost:12346/health && break
+            curl -sf http://localhost:12346/healthcheck && break
             echo "Waiting for rollup... ($i)"
             sleep 2
           done
@@ -121,7 +114,7 @@ jobs:
           chmod +x ./bin/rollup
           ./bin/rollup &
           for i in {1..30}; do
-            curl -sf http://localhost:12346/health && break
+            curl -sf http://localhost:12346/healthcheck && break
             echo "Waiting for rollup... ($i)"
             sleep 2
           done

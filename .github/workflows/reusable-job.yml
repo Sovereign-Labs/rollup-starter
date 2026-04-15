@@ -9,30 +9,14 @@ on:
       command:
         required: true
         type: string
-      setup-sp1:
-        required: false
-        type: boolean
-        default: false
-      setup-risc0:
-        required: false
-        type: boolean
-        default: false
-      setup-nextest:
-        required: false
-        type: boolean
-        default: false
-      setup-zepter:
-        required: false
-        type: boolean
-        default: false
       env-vars:
         required: false
         type: string
         default: ""
-      runner-size:
+      cache-tag:
         required: false
         type: string
-        default: "8x32"
+        default: "dev"
       check-dirty-tree:
         required: false
         type: boolean
@@ -41,62 +25,16 @@ on:
 jobs:
   run:
     name: ${{ inputs.job-name }}
-    runs-on:
-      - nscloud-ubuntu-22.04-amd64-${{ inputs.runner-size }}-with-cache
-      - nscloud-cache-tag-rollup-starter-build
-      - nscloud-cache-size-100gb
-      # Privileged feature is needed for proper `io_uring` functionality needed by NOMT
-      - nscloud-exp-features:privileged;host-pid-namespace
+    runs-on: namespace-profile-sov-ubuntu-24-04-amd64-16x64-test-300gb-1-93;container.privileged=true;container.host-pid-namespace=true;overrides.cache-tag=starter-${{ inputs.cache-tag }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v2
-        with:
-          version: "23.2"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: namespacelabs/nscloud-cache-action@v1
         with:
           cache: rust
-
-      - name: Install zepter
-        if: ${{ inputs.setup-zepter }}
-        uses: taiki-e/install-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tool: zepter@1
-
-      - name: Install nextest
-        if: ${{ inputs.setup-nextest }}
-        uses: taiki-e/install-action@nextest
-
-      - name: Install Bashtestmd
-        uses: taiki-e/install-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.github_token }}
-        with:
-          tool: bashtestmd@0.5
-
-      - name: Install risc0-zkvm toolchain
-        if: ${{ inputs.setup-risc0 }}
-        shell: bash
-        run: make install-risc0-toolchain
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install SP1 toolchain
-        if: ${{ inputs.setup-sp1 }}
-        shell: bash
-        env:
-          SHELL: /bin/bash
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: make install-sp1-toolchain
+          path: |
+            ~/.npm
+            examples/starter-js/node_modules
 
       - name: Run command
         env:

@@ -29,7 +29,6 @@ jobs:
       # Lints native project, but also compiles guests on bare metal.
       # This to enforce update of Cargo.lock fo guests
       command: "make lint && make check"
-      setup-zepter: true
       check-dirty-tree: true
     secrets: inherit
 
@@ -38,9 +37,6 @@ jobs:
     with:
       job-name: "Test"
       command: "cargo nextest run"
-      setup-sp1: true
-      setup-risc0: true
-      setup-nextest: true
       check-dirty-tree: true
     secrets: inherit
 
@@ -50,7 +46,7 @@ jobs:
       job-name: "Build Celestia SP1"
       env-vars: "SKIP_GUEST_BUILD=risc0 RUSTFLAGS='-D warnings'"
       command: "cargo build --no-default-features --features celestia_da,sp1"
-      setup-sp1: true
+      cache-tag: 'celestia-sp1'
       check-dirty-tree: true
     secrets: inherit
 
@@ -60,7 +56,7 @@ jobs:
       job-name: "Build Celestia RISC0"
       env-vars: "SKIP_GUEST_BUILD=sp1 RUSTFLAGS='-D warnings'"
       command: "cargo build --no-default-features --features celestia_da,risc0"
-      setup-risc0: true
+      cache-tag: 'celestia-risc0'
       check-dirty-tree: true
     secrets: inherit
 
@@ -70,7 +66,6 @@ jobs:
     with:
       job-name: "Run README"
       env-vars: "SKIP_GUEST_BUILD=1 RUSTFLAGS='-D warnings'"
-      runner-size: "16x64"
       command: |
         bashtestmd --input README.md --output scripts/rollup-starter.sh --tag=test-ci
         chmod +x scripts/rollup-starter.sh
@@ -84,7 +79,6 @@ jobs:
     with:
       job-name: "Run README_EXTERNAL_MOCK_DA"
       env-vars: "SKIP_GUEST_BUILD=1 RUSTFLAGS='-D warnings'"
-      runner-size: "16x64"
       command: |
         bashtestmd --input README_EXTERNAL_MOCK_DA.md --output scripts/rollup-starter-external-da.sh --tag=test-ci
         chmod +x scripts/rollup-starter-external-da.sh
@@ -93,12 +87,7 @@ jobs:
 
   docker-mock-da:
     name: "Docker Mock DA"
-    runs-on:
-      - nscloud-ubuntu-22.04-amd64-16x64-with-cache
-      - nscloud-cache-tag-rollup-starter-build
-      - nscloud-cache-size-100gb
-      # Privileged feature is needed for proper `io_uring` functionality needed by NOMT
-      - nscloud-exp-features:privileged;host-pid-namespace
+    runs-on: namespace-profile-sov-ubuntu-24-04-amd64-16x64-test-300gb-1-93;container.privileged=true;container.host-pid-namespace=true;overrides.cache-tag=starter-docker-mock-da
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-mock-da
@@ -111,7 +100,7 @@ jobs:
     with:
       job-name: "Run Celestia Tutorial"
       env-vars: "SKIP_GUEST_BUILD=1"
-      runner-size: "16x64"
+      cache-tag: "celestia"
       command: |
         bashtestmd --input GETTING_STARTED_WITH_CELESTIA.md --output scripts/rollup-starter-celestia.sh --tag=test-ci
         chmod +x scripts/rollup-starter-celestia.sh
@@ -124,7 +113,6 @@ jobs:
     with:
       job-name: "Run Hyperlane Tutorial"
       env-vars: "SKIP_GUEST_BUILD=1"
-      runner-size: "16x64"
       command: |
         bashtestmd --input GETTING_STARTED_WITH_HYPERLANE.md --output scripts/rollup-starter-hyperlane.sh --tag=test-ci
         chmod +x scripts/rollup-starter-hyperlane.sh
