@@ -45,53 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v2
-        with:
-          version: "23.2"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: namespacelabs/nscloud-cache-action@v1
         with:
+          # TODO: Add NPM with locations
           cache: rust
-
-      - name: Install zepter
-        if: ${{ inputs.setup-zepter }}
-        uses: taiki-e/install-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tool: zepter@1
-
-      - name: Install nextest
-        if: ${{ inputs.setup-nextest }}
-        uses: taiki-e/install-action@nextest
-
-      - name: Install Bashtestmd
-        uses: taiki-e/install-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.github_token }}
-        with:
-          tool: bashtestmd@0.5
-
-      - name: Install risc0-zkvm toolchain
-        if: ${{ inputs.setup-risc0 }}
-        shell: bash
-        run: make install-risc0-toolchain
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install SP1 toolchain
-        if: ${{ inputs.setup-sp1 }}
-        shell: bash
-        env:
-          SHELL: /bin/bash
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: make install-sp1-toolchain
 
       - name: Run command
         env:
