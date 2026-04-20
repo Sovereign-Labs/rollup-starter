@@ -235,6 +235,7 @@ $ cargo run --no-default-features --features celestia_da,risc0
 
 Proving is disabled by default. Enable it with this environment variable before recompiling the rollup:
 
+- `export SOV_PROVER_MODE=disable` - Skip verification logic (the same as not set)
 - `export SOV_PROVER_MODE=prove` - Run verifier and create a SNARK proof
 
 ### Paymaster Configuration
