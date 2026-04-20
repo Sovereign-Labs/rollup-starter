@@ -4,7 +4,6 @@ use std::num::{NonZero, NonZeroU64, NonZeroUsize};
 use std::path::Path;
 
 use rollup_starter::rollup::StarterRollup;
-use rollup_starter::zkvm::InnerZkvm;
 use sov_address::EthereumAddress;
 use sov_db::config::RollupDbConfig;
 use sov_mock_da::MockDaConfig;
@@ -25,7 +24,7 @@ const PROVER_ADDRESS: &str = "0x4fD62a0D0c35e1Fdcd97231A4586E65e7Eb454a5";
 pub async fn start_rollup(
     rest_reporting_channel: oneshot::Sender<SocketAddr>,
     genesis_input: std::path::PathBuf,
-    rollup_prover_config: Option<RollupProverConfig<InnerZkvm>>,
+    rollup_prover_config: RollupProverConfig,
     da_config: MockDaConfig,
 ) {
     let temp_dir = tempfile::tempdir().unwrap();

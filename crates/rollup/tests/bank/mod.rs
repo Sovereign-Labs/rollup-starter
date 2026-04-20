@@ -56,7 +56,7 @@ async fn bank_tx_tests() -> Result<(), anyhow::Error> {
             rest_port_tx,
             std::path::PathBuf::from_str("../../configs/mock/genesis.json")
                 .expect("Failed to build genesis config path"),
-            None,
+            sov_stf_runner::processes::RollupProverConfig::Disabled,
             MockDaConfig {
                 connection_string: MockDaConfig::sqlite_in_memory(),
                 sender_address: MockAddress::new([0; 32]),

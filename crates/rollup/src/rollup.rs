@@ -40,7 +40,7 @@ use stf_starter::Runtime;
 use tokio::sync::watch;
 
 use crate::da::{new_da_service, new_verifier, DaService, DaSpec};
-use crate::zkvm::{create_inner_vm_from_config, get_outer_vm, Hasher, InnerZkvm, OuterZkvm};
+use crate::zkvm::{create_inner_vm, get_outer_vm, Hasher, InnerZkvm, OuterZkvm};
 
 type NativeStorage = NomtProverStorage<
     DefaultStorageSpec<Hasher>,
@@ -129,12 +129,11 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
 
     async fn create_prover_service(
         &self,
-        prover_config: RollupProverConfig<<Self::Spec as Spec>::InnerZkvm>,
+        _prover_config: RollupProverConfig,
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
         _da_service: &Self::DaService,
     ) -> Self::ProverService {
-        let inner_vm = create_inner_vm_from_config(prover_config.clone());
-        let (_, prover_config_disc) = prover_config.split();
+        let inner_vm = create_inner_vm();
         let outer_vm = get_outer_vm();
         let da_verifier = new_verifier();
 
@@ -142,7 +141,6 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
             inner_vm,
             outer_vm,
             da_verifier,
-            prover_config_disc,
             rollup_config.proof_manager.prover_address,
         )
     }
