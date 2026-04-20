@@ -33,8 +33,9 @@ sov-sequencer = { workspace = true }
 sov-rest-utils = { workspace = true }
 sov-eip712-auth = { workspace = true }
 sov-rollup-interface = { workspace = true }
+sov-rollup-full-node-interface = { workspace = true }
 sov-mock-da = { workspace = true, features = ["native"], optional = true }
-sov-celestia-adapter = { workspace = true, features = ["native", ], optional = true }
+sov-celestia-adapter = { workspace = true, features = ["native"], optional = true }
 
 axum = { workspace = true }
 anyhow = { workspace = true }

@@ -14,7 +14,6 @@ use sov_hyperlane_integration::HyperlaneAddress;
 use sov_mock_zkvm::MockCodeCommitment;
 use sov_modules_api::capabilities::TransactionAuthenticator;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
-use sov_modules_api::rest::StateUpdateReceiver;
 use sov_modules_api::{RawTx, Spec};
 use sov_modules_api::{SequencerType, ZkVerifier};
 use sov_modules_rollup_blueprint::pluggable_traits::PluggableSpec;
@@ -27,6 +26,7 @@ use sov_rollup_interface::node::da::DaService as DaServiceTrait;
 use sov_sequencer::rest_api::{AcceptTx, TxInfoWithConfirmation};
 use std::net::SocketAddr;
 
+use sov_rollup_full_node_interface::StateUpdateReceiver;
 use sov_rollup_interface::execution_mode::Native;
 use sov_rollup_interface::node::SyncStatus;
 use sov_sequencer::{ProofBlobSender, SeqConfigExtension, Sequencer, TxStatus};
