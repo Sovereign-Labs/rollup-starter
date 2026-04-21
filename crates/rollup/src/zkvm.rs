@@ -39,10 +39,8 @@ mod risc0 {
         )
     }
 
-    pub fn create_inner_vm_from_config(
-        prover_config: sov_stf_runner::processes::RollupProverConfig<Zkvm>,
-    ) -> ZkvmHost<'static> {
-        let (elf, _) = prover_config.split();
+    pub fn create_inner_vm() -> ZkvmHost<'static> {
+        let elf = rollup_host_args();
         ZkvmHost::new(*elf)
     }
 }
@@ -80,10 +78,8 @@ mod sp1 {
         }
     }
 
-    pub fn create_inner_vm_from_config(
-        prover_config: sov_stf_runner::processes::RollupProverConfig<Zkvm>,
-    ) -> ZkvmHost {
-        let (elf, _) = prover_config.split();
+    pub fn create_inner_vm() -> ZkvmHost {
+        let elf = rollup_host_args();
         ZkvmHost::new(*elf).expect("Failed to create SP1 host")
     }
 }
@@ -99,10 +95,7 @@ mod mock_zkvm {
         Arc::new(())
     }
 
-    pub fn create_inner_vm_from_config(
-        _prover_config: sov_stf_runner::processes::RollupProverConfig<Zkvm>,
-    ) -> ZkvmHost {
-        // Mock zkvm doesn't need the ELF from prover config
+    pub fn create_inner_vm() -> ZkvmHost {
         ZkvmHost::new()
     }
 
@@ -111,20 +104,17 @@ mod mock_zkvm {
 
 #[cfg(feature = "mock_zkvm")]
 pub use mock_zkvm::{
-    create_inner_vm_from_config, rollup_host_args, Hasher, Zkvm as InnerZkvm,
-    ZkvmHost as InnerZkvmHost,
+    create_inner_vm, rollup_host_args, Hasher, Zkvm as InnerZkvm, ZkvmHost as InnerZkvmHost,
 };
 
 #[cfg(feature = "risc0")]
 pub use risc0::{
-    create_inner_vm_from_config, rollup_host_args, Hasher, Zkvm as InnerZkvm,
-    ZkvmHost as InnerZkvmHost,
+    create_inner_vm, rollup_host_args, Hasher, Zkvm as InnerZkvm, ZkvmHost as InnerZkvmHost,
 };
 
 #[cfg(feature = "sp1")]
 pub use sp1::{
-    create_inner_vm_from_config, rollup_host_args, Hasher, Zkvm as InnerZkvm,
-    ZkvmHost as InnerZkvmHost,
+    create_inner_vm, rollup_host_args, Hasher, Zkvm as InnerZkvm, ZkvmHost as InnerZkvmHost,
 };
 
 pub use sov_mock_zkvm::MockZkvm as OuterZkvm;

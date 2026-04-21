@@ -233,11 +233,9 @@ $ cargo run --no-default-features --features celestia_da,risc0
 
 ### Enabling the Prover
 
-Proving is disabled by default. Enable it with these environment variables before recompiling the rollup:
+Proving is disabled by default. Enable it with this environment variable before recompiling the rollup:
 
-- `export SOV_PROVER_MODE=skip` - Skip verification logic
-- `export SOV_PROVER_MODE=simulate` - Run verification logic in the current process
-- `export SOV_PROVER_MODE=execute` - Run verifier in a zkVM executor
+- `export SOV_PROVER_MODE=disable` - Skip verification logic (the same as not set)
 - `export SOV_PROVER_MODE=prove` - Run verifier and create a SNARK proof
 
 ### Paymaster Configuration
