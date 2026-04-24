@@ -6,7 +6,7 @@ This repository contains the complete code for the relay chain full node.
 
 Before you begin, ensure you have the following installed:
 
-- **Rust**: 1.88.0 or later
+- **Rust**: 1.93.0 or later
   - Install via [rustup](https://rustup.rs/): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
   - The project will automatically install the correct version via `rust-toolchain.toml`
 - **Git**: For cloning the repository

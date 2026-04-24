@@ -17,7 +17,6 @@ use std::str::FromStr;
 use sov_address::EthereumAddress;
 use sov_modules_api::capabilities::RollupHeight;
 
-
 const ROLLUP_CONFIG_PATH: &str = "configs/celestia/rollup.toml";
 
 const GENESIS_PATH: &str = "configs/celestia/genesis.json";
