@@ -11,11 +11,10 @@ use sov_db::ledger_db::LedgerDb;
 use sov_db::storage_manager::NomtStorageManager;
 use sov_eip712_auth::Eip712AuthenticatorTrait;
 use sov_hyperlane_integration::HyperlaneAddress;
-use sov_mock_zkvm::MockCodeCommitment;
 use sov_modules_api::capabilities::TransactionAuthenticator;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
+use sov_modules_api::SequencerType;
 use sov_modules_api::{RawTx, Spec};
-use sov_modules_api::{SequencerType, ZkVerifier};
 use sov_modules_rollup_blueprint::pluggable_traits::PluggableSpec;
 use sov_modules_rollup_blueprint::proof_sender::SovApiProofSender;
 use sov_modules_rollup_blueprint::{FullNodeBlueprint, RollupBlueprint, SequencerCreationReceipt};
@@ -33,7 +32,7 @@ use sov_sequencer::{ProofBlobSender, SeqConfigExtension, Sequencer, TxStatus};
 use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
 use sov_state::Storage;
-use sov_stf_runner::processes::{ParallelProverService, ProverService, RollupProverConfig};
+use sov_stf_runner::processes::{ParallelProverService, RollupProverConfig};
 use sov_stf_runner::RollupConfig;
 use std::sync::Arc;
 use stf_starter::Runtime;
@@ -92,12 +91,6 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
 
     type ProofSender = SovApiProofSender<Self::Spec>;
 
-    fn create_outer_code_commitment(
-        &self,
-    ) -> <<Self::ProverService as ProverService>::Verifier as ZkVerifier>::CodeCommitment {
-        MockCodeCommitment::default()
-    }
-
     async fn create_endpoints(
         &self,
         state_update_receiver: StateUpdateReceiver<<Self::Spec as Spec>::Storage>,
@@ -133,7 +126,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
         _da_service: &Self::DaService,
     ) -> Self::ProverService {
-        let inner_vm = create_inner_vm();
+        let inner_vm = create_inner_vm().await;
         let outer_vm = get_outer_vm();
         let da_verifier = new_verifier();
 

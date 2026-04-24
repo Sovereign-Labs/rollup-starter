@@ -39,7 +39,7 @@ mod risc0 {
         )
     }
 
-    pub fn create_inner_vm() -> ZkvmHost<'static> {
+    pub async fn create_inner_vm() -> ZkvmHost<'static> {
         let elf = rollup_host_args();
         ZkvmHost::new(*elf)
     }
@@ -78,9 +78,21 @@ mod sp1 {
         }
     }
 
-    pub fn create_inner_vm() -> ZkvmHost {
+    pub async fn create_inner_vm() -> ZkvmHost {
         let elf = rollup_host_args();
-        ZkvmHost::new(*elf).expect("Failed to create SP1 host")
+        // The starter uses `MockZkvm` as the outer zkVM, so SP1's `outer_vk` is a
+        // placeholder derived from the inner ELF. Swap in a dedicated aggregation
+        // guest key here when wiring SP1 proof aggregation end-to-end.
+        //
+        // `ProverClient::setup` spins up its own tokio runtime, so the verifying-key
+        // derivation and the host construction must run off the async executor thread.
+        tokio::task::spawn_blocking(move || {
+            let outer_vk = Arc::new(sov_sp1_adapter::host::verifying_key_from_elf(*elf)?);
+            ZkvmHost::new(*elf, outer_vk)
+        })
+        .await
+        .expect("SP1Host setup task panicked")
+        .expect("Failed to create SP1 host")
     }
 }
 
@@ -95,7 +107,7 @@ mod mock_zkvm {
         Arc::new(())
     }
 
-    pub fn create_inner_vm() -> ZkvmHost {
+    pub async fn create_inner_vm() -> ZkvmHost {
         ZkvmHost::new()
     }
 
