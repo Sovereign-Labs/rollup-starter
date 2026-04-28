@@ -90,6 +90,19 @@ To stop it run `make stop-obs` and it will shut down all containers.
 Learn more in our [Observability Tutorial](https://sovlabs.notion.site/Tutorial-Getting-started-with-Grafana-Cloud-17e47ef6566b80839fe5c563f5869017?pvs=74).
 
 
+## Docker Image 
+
+Each release of relay-chain ships with a pre-built docker image: 
+
+```bash 
+docker run --rm \
+  -v $(pwd)/configs/celestia/rollup.toml:/rollup/configs/celestia/rollup.toml:ro \
+  -v rollup-data:/rollup/rollup-state \
+  -p 12346:12346 \
+  ghcr.io/Sovereign-Labs/rollup-starter/relay-chain:latest
+```
+
+Note: If your host blocks io_uring, add `--security-opt seccomp=unconfined` to your docker run command, or set up a custom seccomp profile allowing the `io_uring_*` syscalls.
 
 ## Additional Resources
 For more details, visit the [Sovereign SDK documentation](https://docs.sovereign.xyz).
