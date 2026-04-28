@@ -25,9 +25,15 @@ use sov_rollup_interface::node::da::DaService as DaServiceTrait;
 use sov_sequencer::rest_api::{AcceptTx, TxInfoWithConfirmation};
 use std::net::SocketAddr;
 
+use sov_mock_zkvm::{MockCodeCommitment, MockZkVerifier};
 use sov_rollup_full_node_interface::StateUpdateReceiver;
+use sov_rollup_interface::common::SlotNumber;
 use sov_rollup_interface::execution_mode::Native;
+use sov_rollup_interface::node::ledger_api::LedgerStateProvider;
 use sov_rollup_interface::node::SyncStatus;
+use sov_rollup_interface::zk::aggregated_proof::{
+    AggregateProofVerifier, AggregatedProofPublicData, SerializedAggregatedProof,
+};
 use sov_sequencer::{ProofBlobSender, SeqConfigExtension, Sequencer, TxStatus};
 use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
@@ -125,17 +131,34 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         _prover_config: RollupProverConfig,
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
         _da_service: &Self::DaService,
-    ) -> Self::ProverService {
+        ledger_db: &LedgerDb,
+    ) -> (Self::ProverService, Option<SlotNumber>) {
+        let previous_public_data: Option<
+            AggregatedProofPublicData<
+                <Self::Spec as Spec>::Address,
+                DaSpec,
+                <<Self::Spec as Spec>::Storage as Storage>::Root,
+            >,
+        > = read_latest_aggregated_proof(ledger_db).await.map(|proof| {
+            AggregateProofVerifier::<MockZkVerifier>::new(MockCodeCommitment::default())
+                .verify(&proof)
+                .expect("Persisted aggregated proof failed verification")
+        });
+
+        let latest_proof_final_slot = previous_public_data.as_ref().map(|p| p.final_slot_number);
+
         let inner_vm = create_inner_vm().await;
-        let outer_vm = get_outer_vm();
+        let outer_vm = get_outer_vm(previous_public_data.as_ref());
         let da_verifier = new_verifier();
 
-        ParallelProverService::new_with_default_workers(
+        let prover = ParallelProverService::new_with_default_workers(
             inner_vm,
             outer_vm,
             da_verifier,
             rollup_config.proof_manager.prover_address,
-        )
+        );
+
+        (prover, latest_proof_final_slot)
     }
 
     fn create_storage_manager(
@@ -224,4 +247,14 @@ where
         status: TxStatus::Submitted,
     }
     .into())
+}
+
+async fn read_latest_aggregated_proof(ledger_db: &LedgerDb) -> Option<SerializedAggregatedProof> {
+    Some(
+        ledger_db
+            .get_latest_aggregated_proof()
+            .await
+            .expect("Failed to read latest aggregated proof from ledger DB")?
+            .proof,
+    )
 }
