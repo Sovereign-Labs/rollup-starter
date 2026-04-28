@@ -10,6 +10,8 @@ freeze = [1, 1]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
 CHAIN_ID = 537713
 CHAIN_NAME = "Relay"
+# Chain hash overrides by rollup block height range.
+CHAIN_HASH_OVERRIDES = [ ]
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert to ASCII bytes
@@ -22,12 +24,16 @@ BATCH_NAMESPACE = { byte_string = "relay-data" }
 # Should be 10 bytes long for Celestia
 PROOF_NAMESPACE = { byte_string = "sov-p-dev8" }
 
+# The number of bytes a transaction can have.
+MAX_TX_SIZE=1_048_576
 EVM_GAS_METERING_MODE = "Rollup"
 # We will keep only this many blocks in the EVM module.
 EVM_BLOCK_PRUNING_THRESHOLD = 1000000000
 # How many rollup blocks to wait before terminating setup mode. While setup mode is enabled,
 # the rollup does not charge gas. This is useful when initializing the rollup with a bridged gas token.
 SETUP_MODE_TERMINATION_HEIGHT = 100000
+# Disable saving the timestamp oracle to state by setting this to i64::MAX
+ENABLE_TIMESTAMP_ORACLE_AT = 9_223_372_036_854_775_807
 # When using soft-confirmations, this parameter sets the maximum number of slots that a transaction can be deferred by the sequencer before
 # being force-executed by the rollup. Decreasing the number of slots means that "forced" transactions are processed
 # more quickly in the worst case, but increases the likelihood that some soft confirmations
@@ -100,6 +106,9 @@ DEFAULT_FIXED_GAS_TO_CHARGE_PER_SIGNATURE_VERIFICATION = [100, 100]
 DEFAULT_GAS_TO_CHARGE_PER_EVM_GAS = [1, 0]
 
 EVM_MAX_FEE_CHECK_HEIGHT = 172397
+# This value needs to be adjusted after deployment
+# Until deployment is done, it is one billion
+EVM_RECEIPT_ACTUAL_FEE_HEIGHT = 1_000_000_000
 
 # Maximum amount of gas the sequencer can pay for the tx execution ---
 MAX_SEQUENCER_EXEC_GAS_PER_TX = [1_000_000_000, 1_000_000_000]
@@ -144,6 +153,9 @@ FIXED_GAS_TO_CHARGE_PER_PROOF = [100, 100]
 # --- Gas fee adjustment parameters: See https://eips.ethereum.org/EIPS/eip-1559 for a detailed description ---
 # The initial gas limit of the rollup.
 INITIAL_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
+UPDATED_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
+CHANGE_GAS_LIMIT_AFTER_HEIGHT = 9223372036854775807
+
 # The initial "base fee" that every transaction emits when executed.
 INITIAL_BASE_FEE_PER_GAS = [10, 10]
 # The maximum change denominator of the base fee.

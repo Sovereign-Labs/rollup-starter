@@ -28,3 +28,12 @@ integrations/rollup/data
 crates/stf/.artifacts
 test-data/**
 integrations/**
+docker/
+.git
+.vscode/
+.claude/
+.codex
+*.log
+.env
+**/.env
+configs/**/rollup.toml

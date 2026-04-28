@@ -202,6 +202,7 @@ where
     S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Capabilities<'a> = StandardCapabilities<'a, S, &'a mut sov_paymaster::Paymaster<S>>;
+    type SequencingData = sov_modules_api::HDTimestamp;
 
     fn capabilities(&mut self) -> Guard<Self::Capabilities<'_>> {
         Guard::new(StandardCapabilities {
@@ -210,6 +211,7 @@ where
             accounts: &mut self.0.accounts,
             uniqueness: &mut self.0.uniqueness,
             gas_payer: &mut self.0.paymaster,
+            chain_state: &mut self.0.chain_state,
             operator_incentives: &mut self.0.operator_incentives,
             attester_incentives: &mut self.0.attester_incentives,
             prover_incentives: &mut self.0.prover_incentives,
