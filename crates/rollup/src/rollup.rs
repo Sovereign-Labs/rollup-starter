@@ -151,11 +151,14 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         let outer_vm = get_outer_vm(previous_public_data.as_ref());
         let da_verifier = new_verifier();
 
+        let num_threads = rollup_config.proof_manager.prover_thread_count();
+
         let prover = ParallelProverService::new_with_default_workers(
             inner_vm,
             outer_vm,
             da_verifier,
             rollup_config.proof_manager.prover_address,
+            num_threads,
         );
 
         (prover, latest_proof_final_slot)
