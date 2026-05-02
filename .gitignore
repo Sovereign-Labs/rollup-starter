@@ -1,5 +1,5 @@
 .idea
-**/target/*
+target
 rollup-state/
 rollup-starter-data/
 rollup-starter-data-external/
