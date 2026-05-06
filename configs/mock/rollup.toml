@@ -57,12 +57,14 @@ aggregated_proof_block_jump = 1
 prover_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
 max_number_of_transitions_in_db = 100
 max_number_of_transitions_in_memory = 20
+max_number_of_aggregated_proofs_in_memory = 5
 
 
 [sequencer]
 # 7 MiB
 max_batch_size_bytes = 7340032
-max_concurrent_blobs = 128
+max_concurrent_batch_blobs = 128
+max_concurrent_proof_blobs = 1024
 max_allowed_node_distance_behind = 10
 rollup_address = "0xA6edfca3AA985Dd3CC728BFFB700933a986aC085"
 blob_processing_timeout_secs = 60

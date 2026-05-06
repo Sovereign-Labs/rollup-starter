@@ -47,11 +47,14 @@ pub async fn start_rollup(
             max_number_of_transitions_in_db: NonZeroU64::new(100).unwrap(),
             max_number_of_transitions_in_memory: NonZeroU64::new(20).unwrap(),
             eager_proof_submission: true,
+            prover_thread_count_override: None,
+            max_number_of_aggregated_proofs_in_memory: NonZeroUsize::new(5).unwrap(),
         },
         sequencer: SequencerConfig {
             max_allowed_node_distance_behind: 10,
             max_batch_size_bytes: 1048576,
-            max_concurrent_blobs: 16,
+            max_concurrent_batch_blobs: 16,
+            max_concurrent_proof_blobs: 1024,
             automatic_batch_production: true,
             rollup_address: EthereumAddress::from_str(PROVER_ADDRESS)
                 .expect("Sequencer address is not valid"),
