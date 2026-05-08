@@ -37,7 +37,7 @@ Report findings to the user before proceeding.
 
 ### 4. Update SDK revision
 
-Run `./scripts/upgrade_rev.sh <NEW_REV>` to update all relevant Cargo.toml files.
+Run `./scripts/update_rev.sh <NEW_REV>` to update all relevant Cargo.toml files.
 
 ### 5. Verify configs and constants
 

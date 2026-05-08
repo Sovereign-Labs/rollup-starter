@@ -778,7 +778,7 @@ pub async fn run_soak(
                 info!("Received new slot {}, with batch {}. Rollup has processed {} txs in {} slots. Average throughput: {} txs/slot", slot.number, slot.batch_range.start, num_soak_txs, num_soak_slots, num_soak_txs as f64 / num_soak_slots as f64);
                 // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
                 if num_soak_slots % full_slot_save_interval == 0 {
-                   match client.get_slot_by_id(&types::IntOrHash::Integer(slot.number), Some(GetSlotByIdChildren::_1)).await {
+                   match client.get_slot_by_id(&types::IntOrHash::Integer(slot.number), Some(GetSlotByIdChildren::X1)).await {
                         Ok(full_slot) => {
                             save_slot_snapshot_if_needed(&full_slot, &directories, save_slot_snapshots)?;
                         }

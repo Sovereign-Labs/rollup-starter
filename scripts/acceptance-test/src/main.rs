@@ -198,7 +198,7 @@ async fn run_test(
             let include_children = if slot_snapshot.batches.is_empty() {
                 None
             } else {
-                Some(GetSlotByIdChildren::_1)
+                Some(GetSlotByIdChildren::X1)
             };
             let slot = client
                 .get_slot_by_id(&types::IntOrHash::Integer(slot_number), include_children)
