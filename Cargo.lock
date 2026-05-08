@@ -9490,6 +9490,7 @@ dependencies = [
  "prometheus_exporter",
  "rand 0.8.5",
  "risc0-starter",
+ "rustls 0.23.37",
  "serde",
  "serde_json",
  "sha2 0.10.9",
