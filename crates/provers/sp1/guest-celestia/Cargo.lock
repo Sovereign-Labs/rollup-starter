@@ -1822,7 +1822,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ab67060fc6b8ef687992d439ca0fa36e7ed17e9a0b16b25b601e8757df720de"
 dependencies = [
  "data-encoding",
- "syn 2.0.117",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -3544,7 +3544,7 @@ checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 [[package]]
 name = "nearly-linear"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 
 [[package]]
 name = "nmt-rs"
@@ -5343,18 +5343,6 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "0.8.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
-dependencies = [
- "dyn-clone",
- "schemars_derive",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "schemars"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cd191f9397d57d581cddd31014772520aa448f65ef991055d7f61582c65165f"
@@ -5373,15 +5361,16 @@ checksum = "a2b42f36aa1cd011945615b92222f6bf73c599a102a300334cd7f8dbeec726cc"
 dependencies = [
  "dyn-clone",
  "ref-cast",
+ "schemars_derive",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "schemars_derive"
-version = "0.8.22"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+checksum = "7d115b50f4aaeea07e79c1912f645c7513d81715d0420f8bc77a18c6260b307f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5602,16 +5591,16 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.15.1"
+version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa66c845eee442168b2c8134fec70ac50dc20e760769c8ba0ad1319ca1959b04"
+checksum = "e72c1c2cb7b223fafb600a619537a871c2818583d619401b785e7c0b746ccde2"
 dependencies = [
  "base64 0.22.1",
+ "bs58",
  "chrono",
  "hex",
  "indexmap 1.9.3",
  "indexmap 2.13.0",
- "schemars 0.8.22",
  "schemars 0.9.0",
  "schemars 1.2.1",
  "serde_core",
@@ -5622,11 +5611,11 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.15.1"
+version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b91a903660542fced4e99881aa481bdbaec1634568ee02e0b8bd57c64cb38955"
+checksum = "b90c488738ecb4fb0262f41f43bc40efc5868d9fb744319ddf5f5317f417bfac"
 dependencies = [
- "darling 0.21.3",
+ "darling 0.23.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -6242,11 +6231,11 @@ dependencies = [
 [[package]]
 name = "sov-accounts"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_with",
  "sov-modules-api",
@@ -6256,14 +6245,14 @@ dependencies = [
 [[package]]
 name = "sov-address"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "alloy-primitives",
  "anyhow",
  "borsh",
  "hex",
  "k256",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -6274,12 +6263,12 @@ dependencies = [
 [[package]]
 name = "sov-attester-incentives"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
  "derivative",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-address",
  "sov-bank",
@@ -6294,12 +6283,12 @@ dependencies = [
 [[package]]
 name = "sov-bank"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
  "derive_more 2.1.1",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "sov-modules-api",
@@ -6313,13 +6302,13 @@ dependencies = [
 [[package]]
 name = "sov-blob-storage"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
  "derive_more 2.1.1",
  "hex",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-bank",
  "sov-chain-state",
@@ -6333,7 +6322,7 @@ dependencies = [
 [[package]]
 name = "sov-build"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
@@ -6345,7 +6334,7 @@ dependencies = [
 [[package]]
 name = "sov-capabilities"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "sov-accounts",
@@ -6365,7 +6354,7 @@ dependencies = [
 [[package]]
 name = "sov-celestia-adapter"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6376,7 +6365,7 @@ dependencies = [
  "hex",
  "nmt-rs",
  "prost",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "sov-metrics",
@@ -6392,11 +6381,11 @@ dependencies = [
 [[package]]
 name = "sov-chain-state"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-modules-api",
  "sov-rollup-interface",
@@ -6408,7 +6397,7 @@ dependencies = [
 [[package]]
 name = "sov-db-types"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "borsh",
  "derivative",
@@ -6442,7 +6431,7 @@ dependencies = [
 [[package]]
 name = "sov-eip712-auth"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
@@ -6460,7 +6449,7 @@ dependencies = [
 [[package]]
 name = "sov-evm"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -6475,7 +6464,7 @@ dependencies = [
  "itertools 0.14.0",
  "revm",
  "revm-database-interface",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "serde_with",
@@ -6496,14 +6485,14 @@ dependencies = [
 [[package]]
 name = "sov-hyperlane-integration"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
  "derive_more 2.1.1",
  "k256",
  "ruint",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sha3",
  "sov-address",
@@ -6517,7 +6506,7 @@ dependencies = [
 [[package]]
 name = "sov-kernels"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "sov-blob-storage",
@@ -6530,7 +6519,7 @@ dependencies = [
 [[package]]
 name = "sov-metrics"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "bincode",
@@ -6543,7 +6532,7 @@ dependencies = [
 [[package]]
 name = "sov-mock-zkvm"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "bincode",
@@ -6551,7 +6540,7 @@ dependencies = [
  "digest 0.10.7",
  "ed25519-dalek",
  "hex",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sha2 0.10.9",
  "sov-rollup-interface",
@@ -6562,7 +6551,7 @@ dependencies = [
 [[package]]
 name = "sov-modules-api"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "bech32",
@@ -6573,7 +6562,7 @@ dependencies = [
  "digest 0.10.7",
  "hex",
  "nearly-linear",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -6592,7 +6581,7 @@ dependencies = [
 [[package]]
 name = "sov-modules-macros"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "bech32",
@@ -6614,12 +6603,12 @@ dependencies = [
 [[package]]
 name = "sov-modules-stf-blueprint"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
  "hex",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-metrics",
  "sov-modules-api",
@@ -6632,12 +6621,12 @@ dependencies = [
 [[package]]
 name = "sov-operator-incentives"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
  "derive_more 2.1.1",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-modules-api",
  "sov-rollup-interface",
@@ -6650,14 +6639,14 @@ dependencies = [
 [[package]]
 name = "sov-paymaster"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "bcs",
  "borsh",
  "derivative",
  "derive_more 2.1.1",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-bank",
  "sov-modules-api",
@@ -6669,12 +6658,12 @@ dependencies = [
 [[package]]
 name = "sov-prover-incentives"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
  "derive_more 2.1.1",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-bank",
  "sov-chain-state",
@@ -6689,11 +6678,11 @@ dependencies = [
 [[package]]
 name = "sov-revenue-share"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-bank",
  "sov-modules-api",
@@ -6704,7 +6693,7 @@ dependencies = [
 [[package]]
 name = "sov-rollup-interface"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6713,7 +6702,7 @@ dependencies = [
  "derive_more 2.1.1",
  "digest 0.10.7",
  "hex",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "serde_with",
@@ -6724,11 +6713,11 @@ dependencies = [
 [[package]]
 name = "sov-sequencer-registry"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-bank",
  "sov-modules-api",
@@ -6740,14 +6729,14 @@ dependencies = [
 [[package]]
 name = "sov-sp1-adapter"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "bincode",
  "borsh",
  "ed25519-consensus",
  "hex",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sha2 0.10.9",
  "slop-algebra",
@@ -6765,7 +6754,7 @@ dependencies = [
 [[package]]
 name = "sov-state"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "bcs",
@@ -6788,12 +6777,12 @@ dependencies = [
 [[package]]
 name = "sov-test-state-consistency"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
  "hex",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-modules-api",
  "sov-state",
@@ -6803,11 +6792,11 @@ dependencies = [
 [[package]]
 name = "sov-uniqueness"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "borsh",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-modules-api",
  "sov-state",
@@ -6816,7 +6805,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -6827,7 +6816,7 @@ dependencies = [
  "hex",
  "nmt-rs",
  "once_cell",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -6838,7 +6827,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet-macro-helpers"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "bech32",
  "borsh",
@@ -6855,7 +6844,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet-macros"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "proc-macro2",
  "sov-universal-wallet-macro-helpers",
@@ -6865,7 +6854,7 @@ dependencies = [
 [[package]]
 name = "sov-zkvm-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f6cd64749edc56428fbeb7f22702458b0afb698a#f6cd64749edc56428fbeb7f22702458b0afb698a"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=1b2b3165a7d591774ccf070ab0d11e805ecf84de#1b2b3165a7d591774ccf070ab0d11e805ecf84de"
 dependencies = [
  "anyhow",
  "convert_case 0.6.0",
@@ -8433,7 +8422,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "borsh",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "sov-bank",
  "sov-modules-api",
