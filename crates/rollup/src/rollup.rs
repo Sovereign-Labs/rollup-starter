@@ -132,6 +132,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
         _da_service: &Self::DaService,
         ledger_db: &LedgerDb,
+        start_fresh_outer_proof_on_resync: bool,
     ) -> (Self::ProverService, Option<SlotNumber>) {
         let previous_public_data: Option<
             AggregatedProofPublicData<
@@ -147,8 +148,14 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
 
         let latest_proof_final_slot = previous_public_data.as_ref().map(|p| p.final_slot_number);
 
+        let previous_for_outer = if start_fresh_outer_proof_on_resync {
+            None
+        } else {
+            previous_public_data.as_ref()
+        };
+
         let inner_vm = create_inner_vm().await;
-        let outer_vm = get_outer_vm(previous_public_data.as_ref());
+        let outer_vm = get_outer_vm(previous_for_outer);
         let da_verifier = new_verifier();
 
         let num_threads = rollup_config.proof_manager.prover_thread_count();

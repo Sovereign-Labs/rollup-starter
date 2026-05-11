@@ -94,11 +94,20 @@ struct Args {
     /// Stops the rollup at a given height.
     #[arg(long, default_value = None)]
     stop_at_rollup_height: Option<u64>,
+
+    /// When true, the rollup skips proving unsynced blocks; once it catches up,
+    /// it issues a fresh outer proof that replaces any previous one.
+    #[arg(long, default_value_t = false)]
+    start_fresh_outer_proof_on_resync: bool,
 }
 
 #[tokio::main]
 // Not returning a result here, so the error could be logged properly.
 async fn main() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls ring crypto provider");
+
     let args = Args::parse();
 
     let _guard = initialize_logging();
@@ -117,6 +126,7 @@ async fn main() {
         prover_config,
         args.start_at_rollup_height.map(RollupHeight::new),
         args.stop_at_rollup_height.map(RollupHeight::new),
+        args.start_fresh_outer_proof_on_resync,
     )
     .await
     .expect("Couldn't start rollup");
@@ -150,6 +160,7 @@ async fn new_rollup(
     prover_config: RollupProverConfig,
     start_at_rollup_height: Option<RollupHeight>,
     stop_at_rollup_height: Option<RollupHeight>,
+    start_fresh_outer_proof_on_resync: bool,
 ) -> Result<Rollup<StarterRollup<Native>, Native>, anyhow::Error> {
     tracing::info!(
         ?rollup_config_path,
@@ -186,6 +197,7 @@ async fn new_rollup(
             start_at_rollup_height,
             stop_at_rollup_height,
             Some(evm_pinned_cache_config),
+            start_fresh_outer_proof_on_resync,
         )
         .await
 }

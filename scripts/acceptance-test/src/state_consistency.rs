@@ -3,6 +3,7 @@ use futures::stream::BoxStream;
 use futures::FutureExt;
 use serde::de::DeserializeOwned;
 use sov_api_spec::types::Slot;
+use sov_api_spec::ClientInfo;
 use sov_modules_api::capabilities::config_chain_id;
 use sov_modules_api::transaction::{Transaction, TxDetails};
 use sov_modules_api::{DispatchCall, PrivateKey, Runtime as RuntimeTrait};

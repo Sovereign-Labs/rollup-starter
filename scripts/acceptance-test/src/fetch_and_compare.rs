@@ -318,7 +318,7 @@ impl SlotFetcher {
             .client
             .get_batch_by_id(
                 &types::IntOrHash::Hash(batch.hash.clone()),
-                Some(GetBatchByIdChildren::_0),
+                Some(GetBatchByIdChildren::X0),
             )
             .await?
             .into_inner();
@@ -326,7 +326,7 @@ impl SlotFetcher {
             .client
             .get_batch_by_id(
                 &types::IntOrHash::Integer(batch_number),
-                Some(GetBatchByIdChildren::_1),
+                Some(GetBatchByIdChildren::X1),
             )
             .await?
             .into_inner();
@@ -334,7 +334,7 @@ impl SlotFetcher {
             .client
             .get_batch_by_id(
                 &types::IntOrHash::Hash(batch.hash.clone()),
-                Some(GetBatchByIdChildren::_1),
+                Some(GetBatchByIdChildren::X1),
             )
             .await?
             .into_inner();
@@ -362,14 +362,14 @@ impl SlotFetcher {
             .client
             .get_slot_by_id(
                 &types::IntOrHash::Integer(slot_number),
-                Some(GetSlotByIdChildren::_1),
+                Some(GetSlotByIdChildren::X1),
             )
             .await?;
         let slot_without_children = self
             .client
             .get_slot_by_id(
                 &types::IntOrHash::Integer(slot_number),
-                Some(GetSlotByIdChildren::_0),
+                Some(GetSlotByIdChildren::X0),
             )
             .await?;
         let slot_by_hash = self
@@ -383,7 +383,7 @@ impl SlotFetcher {
             .client
             .get_slot_by_id(
                 &types::IntOrHash::Hash(slot_with_children.hash.clone()),
-                Some(GetSlotByIdChildren::_1),
+                Some(GetSlotByIdChildren::X1),
             )
             .await?;
 
