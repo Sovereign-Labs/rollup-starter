@@ -87,6 +87,7 @@ pub async fn start_rollup(
             None,
             None,
             None,
+            false,
         )
         .await
         .unwrap();
