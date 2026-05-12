@@ -18,6 +18,7 @@ serde = { workspace = true }
 
 sov-soak-testing-lib = { workspace = true }
 sov-api-spec = { workspace = true }
+sov-address = { workspace = true, features = ["arbitrary"] }
 sov-rollup-interface = { workspace = true, features = ["arbitrary"] }
 sov-modules-rollup-blueprint = { workspace = true, features = ["native"] }
 sov-test-utils = { workspace = true, features = ["arbitrary"] }
