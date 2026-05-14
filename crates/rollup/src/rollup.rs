@@ -133,7 +133,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         _da_service: &Self::DaService,
         ledger_db: &LedgerDb,
         start_fresh_outer_proof_on_resync: bool,
-    ) -> (Self::ProverService, Option<SlotNumber>) {
+    ) -> anyhow::Result<(Self::ProverService, Option<SlotNumber>)> {
         let previous_public_data: Option<
             AggregatedProofPublicData<
                 <Self::Spec as Spec>::Address,
@@ -168,7 +168,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
             num_threads,
         );
 
-        (prover, latest_proof_final_slot)
+        Ok((prover, latest_proof_final_slot))
     }
 
     fn create_storage_manager(
