@@ -131,16 +131,8 @@ pub use sp1::{
 
 pub use sov_mock_zkvm::MockZkvm as OuterZkvm;
 pub use sov_mock_zkvm::MockZkvmHost as OuterZkvmHost;
-use sov_rollup_interface::da::DaSpec;
-use sov_rollup_interface::zk::aggregated_proof::AggregatedProofPublicData;
+use sov_rollup_interface::zk::aggregated_proof::SerializedAggregatedProof;
 
-pub fn get_outer_vm<Address, Da, Root>(
-    previous_public_data: Option<&AggregatedProofPublicData<Address, Da, Root>>,
-) -> OuterZkvmHost
-where
-    Address: serde::Serialize,
-    Da: DaSpec,
-    Root: serde::Serialize,
-{
-    OuterZkvmHost::new_non_blocking_with_previous_anchor(previous_public_data)
+pub fn get_outer_vm(previous_outer_proof: Option<SerializedAggregatedProof>) -> OuterZkvmHost {
+    OuterZkvmHost::new_non_blocking_with_previous_outer_proof(previous_outer_proof)
 }
