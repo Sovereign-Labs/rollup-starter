@@ -81,3 +81,19 @@ If all steps succeed:
    [List specific breaking changes and how they were resolved, if any]
    ```
 2. Ask the user whether to push and create a PR.
+
+### 9. Sync schema to `relay-chain-upgrade` (resync compatibility)
+
+The `relay-chain-upgrade` branch carries Relay-specific values for the production resync job against `https://rpc.chain.relay.link`. After the SDK upgrade lands, port any **structural** schema changes (added / removed / renamed keys) so that branch keeps building. Never copy values — the Relay branch deliberately diverges on `CHAIN_ID`, namespaces, `GAS_TOKEN_ID`, prod admin & sequencer addresses, `genesis_da_height`, contract allowlist, etc.
+
+1. Compute the delta — look at key-level differences only, ignore value-only differences:
+   ```bash
+   git diff sdk-upgrade..relay-chain-upgrade -- constants.toml configs/celestia/genesis.json
+   ```
+2. If there is a structural delta, **ask the user before porting**: "Schema changed in this SDK upgrade. Port the delta to `relay-chain-upgrade` now?"
+3. On confirmation:
+   - `git checkout relay-chain-upgrade` — use the local branch as-is. Do not rebase or fast-forward; it may carry unpushed work.
+   - Apply only structural changes (add new keys with their default values & comments from `sdk-upgrade`, delete removed keys, rename where the SDK renamed). Preserve every Relay value.
+   - Commit on `relay-chain-upgrade` with a message like `Port SDK schema additions from sdk-upgrade`.
+   - `git checkout sdk-upgrade`.
+4. If declined, skip without comment.
