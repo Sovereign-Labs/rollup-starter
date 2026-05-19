@@ -85,10 +85,10 @@ If all steps succeed:
 ### 9. Sync schema to `relay-chain-upgrade` (resync compatibility)
 
 The `relay-chain-upgrade` branch carries Relay-specific values for the production resync job against `https://rpc.chain.relay.link`. Specifically, the `constants.toml`, `configs/celestia/genesis.json` and `configs/celestia/rollup.toml` files are checked out from that branch.
-After the `sdk-upgrade` branch is upgraded, port any **structural** changes that you made to these files to the `relay-chain-upgrade` branch as well.
+After the `sdk-upgrade` branch is upgraded, port any **structural** changes that you made to these files to the `relay-chain-upgrade` branch as well - if there were any.
 
 1. `git checkout relay-chain-upgrade`. As before, if there is local unpushed state, ask the user before proceeding.
 2. Apply any new **structural** edits (add new keys with their default values & comments from `sdk-upgrade`, delete removed keys, rename where the SDK renamed).
   - Identify any values that look like they are enabling a consensus change: e.g. new activation height constants. Instead of copying the default from the SDK, set these to a far future value, e.g. in toml `i64::MAX`: 9_223_372_036_854_775_807; and add a comment specifically mentioning it is a new activation that is currently disabled, and will need to be reviewed before deployment. **Enumerate and report** any such changes you made to the user afterwards in your summary.
 3. If the `sdk-upgrade` upgrade involved modifying *values* rather than structural key changes, ask the user how to proceed in porting these to `relay-chain-upgrade`.
-4. Once finished, commit on `relay-chain-upgrade` with a message like `Port SDK schema additions from sdk-upgrade`.
+4. Once finished, commit on `relay-chain-upgrade` with a message like `Update {configs/constants/genesis}` and a brief description, and push upstream.

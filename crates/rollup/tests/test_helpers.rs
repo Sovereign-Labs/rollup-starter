@@ -40,7 +40,7 @@ pub async fn start_rollup(
             pre_fetched_blocks_capacity: NonZero::new(3).unwrap(),
         },
         da: da_config,
-        proof_manager: ProofManagerConfig {
+        proof_manager: Some(ProofManagerConfig {
             aggregated_proof_block_jump: NonZeroUsize::new(1).unwrap(),
             prover_address: EthereumAddress::from_str(PROVER_ADDRESS)
                 .expect("Prover address is not valid"),
@@ -49,12 +49,12 @@ pub async fn start_rollup(
             eager_proof_submission: true,
             prover_thread_count_override: None,
             max_number_of_aggregated_proofs_in_memory: NonZeroUsize::new(5).unwrap(),
-        },
+            max_concurrent_proof_blobs: 1024,
+        }),
         sequencer: SequencerConfig {
             max_allowed_node_distance_behind: 10,
             max_batch_size_bytes: 1048576,
             max_concurrent_batch_blobs: 16,
-            max_concurrent_proof_blobs: 1024,
             automatic_batch_production: true,
             rollup_address: EthereumAddress::from_str(PROVER_ADDRESS)
                 .expect("Sequencer address is not valid"),
