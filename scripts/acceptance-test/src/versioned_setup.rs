@@ -23,6 +23,13 @@ pub const SOAK_NUM_WORKERS: u32 = 20;
 pub const SOAK_SALT: u32 = 3; // existing acceptance-test-data started from 3 for some reason
 pub const SOAK_SAFETY_STOP_BLOCKS: u64 = 5;
 const ACCEPTANCE_TEST_FEATURES: [&str; 3] = ["acceptance-testing", "mock_da", "mock_zkvm"];
+const ACCEPTANCE_CONSTANTS_FILENAME: &str = "constants.testing.toml";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalConstantsManifest {
+    Default,
+    AcceptanceTest,
+}
 
 fn acceptance_test_features() -> Vec<String> {
     ACCEPTANCE_TEST_FEATURES
@@ -167,42 +174,71 @@ fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<Resolve
     Ok(versions)
 }
 
-fn build_local_head_binaries(rollup_root: &Path) -> Result<(PathBuf, PathBuf), anyhow::Error> {
+fn build_local_head_binaries(
+    directories: &Directories,
+    constants_manifest: LocalConstantsManifest,
+) -> Result<(PathBuf, PathBuf), anyhow::Error> {
     let feature_list = acceptance_test_feature_list();
+    let rollup_root = &directories.rollup_root;
+    let target_dir = match constants_manifest {
+        LocalConstantsManifest::Default => rollup_root.join("target"),
+        LocalConstantsManifest::AcceptanceTest => {
+            let constants_path = directories
+                .acceptance_test_dir
+                .join(ACCEPTANCE_CONSTANTS_FILENAME);
+            if !constants_path.is_file() {
+                return Err(anyhow!(
+                    "acceptance-test constants manifest not found at {}",
+                    constants_path.display()
+                ));
+            }
+            // Keep this build in a dedicated target dir so the proc-macro crate is compiled
+            // with the acceptance-test constants manifest instead of reusing the default one.
+            rollup_root.join("target").join("acceptance-test")
+        }
+    };
+
+    let configure_constants_manifest = |cmd: &mut StdCommand| {
+        if constants_manifest == LocalConstantsManifest::AcceptanceTest {
+            cmd.env("SOV_TEST_MODE_CONST_MANIFEST", "1")
+                .env("CONSTANTS_MANIFEST", &directories.acceptance_test_dir)
+                .env("CARGO_TARGET_DIR", &target_dir);
+        }
+    };
 
     tracing::info!("Building rollup at local HEAD...");
-    run_checked(
-        StdCommand::new("cargo").current_dir(rollup_root).args([
-            "build",
-            "--release",
-            "--package",
-            "rollup-starter",
-            "--bin",
-            "rollup",
-            "--no-default-features",
-            "--features",
-            &feature_list,
-        ]),
-        "build local head rollup binary",
-    )?;
+    let mut rollup_build = StdCommand::new("cargo");
+    rollup_build.current_dir(rollup_root).args([
+        "build",
+        "--release",
+        "--package",
+        "rollup-starter",
+        "--bin",
+        "rollup",
+        "--no-default-features",
+        "--features",
+        &feature_list,
+    ]);
+    configure_constants_manifest(&mut rollup_build);
+    run_checked(&mut rollup_build, "build local head rollup binary")?;
 
     tracing::info!("Building soak test at local HEAD...");
-    run_checked(
-        StdCommand::new("cargo").current_dir(rollup_root).args([
-            "build",
-            "--release",
-            "--package",
-            "rollup-starter-soak-test",
-            "--bin",
-            "rollup-starter-soak-test",
-            "--no-default-features",
-            "--features",
-            &feature_list,
-        ]),
-        "build local head soak binary",
-    )?;
+    let mut soak_build = StdCommand::new("cargo");
+    soak_build.current_dir(rollup_root).args([
+        "build",
+        "--release",
+        "--package",
+        "rollup-starter-soak-test",
+        "--bin",
+        "rollup-starter-soak-test",
+        "--no-default-features",
+        "--features",
+        &feature_list,
+    ]);
+    configure_constants_manifest(&mut soak_build);
+    run_checked(&mut soak_build, "build local head soak binary")?;
 
-    let release_dir = rollup_root.join("target").join("release");
+    let release_dir = target_dir.join("release");
     let rollup_bin = release_dir.join("rollup");
     if !rollup_bin.exists() {
         return Err(anyhow!(
@@ -293,6 +329,20 @@ pub fn prepare_acceptance_run_plan(
     password: &str,
     blocks_per_version: u64,
 ) -> Result<AcceptanceRunPlan, anyhow::Error> {
+    prepare_acceptance_run_plan_with_constants(
+        directories,
+        password,
+        blocks_per_version,
+        LocalConstantsManifest::Default,
+    )
+}
+
+pub fn prepare_acceptance_run_plan_with_constants(
+    directories: &Directories,
+    password: &str,
+    blocks_per_version: u64,
+    local_constants_manifest: LocalConstantsManifest,
+) -> Result<AcceptanceRunPlan, anyhow::Error> {
     let binary_cache_dir = &directories.rollup_build_cache_dir;
     fs::create_dir_all(binary_cache_dir)?;
 
@@ -334,7 +384,8 @@ pub fn prepare_acceptance_run_plan(
         )
     };
 
-    let (local_rollup_bin, local_soak_bin) = build_local_head_binaries(&directories.rollup_root)?;
+    let (local_rollup_bin, local_soak_bin) =
+        build_local_head_binaries(directories, local_constants_manifest)?;
 
     let versioned_configs_dir = directories.output_dir.join("versioned-configs");
     fs::create_dir_all(&versioned_configs_dir)?;
