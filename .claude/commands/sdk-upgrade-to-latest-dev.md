@@ -44,7 +44,7 @@ Run `./scripts/update_rev.sh <NEW_REV>` to update all relevant Cargo.toml files.
 Before building, check that configs and constants are up to date with the SDK changes identified in step 3.
 
 1. **`constants.toml`**: Compare against SDK's demo-rollup constants. Add any new constants with appropriate values and comments.
-2. **`configs/.*/rollup.toml`**: Verify fields still match the SDK's config struct definitions. Add/remove fields as needed.
+2. **`configs/.*/rollup.toml`** and **`scripts/acceptance-test/rollup_config.toml`**: Verify fields still match the SDK's config struct definitions. Add/remove fields as needed.
 
 ### 6. Build, fix, repeat
 
