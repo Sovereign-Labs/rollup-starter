@@ -17,10 +17,14 @@ lint: ## Run fmt, check and clippy with the most important feature combinations
 	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features risc0 --no-default-features
 	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features sp1 --no-default-features
 	SKIP_GUEST_BUILD=1 cargo check --features celestia_da --features mock_zkvm --no-default-features
+	SKIP_GUEST_BUILD=1 cargo check --manifest-path scripts/acceptance-test/Cargo.toml
+	SKIP_GUEST_BUILD=1 cargo check --manifest-path scripts/soak-test/Cargo.toml
 	SKIP_GUEST_BUILD=1 cargo clippy --workspace
 	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features risc0 --no-default-features
 	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features sp1 --no-default-features
 	SKIP_GUEST_BUILD=1 cargo clippy --features celestia_da --features mock_zkvm --no-default-features
+	SKIP_GUEST_BUILD=1 cargo clippy --manifest-path scripts/acceptance-test/Cargo.toml
+	SKIP_GUEST_BUILD=1 cargo clippy --manifest-path scripts/soak-test/Cargo.toml
 	zepter  # Run it several times, as fix from the first run can uncover other issues
 	zepter
 	zepter

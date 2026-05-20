@@ -2,11 +2,11 @@ use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
     cleanup_rollup_state_dir, extend_last_stop_height,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
-    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan,
+    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan_with_constants,
     prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, shutdown_error,
     sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown, write_manager_config,
-    AcceptanceRunPlan, CommonArgs, Directories, PostgresContainerGuard, ResolvedRunSettings,
-    ShutdownReceiver, SoakRunOptions, API_URL,
+    AcceptanceRunPlan, CommonArgs, Directories, LocalConstantsManifest, PostgresContainerGuard,
+    ResolvedRunSettings, ShutdownReceiver, SoakRunOptions, API_URL,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use chrono::Utc;
@@ -97,7 +97,12 @@ fn prepare_test_run(args: Args) -> Result<PreparedTestRun, anyhow::Error> {
         &directories.rollup_data_path,
         settings.on_existing_rollup_state,
     )?;
-    let plan = prepare_acceptance_run_plan(&directories, &password, settings.blocks_per_version)?;
+    let plan = prepare_acceptance_run_plan_with_constants(
+        &directories,
+        &password,
+        settings.blocks_per_version,
+        LocalConstantsManifest::AcceptanceTest,
+    )?;
     Ok(PreparedTestRun {
         directories,
         password,
