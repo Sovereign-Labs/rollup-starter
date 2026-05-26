@@ -4487,7 +4487,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=2a119d28b6406c613b868a40f4bda88921f9f006)",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=fc570db739cc5e2677e5a2361a55cc18ac2e8bf5)",
  "sov-proxy-utils",
  "tokio",
  "tracing",
@@ -7717,25 +7717,6 @@ dependencies = [
 [[package]]
 name = "sov-metrics"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=2a119d28b6406c613b868a40f4bda88921f9f006#2a119d28b6406c613b868a40f4bda88921f9f006"
-dependencies = [
- "anyhow",
- "bincode",
- "derivative",
- "derive-new",
- "derive_more",
- "hex",
- "http",
- "schemars 1.2.1",
- "serde",
- "tokio",
- "tokio-metrics",
- "tracing",
-]
-
-[[package]]
-name = "sov-metrics"
-version = "0.3.0"
 source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0#eaf746a0e8a193c67af8be6fa81226824e71bea0"
 dependencies = [
  "anyhow",
@@ -7748,6 +7729,25 @@ dependencies = [
  "schemars 0.8.22",
  "serde",
  "strum 0.26.3",
+ "tokio",
+ "tokio-metrics",
+ "tracing",
+]
+
+[[package]]
+name = "sov-metrics"
+version = "0.3.0"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=fc570db739cc5e2677e5a2361a55cc18ac2e8bf5#fc570db739cc5e2677e5a2361a55cc18ac2e8bf5"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "derivative",
+ "derive-new",
+ "derive_more",
+ "hex",
+ "http",
+ "schemars 1.2.1",
+ "serde",
  "tokio",
  "tokio-metrics",
  "tracing",
@@ -8016,13 +8016,13 @@ dependencies = [
 [[package]]
 name = "sov-proxy-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=2a119d28b6406c613b868a40f4bda88921f9f006#2a119d28b6406c613b868a40f4bda88921f9f006"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=fc570db739cc5e2677e5a2361a55cc18ac2e8bf5#fc570db739cc5e2677e5a2361a55cc18ac2e8bf5"
 dependencies = [
  "anyhow",
  "async-trait",
  "reqwest 0.13.4",
  "serde",
- "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=2a119d28b6406c613b868a40f4bda88921f9f006)",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=fc570db739cc5e2677e5a2361a55cc18ac2e8bf5)",
  "sqlx",
  "thiserror 2.0.18",
  "time",
