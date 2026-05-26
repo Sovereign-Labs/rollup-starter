@@ -1,6 +1,5 @@
 use crate::evm_contracts::StateConsistencyTester;
 use crate::{Directories, API_ADDR};
-use alloy::signers::local::PrivateKeySigner;
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::SolCall;
@@ -29,7 +28,6 @@ const PRIVILEGED_DEPLOYER_KEY: &str =
 const UNPRIVILEGED_DEPLOYER_OFFSET: u8 = 1;
 const PINNED_WORKER_KEY_OFFSET: u8 = 10;
 const UNPINNED_WORKER_KEY_OFFSET: u8 = 60;
-const DEFAULT_BUCKET_SIZE_LIMIT: usize = 100 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct StateConsistencyMetadata {
@@ -37,27 +35,10 @@ struct StateConsistencyMetadata {
     unpinned_addresses: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct EvmPinnedCacheConfig {
     #[serde(default)]
     preferred_sequencer_publish_reverted_txs: bool,
-    #[serde(default = "default_bucket_size_limit")]
-    default_bucket_size_limit: usize,
-    #[serde(default)]
-    privileged_deployer_addresses: Vec<Address>,
-    #[serde(default)]
-    known_contracts_and_limits: std::collections::BTreeMap<Address, usize>,
-}
-
-impl Default for EvmPinnedCacheConfig {
-    fn default() -> Self {
-        Self {
-            preferred_sequencer_publish_reverted_txs: false,
-            default_bucket_size_limit: default_bucket_size_limit(),
-            privileged_deployer_addresses: Vec::new(),
-            known_contracts_and_limits: std::collections::BTreeMap::new(),
-        }
-    }
 }
 
 fn evm_rpc_addr() -> SocketAddr {
@@ -76,21 +57,12 @@ fn state_consistency_metadata_path(directories: &Directories) -> PathBuf {
     evm_artifacts_dir(directories).join(STATE_CONSISTENCY_METADATA)
 }
 
-fn default_bucket_size_limit() -> usize {
-    DEFAULT_BUCKET_SIZE_LIMIT
-}
-
 fn derive_worker_key(root_key: &str, worker_idx: u8) -> anyhow::Result<String> {
     let mut key_bytes: [u8; 32] = hex::decode(root_key)?
         .try_into()
         .map_err(|_| anyhow!("Invalid private key length"))?;
     key_bytes[0] = key_bytes[0].wrapping_add(worker_idx);
     Ok(hex::encode(key_bytes))
-}
-
-fn privileged_deployer_address() -> anyhow::Result<Address> {
-    let signer: PrivateKeySigner = PRIVILEGED_DEPLOYER_KEY.parse()?;
-    Ok(signer.address())
 }
 
 pub fn privileged_deployer_key() -> &'static str {
@@ -233,24 +205,13 @@ pub fn load_state_consistency_contracts(
 
 pub fn ensure_evm_pinned_cache_config(directories: &Directories) -> anyhow::Result<()> {
     let config_path = evm_pinned_cache_path(directories);
-    let mut config = if config_path.exists() {
+    let config = if config_path.exists() {
         let raw = fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read {}", config_path.display()))?;
         serde_json::from_str::<EvmPinnedCacheConfig>(&raw)?
     } else {
         EvmPinnedCacheConfig::default()
     };
-
-    let privileged_address = privileged_deployer_address()?;
-    if !config
-        .privileged_deployer_addresses
-        .iter()
-        .any(|addr| addr == &privileged_address)
-    {
-        config
-            .privileged_deployer_addresses
-            .push(privileged_address);
-    }
 
     fs::write(config_path, serde_json::to_string_pretty(&config)?)?;
     Ok(())
