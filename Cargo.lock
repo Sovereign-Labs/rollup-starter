@@ -987,6 +987,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "aws-lc-rs"
+version = "1.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ec2f1fc3ec205783a5da9a7e6c1509cc69dedf09a1949e412c1e18469326d00"
+dependencies = [
+ "aws-lc-sys",
+ "zeroize",
+]
+
+[[package]]
+name = "aws-lc-sys"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a2f9779ce85b93ab6170dd940ad0169b5766ff848247aff13bb788b832fe3f4"
+dependencies = [
+ "cc",
+ "cmake",
+ "dunce",
+ "fs_extra",
+]
+
+[[package]]
 name = "axum"
 version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1777,6 +1799,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31211fc26899744f5b22521fdc971e5f3875991d8880537537470685a0e9552d"
 dependencies = [
  "http",
+]
+
+[[package]]
+name = "cmake"
+version = "0.1.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0f78a02292a74a88ac736019ab962ece0bc380e3f977bf72e376c5d78ff0678"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -2788,6 +2819,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs_extra"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
+
+[[package]]
 name = "funty"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3718,6 +3755,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "jni"
+version = "0.22.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5efd9a482cf3a427f00d6b35f14332adc7902ce91efb778580e180ff90fa3498"
+dependencies = [
+ "cfg-if",
+ "combine",
+ "jni-macros",
+ "jni-sys 0.4.1",
+ "log",
+ "simd_cesu8",
+ "thiserror 2.0.18",
+ "walkdir",
+ "windows-link",
+]
+
+[[package]]
+name = "jni-macros"
+version = "0.22.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a00109accc170f0bdb141fed3e393c565b6f5e072365c3bd58f5b062591560a3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustc_version 0.4.1",
+ "simd_cesu8",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "jni-sys"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3798,7 +3865,7 @@ dependencies = [
  "pin-project",
  "rustls",
  "rustls-pki-types",
- "rustls-platform-verifier",
+ "rustls-platform-verifier 0.5.3",
  "soketto",
  "thiserror 2.0.18",
  "tokio",
@@ -3850,7 +3917,7 @@ dependencies = [
  "jsonrpsee-core",
  "jsonrpsee-types",
  "rustls",
- "rustls-platform-verifier",
+ "rustls-platform-verifier 0.5.3",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -3956,7 +4023,7 @@ dependencies = [
  "percent-encoding",
  "referencing",
  "regex-syntax",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "uuid-simd",
@@ -4420,7 +4487,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-proxy-utils",
  "tokio",
  "tracing",
@@ -5197,7 +5264,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "percent-encoding",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -5504,6 +5571,7 @@ version = "0.11.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098"
 dependencies = [
+ "aws-lc-rs",
  "bytes",
  "getrandom 0.3.4",
  "lru-slab",
@@ -5823,6 +5891,43 @@ dependencies = [
  "wasm-streams",
  "web-sys",
  "webpki-roots 1.0.6",
+]
+
+[[package]]
+name = "reqwest"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "219c5811de6525e5416c7d5d53bb656d3afdbc6c5af816e0802bcfa42dbdc1c3"
+dependencies = [
+ "base64 0.22.1",
+ "bytes",
+ "futures-core",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-rustls",
+ "hyper-util",
+ "js-sys",
+ "log",
+ "percent-encoding",
+ "pin-project-lite",
+ "quinn",
+ "rustls",
+ "rustls-pki-types",
+ "rustls-platform-verifier 0.7.0",
+ "serde",
+ "serde_json",
+ "sync_wrapper",
+ "tokio",
+ "tokio-rustls",
+ "tower",
+ "tower-http",
+ "tower-service",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -6336,6 +6441,7 @@ version = "0.23.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "758025cb5fccfd3bc2fd74708fd4682be41d99e5dff73c377c0646c6012c73a4"
 dependencies = [
+ "aws-lc-rs",
  "log",
  "once_cell",
  "ring",
@@ -6384,7 +6490,7 @@ checksum = "19787cda76408ec5404443dc8b31795c87cd8fec49762dc75fa727740d34acc1"
 dependencies = [
  "core-foundation",
  "core-foundation-sys",
- "jni",
+ "jni 0.21.1",
  "log",
  "once_cell",
  "rustls",
@@ -6395,6 +6501,27 @@ dependencies = [
  "security-framework-sys",
  "webpki-root-certs 0.26.11",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "rustls-platform-verifier"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26d1e2536ce4f35f4846aa13bff16bd0ff40157cdb14cc056c7b14ba41233ba0"
+dependencies = [
+ "core-foundation",
+ "core-foundation-sys",
+ "jni 0.22.4",
+ "log",
+ "once_cell",
+ "rustls",
+ "rustls-native-certs",
+ "rustls-platform-verifier-android",
+ "rustls-webpki",
+ "security-framework",
+ "security-framework-sys",
+ "webpki-root-certs 1.0.6",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6409,6 +6536,7 @@ version = "0.103.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df33b2b81ac578cabaf06b89b0631153a3f416b0a886e8a7a1707fb51abbd1ef"
 dependencies = [
+ "aws-lc-rs",
  "ring",
  "rustls-pki-types",
  "untrusted",
@@ -6464,7 +6592,7 @@ checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
  "chrono",
  "dyn-clone",
- "schemars_derive",
+ "schemars_derive 0.8.22",
  "serde",
  "serde_json",
  "uuid",
@@ -6490,6 +6618,7 @@ checksum = "a2b42f36aa1cd011945615b92222f6bf73c599a102a300334cd7f8dbeec726cc"
 dependencies = [
  "dyn-clone",
  "ref-cast",
+ "schemars_derive 1.2.1",
  "serde",
  "serde_json",
 ]
@@ -6499,6 +6628,18 @@ name = "schemars_derive"
 version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d115b50f4aaeea07e79c1912f645c7513d81715d0420f8bc77a18c6260b307f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7005,6 +7146,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "703d5c7ef118737c72f1af64ad2f6f8c5e1921f818cdcb97b8fe6fc69bf66214"
 
 [[package]]
+name = "simd_cesu8"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94f90157bb87cddf702797c5dadfa0be7d266cdf49e22da2fcaa32eff75b2c33"
+dependencies = [
+ "rustc_version 0.4.1",
+ "simdutf8",
+]
+
+[[package]]
+name = "simdutf8"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
 name = "siphasher"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7126,7 +7283,7 @@ dependencies = [
  "openapiv3",
  "progenitor",
  "regress 0.4.1",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sov-modules-api",
@@ -7193,7 +7350,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sov-db",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-api",
  "sov-rollup-interface",
  "tokio",
@@ -7274,7 +7431,7 @@ dependencies = [
  "schemars 0.8.22",
  "serde",
  "serde_json",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-macros",
  "sov-rollup-interface",
  "tendermint",
@@ -7312,7 +7469,7 @@ dependencies = [
  "directories",
  "futures",
  "hex",
- "reqwest",
+ "reqwest 0.12.28",
  "semver 1.0.27",
  "serde",
  "serde_json",
@@ -7350,7 +7507,7 @@ dependencies = [
  "serde",
  "serde_with",
  "sov-db-types",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-rollup-interface",
  "strum 0.26.3",
  "tempfile",
@@ -7426,7 +7583,7 @@ dependencies = [
  "sov-bank",
  "sov-eth-dev-signer",
  "sov-evm",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-api",
  "sov-modules-stf-blueprint",
  "sov-rest-utils",
@@ -7469,7 +7626,7 @@ dependencies = [
  "sov-bank",
  "sov-chain-state",
  "sov-kernels",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-api",
  "sov-rollup-interface",
  "sov-rpc-eth-types",
@@ -7511,7 +7668,7 @@ dependencies = [
  "sha3",
  "sov-address",
  "sov-bank",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-api",
  "sov-state",
  "strum 0.26.3",
@@ -7560,6 +7717,25 @@ dependencies = [
 [[package]]
 name = "sov-metrics"
 version = "0.3.0"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b#0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "derivative",
+ "derive-new",
+ "derive_more",
+ "hex",
+ "http",
+ "schemars 1.2.1",
+ "serde",
+ "tokio",
+ "tokio-metrics",
+ "tracing",
+]
+
+[[package]]
+name = "sov-metrics"
+version = "0.3.0"
 source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0#eaf746a0e8a193c67af8be6fa81226824e71bea0"
 dependencies = [
  "anyhow",
@@ -7597,7 +7773,7 @@ dependencies = [
  "proptest-derive 0.5.1",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
- "reqwest",
+ "reqwest 0.12.28",
  "schemars 0.8.22",
  "sea-orm",
  "serde",
@@ -7660,7 +7836,7 @@ dependencies = [
  "serde_yaml",
  "sha2 0.10.9",
  "sov-db",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-macros",
  "sov-rest-utils",
  "sov-rollup-interface",
@@ -7693,7 +7869,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-universal-wallet-macro-helpers",
  "syn 2.0.117",
  "toml",
@@ -7723,7 +7899,7 @@ dependencies = [
  "sov-cli",
  "sov-db",
  "sov-ledger-apis",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-api",
  "sov-modules-stf-blueprint",
  "sov-rollup-apis",
@@ -7750,7 +7926,7 @@ dependencies = [
  "jsonrpsee",
  "schemars 0.8.22",
  "serde",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-api",
  "sov-rollup-interface",
  "sov-state",
@@ -7767,7 +7943,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "futures",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sov-api-spec",
@@ -7840,13 +8016,13 @@ dependencies = [
 [[package]]
 name = "sov-proxy-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0#eaf746a0e8a193c67af8be6fa81226824e71bea0"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b#0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b"
 dependencies = [
  "anyhow",
  "async-trait",
- "reqwest",
+ "reqwest 0.13.4",
  "serde",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b)",
  "sqlx",
  "thiserror 2.0.18",
  "time",
@@ -8003,7 +8179,7 @@ dependencies = [
  "sov-db",
  "sov-full-node-configs",
  "sov-kernels",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-api",
  "sov-modules-stf-blueprint",
  "sov-rest-utils",
@@ -8062,7 +8238,7 @@ dependencies = [
  "serde_with",
  "sov-db",
  "sov-db-types",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-modules-macros",
  "sov-rollup-interface",
  "tracing",
@@ -8090,7 +8266,7 @@ dependencies = [
  "serde",
  "sov-db",
  "sov-full-node-configs",
- "sov-metrics",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
  "sov-rest-utils",
  "sov-rollup-interface",
  "strum 0.26.3",
@@ -8130,7 +8306,7 @@ dependencies = [
  "derive_more",
  "jsonschema",
  "num_cpus",
- "reqwest",
+ "reqwest 0.12.28",
  "rockbound",
  "schemars 0.8.22",
  "serde",
@@ -8814,7 +8990,7 @@ dependencies = [
  "memchr",
  "parse-display",
  "pin-project-lite",
- "reqwest",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "serde_with",

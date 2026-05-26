@@ -11,7 +11,7 @@ name = "node-discovery"
 path = "src/main.rs"
 
 [dependencies]
-sov-proxy-utils = { workspace = true }
+sov-proxy-utils = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b" }
 tokio = { workspace = true }
 clap = { workspace = true }
 tracing-subscriber = { workspace = true }
