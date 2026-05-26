@@ -4487,7 +4487,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=eaf746a0e8a193c67af8be6fa81226824e71bea0)",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=2a119d28b6406c613b868a40f4bda88921f9f006)",
  "sov-proxy-utils",
  "tokio",
  "tracing",
@@ -7717,7 +7717,7 @@ dependencies = [
 [[package]]
 name = "sov-metrics"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b#0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=2a119d28b6406c613b868a40f4bda88921f9f006#2a119d28b6406c613b868a40f4bda88921f9f006"
 dependencies = [
  "anyhow",
  "bincode",
@@ -8016,13 +8016,13 @@ dependencies = [
 [[package]]
 name = "sov-proxy-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b#0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=2a119d28b6406c613b868a40f4bda88921f9f006#2a119d28b6406c613b868a40f4bda88921f9f006"
 dependencies = [
  "anyhow",
  "async-trait",
  "reqwest 0.13.4",
  "serde",
- "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=0f9e6d5d22ac928cf40c55fbfef90f89c2fc812b)",
+ "sov-metrics 0.3.0 (git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=2a119d28b6406c613b868a40f4bda88921f9f006)",
  "sqlx",
  "thiserror 2.0.18",
  "time",
