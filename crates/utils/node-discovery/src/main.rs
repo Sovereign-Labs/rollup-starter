@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let args = Args::parse();
-    tracing::info!("Starting node discovery.");
+    tracing::info!("Starting node discovery service.");
 
     let (metrics_shutdown_sender, mut metrics_shutdown_receiver) = tokio::sync::watch::channel(());
     metrics_shutdown_receiver.mark_unchanged();
