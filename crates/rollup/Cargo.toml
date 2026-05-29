@@ -54,6 +54,7 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tracing-panic = "0.1.2"
 bytes = "1.7.2"
 rand = "0.8.5"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

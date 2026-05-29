@@ -56,6 +56,10 @@ struct Args {
 #[tokio::main]
 // Not returning a result here, so the error could be logged properly.
 async fn main() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls ring crypto provider");
+
     let args = Args::parse();
 
     let _guard = initialize_logging();
