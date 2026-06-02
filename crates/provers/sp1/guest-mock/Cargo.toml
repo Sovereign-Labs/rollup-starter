@@ -1,15 +1,15 @@
-[workspace]
-
 [package]
 name = "guest-mock-starter-sp1"
 version = "0.3.0"
 edition = "2021"
 resolver = "2"
 
+[workspace]
+
 [dependencies]
 anyhow = { version = "1.0.95" }
 sp1-zkvm = { version = "6.2.2" }
-serde = { version = "1.0.188", features = ["derive", "rc"] }
+
 sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f2a966a4756bdeeee885fc3174886791f501e3c6", features = ["evm"] }
 sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f2a966a4756bdeeee885fc3174886791f501e3c6" }
 sov-mock-da = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f2a966a4756bdeeee885fc3174886791f501e3c6" }
@@ -47,4 +47,10 @@ lto = true
 opt-level = 3
 
 [features]
-bench = ["sov-modules-api/bench", "sov-state/bench", "sov-modules-stf-blueprint/bench", "sov-metrics/sp1", "stf-starter/bench"]
+bench = [
+    "sov-modules-api/bench",
+    "sov-state/bench",
+    "sov-modules-stf-blueprint/bench",
+    "sov-metrics/sp1",
+    "stf-starter/bench"
+]
