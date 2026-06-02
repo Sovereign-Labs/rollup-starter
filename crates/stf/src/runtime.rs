@@ -104,19 +104,4 @@ where
             EvmAndEip712AuthenticatorInput::Standard(call) => call,
         }
     }
-
-    #[cfg(feature = "native")]
-    fn populate_pinned_cache(storage: &S::Storage) -> Option<sov_state::pinned_cache::PinnedCache> {
-        let buckets_and_limits =
-            sov_evm::Evm::<S>::default().get_pinned_cache_buckets_and_limits()?;
-        let mut pinned_cache = sov_state::pinned_cache::PinnedCache::default();
-        for (bucket_id, limit) in buckets_and_limits {
-            if let Err(e) =
-                pinned_cache.try_load_bucket_if_absent(bucket_id.clone(), storage, limit)
-            {
-                tracing::warn!(bucket_id = ?bucket_id, limit = ?limit, error = ?e, "EVM Failed to load bucket into pinned cache");
-            }
-        }
-        Some(pinned_cache)
-    }
 }

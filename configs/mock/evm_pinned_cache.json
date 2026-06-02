@@ -1,5 +1,3 @@
 {
-  "default_bucket_size_limit": 104857600,
-  "privileged_deployer_addresses": [],
-  "known_contracts_and_limits": {}
+  "preferred_sequencer_publish_reverted_txs": false
 }
