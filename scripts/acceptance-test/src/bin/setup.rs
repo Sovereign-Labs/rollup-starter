@@ -340,14 +340,14 @@ async fn do_manual_setup(
 
     let last_slot = slot_monitor.prev_slot_with_children.as_ref().unwrap();
     let mut slot_fetcher = SlotFetcher::new(client, &directories);
-    for slotnum in 0..first_subscribed_slot_number {
+    for slot_num in 0..first_subscribed_slot_number {
         let _slot = slot_fetcher
-            .fetch_and_compare_slot(slotnum, GetItemBehavior::SaveSnapshot)
+            .fetch_and_compare_slot(slot_num, GetItemBehavior::SaveSnapshot)
             .await?;
     }
-    for slotnum in first_subscribed_slot_number..=last_slot.number {
+    for slot_num in first_subscribed_slot_number..=last_slot.number {
         let _slot = slot_fetcher
-            .fetch_and_compare_slot(slotnum, GetItemBehavior::CheckAgainstSnapshot)
+            .fetch_and_compare_slot(slot_num, GetItemBehavior::CheckAgainstSnapshot)
             .await?;
     }
 
@@ -403,7 +403,7 @@ async fn do_manual_setup(
 
 /// Rename the `mock_da.sqlite` files to `persistent_mock_da.sqlite` so that they can be used across runs.
 /// We'll copy them back to `mock_da.sqlite` as part of the acceptance tests.
-fn save_mock_data(directories: Directories) -> Result<(), anyhow::Error> {
+fn save_mock_data(directories: Directories) -> anyhow::Result<()> {
     for input in ["mock_da.sqlite", "mock_da.sqlite-shm", "mock_da.sqlite-wal"] {
         let mut target = "persistent_".to_string();
         target.push_str(input);
@@ -413,30 +413,27 @@ fn save_mock_data(directories: Directories) -> Result<(), anyhow::Error> {
         ) {
             if input == "mock_da.sqlite" {
                 tracing::error!(
-                    "Failed to rename {} for persistence accross runs: {}",
+                    "Failed to rename {} for persistence across runs: {}",
                     input,
                     err
                 );
-                return Err(anyhow::anyhow!("Failed to rename {}: {}", input, err));
+                return Err(anyhow::anyhow!("Failed to rename {input}: {err}"));
             } else {
-                tracing::warn!(
-                    "Failed to rename {} for persistence accross runs: {}. Ignoring.",
-                    input,
-                    err
-                );
+                warn!("Failed to rename {input} for persistence across runs: {err}. Ignoring.",);
             }
         }
     }
     Ok(())
 }
 
-fn encode_and_sign_tx(msg: RuntimeCall<Spec>) -> Result<RawTx, anyhow::Error> {
+fn encode_and_sign_tx(msg: RuntimeCall<Spec>) -> anyhow::Result<RawTx> {
     let utx = UnsignedTransaction::<Runtime, Spec>::new(
         msg,
         config_value!("CHAIN_ID"),
         PriorityFeeBips(0),
         Amount::new(100_000_000),
         UniquenessData::Generation(0),
+        None,
         None,
     );
     let priv_key: <<Spec as SpecT>::CryptoSpec as CryptoSpec>::PrivateKey = serde_json::from_str(
