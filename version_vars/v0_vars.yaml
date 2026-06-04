@@ -1,5 +1,4 @@
 ---
 # Version v0 overrides.
 # Build of the rollup compiled with STATE_VERSION = 0 (pre-fork / existing chain).
-# TODO: set to the v0 build commit hash after committing it.
-rollup_commit_hash: "TODO_V0_COMMIT_HASH"
+rollup_commit_hash: "c8126ab1307a2074d7705dc186a114b50802b2a7"
