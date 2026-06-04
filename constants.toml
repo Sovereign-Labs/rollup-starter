@@ -14,7 +14,7 @@ CHAIN_NAME = "Relay-Dev"
 # This must match the `sov_chain_state::state_version` value in the current on-disk state. The compiled
 # rollup will refuse to run if there is a mismatch.
 # Increment this whenever an SDK upgrade requires an out-of-band state migration.
-STATE_VERSION = 0
+STATE_VERSION = 1
 
 # Chain hash overrides by rollup block height range.
 CHAIN_HASH_OVERRIDES = [ ]

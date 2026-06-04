@@ -27,7 +27,7 @@
     "inner_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
     "outer_code_commitment": [0, 0, 0, 0, 0, 0, 0, 0],
     "genesis_da_height": 9271962,
-    "state_version": 0
+    "state_version": 1
   },
   "paymaster": {
     "payers": [
