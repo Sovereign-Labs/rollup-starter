@@ -10,6 +10,12 @@ freeze = [1, 1]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
 CHAIN_ID = 537724
 CHAIN_NAME = "Relay-Dev"
+# The global on-chain Sovereign state version expected by this binary.
+# This must match the `sov_chain_state::state_version` value in the current on-disk state. The compiled
+# rollup will refuse to run if there is a mismatch.
+# Increment this whenever an SDK upgrade requires an out-of-band state migration.
+STATE_VERSION = 0
+
 # Chain hash overrides by rollup block height range.
 CHAIN_HASH_OVERRIDES = [ ]
 
@@ -57,6 +63,9 @@ UNREGISTERED_BLOBS_PER_SLOT = 5
 # The default recommendation for users is to use a timestamp in milliseconds for submitting transactions,
 # so keeping the last 5000 generations valid translates to 5 seconds of transaction reordering
 PAST_TRANSACTION_GENERATIONS = 5000
+# The size of the per-credential sliding window (in nonces) used by the nonce-uniqueness
+# check (sov-uniqueness). Must be greater than 7 and less than 65536.
+PAST_TRANSACTIONS_WINDOW = { const = 1_000 }
 # The maximum number of transactions hashes we remember per credential.
 # Higher numbers allow accounts to send more transactions without updating their generation number.
 # This is more user friendly for power users, but increases the worst case cost of the uniqueness check.
@@ -124,6 +133,10 @@ PROCESS_TX_PRE_EXEC_GAS_PER_TX_BYTE = [1, 1]
 # The cost of deserializing a message using Borsh
 DEFAULT_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 BIAS_BORSH_DESERIALIZATION = [1, 1]
+# Per-byte cost charged inside `MeteredReader` and upfront against opaque payloads.
+BORSH_PER_BYTE_READ = [1, 1]
+# Per-read fixed cost charged inside `MeteredReader`.
+BORSH_PER_READ_BIAS = [0, 0]
 
 # The cost of deserializing a tx using Borsh
 TX_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
@@ -151,10 +164,8 @@ GAS_TO_CHARGE_PER_PROOF_BYTE = [1, 1]
 FIXED_GAS_TO_CHARGE_PER_PROOF = [100, 100]
 
 # --- Gas fee adjustment parameters: See https://eips.ethereum.org/EIPS/eip-1559 for a detailed description ---
-# The initial gas limit of the rollup.
-INITIAL_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
-UPDATED_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
-CHANGE_GAS_LIMIT_AFTER_HEIGHT = 9223372036854775807
+# The gas limit of each rollup block.
+BLOCK_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
 
 # The initial "base fee" that every transaction emits when executed.
 INITIAL_BASE_FEE_PER_GAS = [10, 10]

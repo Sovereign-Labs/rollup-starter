@@ -1,0 +1,5 @@
+---
+# Version v1 overrides.
+# Build of the rollup compiled with STATE_VERSION = 1 (post-migration).
+# TODO: set to the v1 build commit hash after committing it.
+rollup_commit_hash: "TODO_V1_COMMIT_HASH"

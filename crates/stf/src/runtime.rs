@@ -30,6 +30,27 @@ pub struct Runtime<S: Spec>(pub(crate) RuntimeInner<S>)
 where
     <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>;
 
+// Expose the inner runtime's modules (e.g. `accounts`, `chain_state`) to other crates
+// such as the `rollup-db-migration` binary, which needs `&mut` access to run migrations.
+impl<S: Spec> std::ops::Deref for Runtime<S>
+where
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    type Target = RuntimeInner<S>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<S: Spec> std::ops::DerefMut for Runtime<S>
+where
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl<S: Spec> SchemaProvider for Runtime<S>
 where
     S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
@@ -103,32 +124,5 @@ where
             EvmAndEip712AuthenticatorInput::Eip712(call) => call,
             EvmAndEip712AuthenticatorInput::Standard(call) => call,
         }
-    }
-
-    #[cfg(feature = "native")]
-    fn populate_pinned_cache(storage: &S::Storage) -> Option<sov_state::pinned_cache::PinnedCache> {
-        let buckets_and_limits =
-            sov_evm::Evm::<S>::default().get_pinned_cache_buckets_and_limits()?;
-        let mut pinned_cache = sov_state::pinned_cache::PinnedCache::default();
-        for (bucket_id, limit) in buckets_and_limits {
-            if let Err(e) =
-                pinned_cache.try_load_bucket_if_absent(bucket_id.clone(), storage, limit)
-            {
-                tracing::warn!(bucket_id = ?bucket_id, limit = ?limit, error = ?e, "EVM Failed to load bucket into pinned cache");
-            }
-        }
-        Some(pinned_cache)
-    }
-
-    #[cfg(feature = "native")]
-    fn resolve_address<ST: sov_modules_api::StateReader<sov_modules_api::User>>(
-        &self,
-        default_address: &S::Address,
-        credential_id: &sov_modules_api::CredentialId,
-        state: &mut ST,
-    ) -> Result<S::Address, ST::Error> {
-        self.0
-            .accounts
-            .resolve_sender_address_read_only(default_address, credential_id, state)
     }
 }

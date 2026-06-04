@@ -9,10 +9,7 @@ mod mock_zkvm {
         Arc::new(())
     }
 
-    pub fn create_inner_vm_from_config(
-        _prover_config: sov_stf_runner::processes::RollupProverConfig<Zkvm>,
-    ) -> ZkvmHost {
-        // Mock zkvm doesn't need the ELF from prover config
+    pub async fn create_inner_vm() -> ZkvmHost {
         ZkvmHost::new()
     }
 
@@ -21,13 +18,13 @@ mod mock_zkvm {
 
 #[cfg(feature = "mock_zkvm")]
 pub use mock_zkvm::{
-    create_inner_vm_from_config, rollup_host_args, Hasher, Zkvm as InnerZkvm,
-    ZkvmHost as InnerZkvmHost,
+    create_inner_vm, rollup_host_args, Hasher, Zkvm as InnerZkvm, ZkvmHost as InnerZkvmHost,
 };
 
 pub use sov_mock_zkvm::MockZkvm as OuterZkvm;
 pub use sov_mock_zkvm::MockZkvmHost as OuterZkvmHost;
+use sov_rollup_interface::zk::aggregated_proof::SerializedAggregatedProof;
 
-pub fn get_outer_vm() -> OuterZkvmHost {
-    OuterZkvmHost::new_non_blocking()
+pub fn get_outer_vm(previous_outer_proof: Option<SerializedAggregatedProof>) -> OuterZkvmHost {
+    OuterZkvmHost::new_non_blocking_with_previous_outer_proof(previous_outer_proof)
 }

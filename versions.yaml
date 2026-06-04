@@ -1,0 +1,24 @@
+---
+# Multi-version rollup specification.
+# Consumed by rollup-starter-ansible to build and select the rollup binary for
+# each block-height range, enabling coordinated hard-fork upgrades.
+#
+# Fork plan (multisig upgrade):
+#   v0  -> STATE_VERSION = 0, runs from genesis up to and including `stop_height`.
+#   (at the boundary the operator stops v0, runs the `rollup-db-migration`
+#    binary to migrate on-disk state 0 -> 1, then starts v1)
+#   v1  -> STATE_VERSION = 1, runs from `start_height` onward.
+rollup_versions:
+  - version_id: "v0"
+    ansible_commit: "cdk-deployment-april-2026"
+    vars_file: "version_vars/v0_vars.yaml"
+    start_height: null
+    stop_height: 510
+    migration_path: null
+
+  - version_id: "v1"
+    ansible_commit: "nikolai/updates-for-multisig-upgrade"
+    vars_file: "version_vars/v1_vars.yaml"
+    start_height: 511
+    stop_height: null
+    migration_path: null
