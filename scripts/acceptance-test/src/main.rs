@@ -6,7 +6,7 @@ use acceptance_test::{
     prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, shutdown_error,
     sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown, write_manager_config,
     AcceptanceRunPlan, CommonArgs, Directories, LocalConstantsManifest, PostgresContainerGuard,
-    ResolvedRunSettings, ShutdownReceiver, SoakRunOptions, API_URL,
+    ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions, API_URL,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use anyhow::Context;
@@ -288,8 +288,15 @@ async fn run_test(
             )?;
         let previous_throughput = previous_throughput_report.throughput();
         let new_throughput = new_throughput_report.throughput();
-        if new_throughput < (previous_throughput * 0.9) {
-            anyhow::bail!("Throughput is less than 90% of the previous throughput. This is likely due to a bug in the rollup. Old throughput: {:.2} txs/slot, new throughput: {:.2} txs/slot", previous_throughput, new_throughput);
+        let min_throughput_ratio = throughput_regression_min_ratio(settings.profile);
+        if new_throughput < (previous_throughput * min_throughput_ratio) {
+            anyhow::bail!(
+                "Throughput is less than {:.0}% of the previous throughput for the {:?} profile. This is likely due to a bug in the rollup. Old throughput: {:.2} txs/slot, new throughput: {:.2} txs/slot",
+                min_throughput_ratio * 100.0,
+                settings.profile,
+                previous_throughput,
+                new_throughput
+            );
         }
     }
 
@@ -322,6 +329,13 @@ fn throughput_check_enabled(args: &Args) -> bool {
     !args.no_throughput_check
 }
 
+fn throughput_regression_min_ratio(profile: RunProfile) -> f64 {
+    match profile {
+        RunProfile::Full => 0.9,
+        RunProfile::Short => 0.7,
+    }
+}
+
 #[derive(Parser, Debug)]
 struct Args {
     #[command(flatten)]
@@ -348,5 +362,15 @@ mod tests {
         let args = Args::try_parse_from(["acceptance-test", "--no-throughput-check"]).unwrap();
 
         assert!(!throughput_check_enabled(&args));
+    }
+
+    #[test]
+    fn full_profile_uses_strict_throughput_threshold() {
+        assert_eq!(throughput_regression_min_ratio(RunProfile::Full), 0.9);
+    }
+
+    #[test]
+    fn short_profile_uses_lenient_throughput_threshold() {
+        assert_eq!(throughput_regression_min_ratio(RunProfile::Short), 0.7);
     }
 }
