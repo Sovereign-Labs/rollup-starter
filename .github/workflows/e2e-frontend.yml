@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build-rollup:
     name: "Build Rollup"
-    runs-on: namespace-profile-sov-ubuntu-24-04-amd64-16x64-test-300gb-1-93;container.privileged=true;container.host-pid-namespace=true;overrides.cache-tag=starter-e2e-frontend
+    runs-on: namespace-profile-sov-ubuntu-24-04-amd64-16x64-rust-1-93-v20260602;container.privileged=true;container.host-pid-namespace=true;overrides.cache-tag=starter-e2e-frontend
     steps:
       - uses: actions/checkout@v4
 
