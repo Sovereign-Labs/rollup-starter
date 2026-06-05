@@ -9,6 +9,7 @@ use acceptance_test::{
     ResolvedRunSettings, ShutdownReceiver, SoakRunOptions, API_URL,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
+use anyhow::Context;
 use chrono::Utc;
 use clap::Parser;
 use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
@@ -60,29 +61,52 @@ fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Er
     tracing::info!("Copying persistent mock data back to mock_da.sqlite");
     // Clean up any files from any previous runs. This is needed particularly for the shm and wal
     // files since they may not get overwritten by a copy, but we do all three for consistency.
-    std::fs::remove_file(directories.output_dir.join("mock_da.sqlite"))
-        .or_else(ignore_file_not_found)?;
-    std::fs::remove_file(directories.output_dir.join("mock_da.sqlite-shm"))
-        .or_else(ignore_file_not_found)?;
-    std::fs::remove_file(directories.output_dir.join("mock_da.sqlite-wal"))
-        .or_else(ignore_file_not_found)?;
+    for stale_file in [
+        directories.output_dir.join("mock_da.sqlite"),
+        directories.output_dir.join("mock_da.sqlite-shm"),
+        directories.output_dir.join("mock_da.sqlite-wal"),
+    ] {
+        std::fs::remove_file(&stale_file)
+            .or_else(ignore_file_not_found)
+            .with_context(|| {
+                format!(
+                    "failed to remove stale mock DA file {}",
+                    stale_file.display()
+                )
+            })?;
+    }
 
     // Then copy the base file, always
-    std::fs::copy(
-        directories.output_dir.join("persistent_mock_da.sqlite"),
-        directories.output_dir.join("mock_da.sqlite"),
-    )?;
+    let persistent_mock_da = directories.output_dir.join("persistent_mock_da.sqlite");
+    let mock_da = directories.output_dir.join("mock_da.sqlite");
+    std::fs::copy(&persistent_mock_da, &mock_da).with_context(|| {
+        format!(
+            "failed to copy persistent mock DA database from {} to {}",
+            persistent_mock_da.display(),
+            mock_da.display()
+        )
+    })?;
     // And the dangling wal and shm only if they exist
-    std::fs::copy(
-        directories.output_dir.join("persistent_mock_da.sqlite-shm"),
-        directories.output_dir.join("mock_da.sqlite-shm"),
-    )
-    .or_else(ignore_file_not_found)?;
-    std::fs::copy(
-        directories.output_dir.join("persistent_mock_da.sqlite-wal"),
-        directories.output_dir.join("mock_da.sqlite-wal"),
-    )
-    .or_else(ignore_file_not_found)?;
+    for (persistent_sidecar, mock_da_sidecar) in [
+        (
+            directories.output_dir.join("persistent_mock_da.sqlite-shm"),
+            directories.output_dir.join("mock_da.sqlite-shm"),
+        ),
+        (
+            directories.output_dir.join("persistent_mock_da.sqlite-wal"),
+            directories.output_dir.join("mock_da.sqlite-wal"),
+        ),
+    ] {
+        std::fs::copy(&persistent_sidecar, &mock_da_sidecar)
+            .or_else(ignore_file_not_found)
+            .with_context(|| {
+                format!(
+                    "failed to copy persistent mock DA sidecar from {} to {}",
+                    persistent_sidecar.display(),
+                    mock_da_sidecar.display()
+                )
+            })?;
+    }
 
     tracing::info!("Persistent mock data copied back to mock_da.sqlite");
     Ok(())
@@ -245,9 +269,23 @@ async fn run_test(
     )
     .await?;
     if throughput_check {
-        let previous_throughput_report: ThroughputReport = serde_json::from_str::<ThroughputReport>(
-            &std::fs::read_to_string(directories.throughput_dir.join(SETUP_THROUGHPUT_FILE))?,
-        )?;
+        let throughput_baseline_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
+        let previous_throughput_contents =
+            std::fs::read_to_string(&throughput_baseline_path).with_context(|| {
+                format!(
+                    "failed to read setup throughput baseline at {}. Run `setup` with the same profile or pass `--no-throughput-check`",
+                    throughput_baseline_path.display()
+                )
+            })?;
+        let previous_throughput_report: ThroughputReport =
+            serde_json::from_str::<ThroughputReport>(&previous_throughput_contents).with_context(
+                || {
+                    format!(
+                        "failed to parse setup throughput baseline {}",
+                        throughput_baseline_path.display()
+                    )
+                },
+            )?;
         let previous_throughput = previous_throughput_report.throughput();
         let new_throughput = new_throughput_report.throughput();
         if new_throughput < (previous_throughput * 0.9) {
@@ -258,10 +296,17 @@ async fn run_test(
     // Save throughput report with timestamp to keep a record of test runs
     let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
     let throughput_filename = format!("test_throughput_{}.json", timestamp);
+    let throughput_path = directories.throughput_dir.join(&throughput_filename);
     std::fs::write(
-        directories.throughput_dir.join(&throughput_filename),
+        &throughput_path,
         serde_json::to_string(&new_throughput_report)?,
-    )?;
+    )
+    .with_context(|| {
+        format!(
+            "failed to write throughput report {}",
+            throughput_path.display()
+        )
+    })?;
     info!("Saved throughput report to {}", throughput_filename);
     if settings.cleanup_rollup_state_on_success() {
         cleanup_rollup_state_dir(&directories.rollup_data_path)?;

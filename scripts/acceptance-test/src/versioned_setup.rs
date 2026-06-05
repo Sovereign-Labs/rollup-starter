@@ -119,8 +119,10 @@ fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<Resolve
         }]);
     }
 
-    let spec_contents = fs::read_to_string(&spec_path)?;
-    let spec: VersionSpecRoot = serde_yaml::from_str(&spec_contents)?;
+    let spec_contents = fs::read_to_string(&spec_path)
+        .with_context(|| format!("failed to read versions spec {}", spec_path.display()))?;
+    let spec: VersionSpecRoot = serde_yaml::from_str(&spec_contents)
+        .with_context(|| format!("failed to parse versions spec {}", spec_path.display()))?;
     let spec_dir = spec_path
         .parent()
         .ok_or_else(|| anyhow!("versions spec has no parent path"))?;
@@ -263,7 +265,17 @@ fn build_local_head_binaries(
         }
     };
 
-    Ok((rollup_bin.canonicalize()?, soak_bin.canonicalize()?))
+    Ok((
+        rollup_bin.canonicalize().with_context(|| {
+            format!(
+                "failed to canonicalize rollup binary {}",
+                rollup_bin.display()
+            )
+        })?,
+        soak_bin.canonicalize().with_context(|| {
+            format!("failed to canonicalize soak binary {}", soak_bin.display())
+        })?,
+    ))
 }
 
 fn render_config_template(
@@ -285,9 +297,19 @@ fn render_config_template(
 
 fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, anyhow::Error> {
     if manager_build_root.exists() {
-        fs::remove_dir_all(manager_build_root)?;
+        fs::remove_dir_all(manager_build_root).with_context(|| {
+            format!(
+                "failed to remove existing rollup manager build directory {}",
+                manager_build_root.display()
+            )
+        })?;
     }
-    fs::create_dir_all(manager_build_root)?;
+    fs::create_dir_all(manager_build_root).with_context(|| {
+        format!(
+            "failed to create rollup manager build directory {}",
+            manager_build_root.display()
+        )
+    })?;
     let manager_repo = manager_build_root.join("repo");
     let manager_repo_arg = manager_repo.to_string_lossy().to_string();
 
@@ -321,7 +343,12 @@ fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, any
             manager_bin.display()
         ));
     }
-    Ok(manager_bin.canonicalize()?)
+    Ok(manager_bin.canonicalize().with_context(|| {
+        format!(
+            "failed to canonicalize built manager binary {}",
+            manager_bin.display()
+        )
+    })?)
 }
 
 pub fn prepare_acceptance_run_plan(
@@ -344,7 +371,12 @@ pub fn prepare_acceptance_run_plan_with_constants(
     local_constants_manifest: LocalConstantsManifest,
 ) -> Result<AcceptanceRunPlan, anyhow::Error> {
     let binary_cache_dir = &directories.rollup_build_cache_dir;
-    fs::create_dir_all(binary_cache_dir)?;
+    fs::create_dir_all(binary_cache_dir).with_context(|| {
+        format!(
+            "failed to create rollup binary cache directory {}",
+            binary_cache_dir.display()
+        )
+    })?;
 
     let resolved_versions = load_version_sources(directories)?;
     let remote_commits: Vec<String> = resolved_versions
@@ -388,7 +420,12 @@ pub fn prepare_acceptance_run_plan_with_constants(
         build_local_head_binaries(directories, local_constants_manifest)?;
 
     let versioned_configs_dir = directories.output_dir.join("versioned-configs");
-    fs::create_dir_all(&versioned_configs_dir)?;
+    fs::create_dir_all(&versioned_configs_dir).with_context(|| {
+        format!(
+            "failed to create versioned config directory {}",
+            versioned_configs_dir.display()
+        )
+    })?;
 
     let mut manager_versions = Vec::with_capacity(resolved_versions.len());
     let mut soak_versions = Vec::with_capacity(resolved_versions.len());
@@ -428,14 +465,32 @@ pub fn prepare_acceptance_run_plan_with_constants(
                         } else {
                             directories.rollup_root.join(path)
                         };
-                        Some(migration_path.canonicalize()?)
+                        Some(migration_path.canonicalize().with_context(|| {
+                            format!(
+                                "failed to canonicalize migration path {} for remote commit {}",
+                                migration_path.display(),
+                                commit
+                            )
+                        })?)
                     } else {
                         None
                     };
 
                     (
-                        artifacts.rollup_binary.canonicalize()?,
-                        soak_binary.canonicalize()?,
+                        artifacts.rollup_binary.canonicalize().with_context(|| {
+                            format!(
+                                "failed to canonicalize rollup binary artifact {} for remote commit {}",
+                                artifacts.rollup_binary.display(),
+                                commit
+                            )
+                        })?,
+                        soak_binary.canonicalize().with_context(|| {
+                            format!(
+                                "failed to canonicalize soak binary artifact {} for remote commit {}",
+                                soak_binary.display(),
+                                commit
+                            )
+                        })?,
                         config_template,
                         migration_path,
                     )
@@ -447,17 +502,27 @@ pub fn prepare_acceptance_run_plan_with_constants(
                         } else {
                             directories.rollup_root.join(path)
                         };
-                        Some(migration_path.canonicalize()?)
+                        Some(migration_path.canonicalize().with_context(|| {
+                            format!(
+                                "failed to canonicalize local migration path {}",
+                                migration_path.display()
+                            )
+                        })?)
                     } else {
                         None
                     };
 
+                    let config_template_path =
+                        directories.acceptance_test_dir.join("rollup_config.toml");
                     (
                         local_rollup_bin.clone(),
                         local_soak_bin.clone(),
-                        fs::read_to_string(
-                            directories.acceptance_test_dir.join("rollup_config.toml"),
-                        )?,
+                        fs::read_to_string(&config_template_path).with_context(|| {
+                            format!(
+                                "failed to read local rollup config template {}",
+                                config_template_path.display()
+                            )
+                        })?,
                         migration_path,
                     )
                 }
@@ -465,7 +530,12 @@ pub fn prepare_acceptance_run_plan_with_constants(
 
         let interpolated = render_config_template(&config_template_content, password, directories);
         let config_path = versioned_configs_dir.join(format!("config_{}.toml", idx));
-        fs::write(&config_path, interpolated)?;
+        fs::write(&config_path, interpolated).with_context(|| {
+            format!(
+                "failed to write rendered versioned rollup config {}",
+                config_path.display()
+            )
+        })?;
 
         manager_versions.push(RollupVersion {
             rollup_binary,
@@ -512,12 +582,18 @@ pub fn extend_last_stop_height(
 
 pub fn write_manager_config(path: &Path, versions: &[RollupVersion]) -> Result<(), anyhow::Error> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create rollup manager config directory {}",
+                parent.display()
+            )
+        })?;
     }
     let manager_config = ManagerConfig {
         versions: versions.to_vec(),
     };
-    fs::write(path, serde_json::to_string_pretty(&manager_config)?)?;
+    fs::write(path, serde_json::to_string_pretty(&manager_config)?)
+        .with_context(|| format!("failed to write rollup manager config {}", path.display()))?;
     Ok(())
 }
 
@@ -571,10 +647,22 @@ pub fn spawn_rollup_manager(
 
     if let Some(path) = stdout_log_path {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            fs::create_dir_all(parent).with_context(|| {
+                format!(
+                    "failed to create rollup manager log directory {}",
+                    parent.display()
+                )
+            })?;
         }
-        let log_file = std::fs::File::create(path)?;
-        cmd.stdout(log_file.try_clone()?).stderr(log_file);
+        let log_file = std::fs::File::create(path)
+            .with_context(|| format!("failed to create rollup manager log {}", path.display()))?;
+        cmd.stdout(log_file.try_clone().with_context(|| {
+            format!(
+                "failed to clone rollup manager log handle {}",
+                path.display()
+            )
+        })?)
+        .stderr(log_file);
     }
 
     let child = cmd.spawn().with_context(|| {

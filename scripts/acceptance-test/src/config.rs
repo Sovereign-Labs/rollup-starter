@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use clap::{Args, ValueEnum};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -123,10 +123,22 @@ pub fn prepare_rollup_state_dir(
             }
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            fs::create_dir_all(path)?;
+            fs::create_dir_all(path).with_context(|| {
+                format!(
+                    "failed to create missing rollup state directory {}",
+                    path.display()
+                )
+            })?;
             return Ok(());
         }
-        Err(e) => return Err(e.into()),
+        Err(e) => {
+            return Err(e).with_context(|| {
+                format!(
+                    "failed to inspect rollup state directory {}",
+                    path.display()
+                )
+            });
+        }
     }
 
     match policy {
@@ -135,7 +147,8 @@ pub fn prepare_rollup_state_dir(
         ExistingRollupState::Ignore => {}
     }
 
-    fs::create_dir_all(path)?;
+    fs::create_dir_all(path)
+        .with_context(|| format!("failed to create rollup state directory {}", path.display()))?;
     Ok(())
 }
 
@@ -150,27 +163,47 @@ pub fn cleanup_rollup_state_dir(path: &Path) -> Result<(), anyhow::Error> {
             }
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(e.into()),
+        Err(e) => {
+            return Err(e).with_context(|| {
+                format!(
+                    "failed to inspect rollup state directory {}",
+                    path.display()
+                )
+            });
+        }
     }
 
     clear_directory(path)
 }
 
 fn clear_directory(path: &Path) -> Result<(), anyhow::Error> {
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
+    for entry in fs::read_dir(path)
+        .with_context(|| format!("failed to read directory {}", path.display()))?
+    {
+        let entry = entry
+            .with_context(|| format!("failed to read entry in directory {}", path.display()))?;
         let entry_path = entry.path();
-        if entry.file_type()?.is_dir() {
-            fs::remove_dir_all(&entry_path)?;
+        if entry
+            .file_type()
+            .with_context(|| format!("failed to inspect directory entry {}", entry_path.display()))?
+            .is_dir()
+        {
+            fs::remove_dir_all(&entry_path)
+                .with_context(|| format!("failed to remove directory {}", entry_path.display()))?;
         } else {
-            fs::remove_file(&entry_path)?;
+            fs::remove_file(&entry_path)
+                .with_context(|| format!("failed to remove file {}", entry_path.display()))?;
         }
     }
     Ok(())
 }
 
 fn ensure_directory_empty(path: &Path) -> Result<(), anyhow::Error> {
-    if fs::read_dir(path)?.next().is_some() {
+    if let Some(entry) = fs::read_dir(path)
+        .with_context(|| format!("failed to read rollup state directory {}", path.display()))?
+        .next()
+    {
+        entry.with_context(|| format!("failed to read entry in directory {}", path.display()))?;
         return Err(anyhow!(
             "Rollup state directory {} is not empty. Re-run with --on-existing-rollup-state=clobber or --on-existing-rollup-state=ignore to proceed.",
             path.display()

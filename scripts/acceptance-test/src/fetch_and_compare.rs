@@ -1,5 +1,6 @@
 use sov_api_spec::types::{self, GetBatchByIdChildren, GetSlotByIdChildren, LedgerBatch, Slot};
 
+use anyhow::Context;
 use futures::stream::BoxStream;
 use serde_json::Value;
 use sov_rollup_interface::node::ledger_api::IncludeChildren;
@@ -98,7 +99,8 @@ pub fn save_slot_snapshot(slot: &Slot, output_dir: &Path) -> Result<(), anyhow::
     let filename = format!("slot_{:04}_with_children.json", slot.number);
     let filepath = output_dir.join(&filename);
 
-    std::fs::write(&filepath, snapshot_json)?;
+    std::fs::write(&filepath, snapshot_json)
+        .with_context(|| format!("failed to write slot snapshot {}", filepath.display()))?;
 
     Ok(())
 }

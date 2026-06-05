@@ -279,7 +279,7 @@ pub struct Directories {
 
 impl Directories {
     pub fn from_settings(settings: &ResolvedRunSettings) -> Result<Self, anyhow::Error> {
-        let cwd = std::env::current_dir()?;
+        let cwd = std::env::current_dir().context("failed to read current working directory")?;
         let acceptance_test_dir = env::var("CARGO_MANIFEST_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("."));
@@ -290,7 +290,7 @@ impl Directories {
         settings: &ResolvedRunSettings,
         acceptance_test_dir: PathBuf,
     ) -> Result<Self, anyhow::Error> {
-        let cwd = std::env::current_dir()?;
+        let cwd = std::env::current_dir().context("failed to read current working directory")?;
         Self::from_settings_with_acceptance_dir_and_cwd(settings, acceptance_test_dir, cwd)
     }
 
@@ -324,7 +324,12 @@ impl Directories {
         } else {
             acceptance_test_dir.join("rollup-build-cache")
         };
-        fs::create_dir_all(&rollup_build_cache_dir)?;
+        fs::create_dir_all(&rollup_build_cache_dir).with_context(|| {
+            format!(
+                "failed to create rollup build cache directory {}",
+                rollup_build_cache_dir.display()
+            )
+        })?;
         let manager_build_dir = acceptance_test_dir.join("rollup-manager-build");
 
         let output_root = if let Some(path) = settings.acceptance_data_dir.clone() {
@@ -333,14 +338,24 @@ impl Directories {
             acceptance_test_dir.join("acceptance-test-data")
         };
         let output_dir = output_root.join(settings.profile.subdir());
-        fs::create_dir_all(&output_dir)?;
+        fs::create_dir_all(&output_dir).with_context(|| {
+            format!(
+                "failed to create acceptance test data directory {}",
+                output_dir.display()
+            )
+        })?;
         let rollup_data_path = if let Some(path) = settings.rollup_state_dir.clone() {
             absolutize_from_cwd(path, &cwd)
         } else {
             output_dir.join("rollup-starter-data")
         };
         let snapshots_dir = output_dir.join("snapshots");
-        fs::create_dir_all(&snapshots_dir)?;
+        fs::create_dir_all(&snapshots_dir).with_context(|| {
+            format!(
+                "failed to create acceptance snapshot directory {}",
+                snapshots_dir.display()
+            )
+        })?;
 
         let throughput_root = if let Some(path) = settings.acceptance_throughput_dir.clone() {
             absolutize_from_cwd(path, &cwd)
@@ -348,7 +363,12 @@ impl Directories {
             acceptance_test_dir.join("acceptance-throughput")
         };
         let throughput_dir = throughput_root.join(settings.profile.subdir());
-        fs::create_dir_all(&throughput_dir)?;
+        fs::create_dir_all(&throughput_dir).with_context(|| {
+            format!(
+                "failed to create acceptance throughput directory {}",
+                throughput_dir.display()
+            )
+        })?;
 
         Ok(Self {
             rollup_root,

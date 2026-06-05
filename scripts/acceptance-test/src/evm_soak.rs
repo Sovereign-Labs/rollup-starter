@@ -161,12 +161,21 @@ fn write_state_consistency_metadata(
             .collect(),
     };
     let metadata_path = state_consistency_metadata_path(directories);
-    fs::create_dir_all(
-        metadata_path
-            .parent()
-            .ok_or_else(|| anyhow!("Invalid metadata path"))?,
-    )?;
-    fs::write(metadata_path, serde_json::to_string_pretty(&metadata)?)?;
+    let metadata_parent = metadata_path
+        .parent()
+        .ok_or_else(|| anyhow!("Invalid metadata path"))?;
+    fs::create_dir_all(metadata_parent).with_context(|| {
+        format!(
+            "failed to create EVM metadata directory {}",
+            metadata_parent.display()
+        )
+    })?;
+    fs::write(&metadata_path, serde_json::to_string_pretty(&metadata)?).with_context(|| {
+        format!(
+            "failed to write EVM state consistency metadata {}",
+            metadata_path.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -179,9 +188,18 @@ pub fn load_state_consistency_contracts(
     directories: &Directories,
 ) -> anyhow::Result<StateConsistencyContracts> {
     let metadata_path = state_consistency_metadata_path(directories);
-    let raw = fs::read_to_string(&metadata_path)
-        .with_context(|| format!("Missing {}", metadata_path.display()))?;
-    let metadata: StateConsistencyMetadata = serde_json::from_str(&raw)?;
+    let raw = fs::read_to_string(&metadata_path).with_context(|| {
+        format!(
+            "failed to read EVM state consistency metadata {}. Run `setup` with the same profile first",
+            metadata_path.display()
+        )
+    })?;
+    let metadata: StateConsistencyMetadata = serde_json::from_str(&raw).with_context(|| {
+        format!(
+            "failed to parse EVM state consistency metadata {}",
+            metadata_path.display()
+        )
+    })?;
     let pinned = metadata
         .pinned_addresses
         .iter()
@@ -208,12 +226,22 @@ pub fn ensure_evm_pinned_cache_config(directories: &Directories) -> anyhow::Resu
     let config = if config_path.exists() {
         let raw = fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read {}", config_path.display()))?;
-        serde_json::from_str::<EvmPinnedCacheConfig>(&raw)?
+        serde_json::from_str::<EvmPinnedCacheConfig>(&raw).with_context(|| {
+            format!(
+                "failed to parse EVM pinned cache config {}",
+                config_path.display()
+            )
+        })?
     } else {
         EvmPinnedCacheConfig::default()
     };
 
-    fs::write(config_path, serde_json::to_string_pretty(&config)?)?;
+    fs::write(&config_path, serde_json::to_string_pretty(&config)?).with_context(|| {
+        format!(
+            "failed to write EVM pinned cache config {}",
+            config_path.display()
+        )
+    })?;
     Ok(())
 }
 
