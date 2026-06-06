@@ -343,12 +343,12 @@ fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, any
             manager_bin.display()
         ));
     }
-    Ok(manager_bin.canonicalize().with_context(|| {
+    manager_bin.canonicalize().with_context(|| {
         format!(
             "failed to canonicalize built manager binary {}",
             manager_bin.display()
         )
-    })?)
+    })
 }
 
 pub fn prepare_acceptance_run_plan(
