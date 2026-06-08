@@ -50,6 +50,7 @@ pub const API_ADDR: &str = "127.0.0.1:12348";
 pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
+const ROLLUP_SLOT_STREAM_CLOSE_WAIT_TIMEOUT: Duration = Duration::from_secs(5);
 const TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT: Duration = Duration::from_secs(90);
 const EVM_SOAK_SAFETY_STOP_BLOCKS: u64 = 20;
 
@@ -1014,6 +1015,83 @@ async fn grow_nomt_buckets_and_start_next_rollup(
     Ok(rollup)
 }
 
+enum RollupSegmentCompletion {
+    Finished,
+    Restarted(ManagedRollupProcess),
+}
+
+async fn handle_completed_rollup_segment(
+    exit_status: std::process::ExitStatus,
+    nomt_bucket_growth: Option<&NomtBucketGrowthConfig>,
+    directories: &Directories,
+    soak_config: &SoakManagerConfig,
+    slot_fetcher: &mut SlotFetcher,
+    shutdown_rx: &mut ShutdownReceiver,
+    background_tasks: &mut Option<SoakBackgroundTasks>,
+    background_generation: &mut u32,
+    segment_stop_height: &mut u64,
+    rollup_stop_height: u64,
+) -> anyhow::Result<RollupSegmentCompletion> {
+    ensure_rollup_exit_status(exit_status)?;
+    tracing::info!("Rollup process finished with successful status");
+
+    if let Some(growth_config) = nomt_bucket_growth {
+        if *segment_stop_height < rollup_stop_height {
+            let stopped_tasks = background_tasks
+                .take()
+                .expect("background tasks must be running before restart");
+            let ignored_errors = stop_background_tasks(stopped_tasks, true).await;
+            for err in ignored_errors {
+                tracing::debug!(
+                    "Ignored background task error while preparing NOMT bucket growth restart: {err:#}"
+                );
+            }
+
+            let completed_stop_height = *segment_stop_height;
+            let next_stop_height = completed_stop_height
+                .saturating_add(growth_config.interval_blocks)
+                .min(rollup_stop_height);
+            let rollup = grow_nomt_buckets_and_start_next_rollup(
+                growth_config,
+                directories,
+                slot_fetcher,
+                shutdown_rx,
+                completed_stop_height,
+                next_stop_height,
+            )
+            .await?;
+
+            *segment_stop_height = next_stop_height;
+            *background_generation = (*background_generation).saturating_add(1);
+            *background_tasks = Some(spawn_soak_background_tasks(
+                directories,
+                soak_config_for_generation(
+                    soak_config,
+                    *background_generation,
+                    Some(*segment_stop_height),
+                ),
+                *segment_stop_height,
+            )?);
+            tracing::info!(
+                generation = *background_generation,
+                segment_stop_height = *segment_stop_height,
+                "Restarted soak background tasks after NOMT bucket growth"
+            );
+            return Ok(RollupSegmentCompletion::Restarted(rollup));
+        }
+    }
+
+    Ok(RollupSegmentCompletion::Finished)
+}
+
+async fn wait_for_rollup_after_slot_stream_closed(
+    rollup: &mut ManagedRollupProcess,
+) -> anyhow::Result<Option<std::process::ExitStatus>> {
+    rollup
+        .wait_for_exit(ROLLUP_SLOT_STREAM_CLOSE_WAIT_TIMEOUT)
+        .await
+}
+
 pub async fn run_soak(
     directories: Directories,
     mut rollup: ManagedRollupProcess,
@@ -1072,53 +1150,26 @@ pub async fn run_soak(
             rollup_result = rollup.wait() => {
                 let exit_status = rollup_result
                     .map_err(|e| anyhow!("Failed to wait for rollup process: {e}"))?;
-                ensure_rollup_exit_status(exit_status)?;
-                tracing::info!("Rollup process finished with successful status");
-                if let Some(growth_config) = &nomt_bucket_growth {
-                    if segment_stop_height < rollup_stop_height {
-                        let stopped_tasks = background_tasks
-                            .take()
-                            .expect("background tasks must be running before restart");
-                        let ignored_errors = stop_background_tasks(stopped_tasks, true).await;
-                        for err in ignored_errors {
-                            tracing::debug!(
-                                "Ignored background task error while preparing NOMT bucket growth restart: {err:#}"
-                            );
-                        }
-
-                        let next_stop_height = segment_stop_height
-                            .saturating_add(growth_config.interval_blocks)
-                            .min(rollup_stop_height);
-                        rollup = grow_nomt_buckets_and_start_next_rollup(
-                            growth_config,
-                            &directories,
-                            &mut slot_fetcher,
-                            &mut shutdown_rx,
-                            segment_stop_height,
-                            next_stop_height,
-                        )
-                        .await?;
-
-                        segment_stop_height = next_stop_height;
-                        background_generation = background_generation.saturating_add(1);
-                        background_tasks = Some(spawn_soak_background_tasks(
-                            &directories,
-                            soak_config_for_generation(
-                                &soak_config,
-                                background_generation,
-                                Some(segment_stop_height),
-                            ),
-                            segment_stop_height,
-                        )?);
-                        tracing::info!(
-                            generation = background_generation,
-                            segment_stop_height,
-                            "Restarted soak background tasks after NOMT bucket growth"
-                        );
+                match handle_completed_rollup_segment(
+                    exit_status,
+                    nomt_bucket_growth.as_ref(),
+                    &directories,
+                    &soak_config,
+                    &mut slot_fetcher,
+                    &mut shutdown_rx,
+                    &mut background_tasks,
+                    &mut background_generation,
+                    &mut segment_stop_height,
+                    rollup_stop_height,
+                )
+                .await?
+                {
+                    RollupSegmentCompletion::Finished => break Ok(()),
+                    RollupSegmentCompletion::Restarted(next_rollup) => {
+                        rollup = next_rollup;
                         continue;
                     }
                 }
-                break Ok(());
             }
             // Background task failure
             Some(task_result) = background_tasks
@@ -1149,17 +1200,36 @@ pub async fn run_soak(
             // Every N slots, we save a full snapshot of the slot. (This is much more expensive, but also allows more thorough checks)
             new_slot = slot_fetcher.next_slot() => {
                 let Some(slot) = new_slot? else {
-                    match rollup.child.try_wait() {
+                    match wait_for_rollup_after_slot_stream_closed(&mut rollup).await {
                         Ok(Some(exit_status)) => {
-                            ensure_rollup_exit_status(exit_status)?;
-                            break Ok(());
+                            match handle_completed_rollup_segment(
+                                exit_status,
+                                nomt_bucket_growth.as_ref(),
+                                &directories,
+                                &soak_config,
+                                &mut slot_fetcher,
+                                &mut shutdown_rx,
+                                &mut background_tasks,
+                                &mut background_generation,
+                                &mut segment_stop_height,
+                                rollup_stop_height,
+                            )
+                            .await?
+                            {
+                                RollupSegmentCompletion::Finished => break Ok(()),
+                                RollupSegmentCompletion::Restarted(next_rollup) => {
+                                    rollup = next_rollup;
+                                    continue;
+                                }
+                            }
                         }
                         Ok(None) => {
                             if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches)
                             {
                                 tracing::warn!(
-                                    "Slot stream closed near expected test end while rollup manager pid={:?} was still running. Treating this as shutdown and proceeding to teardown.",
-                                    rollup.id()
+                                    "Slot stream closed near expected test end while rollup manager pid={:?} was still running after {:?}. Treating this as shutdown and proceeding to teardown.",
+                                    rollup.id(),
+                                    ROLLUP_SLOT_STREAM_CLOSE_WAIT_TIMEOUT,
                                 );
                                 break Ok(());
                             }
@@ -1174,11 +1244,11 @@ pub async fn run_soak(
                         }
                         Err(e) => {
                             tracing::warn!(
-                                "Failed to query rollup manager status after slot stream closed (pid={:?}): {e}",
+                                "Failed to wait for rollup manager after slot stream closed (pid={:?}): {e}",
                                 rollup.id()
                             );
                             break Err(anyhow!(
-                                "Failed to query rollup manager status after slot stream closed (pid={:?}): {e}",
+                                "Failed to wait for rollup manager after slot stream closed (pid={:?}): {e}",
                                 rollup.id()
                             ));
                         }
