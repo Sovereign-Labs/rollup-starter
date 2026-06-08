@@ -580,6 +580,18 @@ pub fn extend_last_stop_height(
     extended
 }
 
+pub fn latest_version_restart_manager_versions(
+    versions: &[RollupVersion],
+) -> Result<Vec<RollupVersion>, anyhow::Error> {
+    let mut latest = versions
+        .last()
+        .cloned()
+        .ok_or_else(|| anyhow!("acceptance-test rollup versions must not be empty"))?;
+    latest.start_height = None;
+    latest.migration_path = None;
+    Ok(vec![latest])
+}
+
 pub fn write_manager_config(path: &Path, versions: &[RollupVersion]) -> Result<(), anyhow::Error> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| {

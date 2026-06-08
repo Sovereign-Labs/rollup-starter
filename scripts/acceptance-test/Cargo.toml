@@ -31,6 +31,7 @@ sov-eth-client = { workspace = true }
 sov-test-state-consistency = { workspace = true }
 sov-test-utils = { workspace = true }
 tokio = { workspace = true }
+toml_edit = "0.22.27"
 reqwest = { version = "0.13", features = ["default-tls"] }
 sov-api-spec.workspace = true
 rollup-starter = { path = "../../crates/rollup/", default-features = false, features = ["mock_da", "mock_zkvm"] }

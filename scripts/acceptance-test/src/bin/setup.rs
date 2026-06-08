@@ -212,6 +212,7 @@ async fn run_setup(
                     rollup_stop_height: stop_at_height,
                     full_slot_save_interval: settings.full_slot_save_interval,
                     save_slot_snapshots: true,
+                    nomt_bucket_growth: None,
                 },
                 shutdown_rx.clone(),
             )

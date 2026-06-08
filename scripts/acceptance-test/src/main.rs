@@ -2,11 +2,12 @@ use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
     cleanup_rollup_state_dir, extend_last_stop_height,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
-    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan_with_constants,
-    prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, shutdown_error,
-    sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown, write_manager_config,
-    AcceptanceRunPlan, CommonArgs, Directories, LocalConstantsManifest, PostgresContainerGuard,
-    ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions, API_URL,
+    generate_postgres_password, get_rollup_client, latest_version_restart_manager_versions,
+    prepare_acceptance_run_plan_with_constants, prepare_rollup_state_dir, run_soak,
+    run_until_shutdown_signal, shutdown_error, sleep_or_shutdown, spawn_rollup_manager,
+    wait_for_shutdown, write_manager_config, AcceptanceRunPlan, CommonArgs, Directories,
+    LocalConstantsManifest, NomtBucketGrowthConfig, PostgresContainerGuard, ResolvedRunSettings,
+    RunProfile, ShutdownReceiver, SoakRunOptions, API_URL,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use anyhow::Context;
@@ -15,6 +16,10 @@ use clap::Parser;
 use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
 use std::time::Duration;
 use tracing::info;
+
+const NOMT_BUCKET_GROWTH_INTERVAL_BLOCKS: u64 = 200;
+const NOMT_KERNEL_BUCKET_GROWTH_FACTOR: u64 = 2;
+const NOMT_USER_BUCKET_GROWTH_INCREMENT: u64 = 1_000_000;
 
 struct PreparedTestRun {
     directories: Directories,
@@ -169,6 +174,16 @@ async fn run_test(
         .output_dir
         .join("acceptance_manager_config.json");
     write_manager_config(&manager_config_path, &manager_versions)?;
+    let restart_manager_versions = latest_version_restart_manager_versions(&manager_versions)?;
+    let nomt_growth_rollup_config_path = restart_manager_versions
+        .first()
+        .expect("restart manager config must contain one rollup version")
+        .config_path
+        .clone();
+    let restart_manager_config_path = directories
+        .output_dir
+        .join("acceptance_restart_manager_config.json");
+    write_manager_config(&restart_manager_config_path, &restart_manager_versions)?;
 
     // Start the rollup. Run for 10 seconds
     info!("Starting rollup through sov-rollup-manager");
@@ -264,6 +279,14 @@ async fn run_test(
             rollup_stop_height: stop_at_height,
             full_slot_save_interval: settings.full_slot_save_interval,
             save_slot_snapshots: false,
+            nomt_bucket_growth: Some(NomtBucketGrowthConfig {
+                rollup_config_path: nomt_growth_rollup_config_path,
+                restart_manager_binary: plan.manager_binary.clone(),
+                restart_manager_config_path,
+                interval_batches: NOMT_BUCKET_GROWTH_INTERVAL_BLOCKS,
+                kernel_bucket_multiplier: NOMT_KERNEL_BUCKET_GROWTH_FACTOR,
+                user_bucket_increment: NOMT_USER_BUCKET_GROWTH_INCREMENT,
+            }),
         },
         shutdown_rx.clone(),
     )
