@@ -10,7 +10,7 @@ publish = false
 lazy_static = { workspace = true }
 
 [build-dependencies]
-sp1-build = { version = "6.2.2", default-features = false }
+sp1-build = { git = "https://github.com/succinctlabs/sp1.git", rev = "df936473ab63dea702f9f6136ba35efab009f202", default-features = false }
 sov-zkvm-utils = { workspace = true }
 
 

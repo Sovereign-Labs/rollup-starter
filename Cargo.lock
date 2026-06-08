@@ -6424,7 +6424,7 @@ dependencies = [
 [[package]]
 name = "nearly-linear"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 
 [[package]]
 name = "nix"
@@ -10233,9 +10233,8 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "slop-air"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4aaab798ba2ee1d2fffb3075fc303e4fd87b5b3062693a68f81adb8b508821bd"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-air",
 ]
@@ -10252,26 +10251,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "slop-algebra"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
+dependencies = [
+ "itertools 0.14.0",
+ "p3-field",
+ "serde",
+]
+
+[[package]]
 name = "slop-alloc"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "550acd655362b52fc00d00410f08fc5dea4d22e35eef091c09b6a37d9c79e014"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "slop-baby-bear"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3263d9487d6e632a747dd267d981e859e4f9fb97506dd8b547049116e0f49dc9"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "lazy_static",
  "p3-baby-bear",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-challenger",
  "slop-poseidon2",
  "slop-symmetric",
@@ -10279,14 +10286,13 @@ dependencies = [
 
 [[package]]
 name = "slop-basefold"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "596da7b2b980055ec1074c61f7b7f243e57f4fef81ab04f717bcc99b3391191d"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "derive-where",
  "itertools 0.14.0",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-baby-bear",
  "slop-bn254",
@@ -10302,15 +10308,14 @@ dependencies = [
 
 [[package]]
 name = "slop-basefold-prover"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce348433feab7a98c2d18419c11320a63a9407a7bf360fcb1d12e98610def29d"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "derive-where",
  "itertools 0.14.0",
  "rand 0.8.5",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-baby-bear",
  "slop-basefold",
@@ -10329,14 +10334,13 @@ dependencies = [
 
 [[package]]
 name = "slop-bn254"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c327e0927fabf9c0ae9a7b0333027dc04431e5981ab80d7bbe994d6c4ce35fc1"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "ff",
  "p3-bn254-fr",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-challenger",
  "slop-poseidon2",
  "slop-symmetric",
@@ -10344,22 +10348,20 @@ dependencies = [
 
 [[package]]
 name = "slop-challenger"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c263e731bb694d4465eedae7ecd6faf1f277198e751f3c209a1c4186d80d1b6b"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "futures",
  "p3-challenger",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-symmetric",
 ]
 
 [[package]]
 name = "slop-commit"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "109134f16ae1ea59d333cb28de896bfc8ee383fb575819b6a9f78ba72f46e8ad"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-commit",
  "serde",
@@ -10368,13 +10370,12 @@ dependencies = [
 
 [[package]]
 name = "slop-dft"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bac9e643a07f2138cf5faaae46ae1a16bb359d5224aa3010bbf7b0b794dfd07"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-dft",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-matrix",
  "slop-tensor",
@@ -10382,18 +10383,16 @@ dependencies = [
 
 [[package]]
 name = "slop-fri"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "407ac1bf5c4b05a4da95c9951bf32307049f3157988e4b22f65915ff58f33173"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-fri",
 ]
 
 [[package]]
 name = "slop-futures"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee61e1c5d07006a5221314cfe6f6f77d2168e117081fb13581f8596f7262ddd4"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "crossbeam",
  "futures",
@@ -10406,9 +10405,8 @@ dependencies = [
 
 [[package]]
 name = "slop-jagged"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d313a73ca824342c6468fd1c63a7e3cde89b7cf456d2f3408843100603eadab"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "derive-where",
  "futures",
@@ -10417,7 +10415,7 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-baby-bear",
  "slop-basefold",
@@ -10440,23 +10438,21 @@ dependencies = [
 
 [[package]]
 name = "slop-keccak-air"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07b7952549a449a95b4a2daa4e1861afbe94c5f22d3c0f36bf42406855f5912f"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-keccak-air",
 ]
 
 [[package]]
 name = "slop-koala-bear"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a8cdc74f04d13e738b4628312b16dfec6a2e547bde697c8bdcf556884c6e91f"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "lazy_static",
  "p3-koala-bear",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-challenger",
  "slop-poseidon2",
  "slop-symmetric",
@@ -10464,33 +10460,30 @@ dependencies = [
 
 [[package]]
 name = "slop-matrix"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57b20e8f35b9ebe60aa9bc0a2b76848bb43c8130f4df85491c5d09f49aa92c45"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-matrix",
 ]
 
 [[package]]
 name = "slop-maybe-rayon"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef79faf36b964b0b8423179e29c9c6839fd16d3f9548785b69988a50c1ea617d"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-maybe-rayon",
 ]
 
 [[package]]
 name = "slop-merkle-tree"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "160e61fa46d477af39d4d1b5737faaee77afe0b4106531ae22b9781686b2888e"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "derive-where",
  "itertools 0.14.0",
  "p3-merkle-tree",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-baby-bear",
  "slop-bn254",
@@ -10508,9 +10501,8 @@ dependencies = [
 
 [[package]]
 name = "slop-multilinear"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "671628cc4119c29685ff484d5eb993ba483cef7915d065c993c55842b4c2f3c9"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "derive-where",
  "futures",
@@ -10518,7 +10510,7 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-challenger",
  "slop-commit",
@@ -10529,33 +10521,30 @@ dependencies = [
 
 [[package]]
 name = "slop-poseidon2"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aedfc3bf87cf2694bd108c039d663c346c7bb807491a7db6701eb9dff5c6e5d"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-poseidon2",
 ]
 
 [[package]]
 name = "slop-primitives"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f30e6e332c3cb103541bed9f5f477b769df1b5fb6076b5e2386569c94b1475dc"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
- "slop-algebra",
+ "slop-algebra 6.2.3",
 ]
 
 [[package]]
 name = "slop-stacked"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4981970b3ea9620889b558cc859edac2ffaeabc0b444027674cf15dd11e8d433"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "derive-where",
  "futures",
  "itertools 0.14.0",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-basefold",
  "slop-basefold-prover",
@@ -10570,15 +10559,14 @@ dependencies = [
 
 [[package]]
 name = "slop-sumcheck"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8a67f4c3d2f73c34032c13b85e22eba69ac8a677481dbbdb3f9942be12eb765"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "futures",
  "itertools 0.14.0",
  "rayon",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-baby-bear",
  "slop-challenger",
@@ -10588,18 +10576,16 @@ dependencies = [
 
 [[package]]
 name = "slop-symmetric"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cb1de854325a8c36a1bdfee5514e1d4c9f39290ae19eeaecb21ca6ee88d96d6"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-symmetric",
 ]
 
 [[package]]
 name = "slop-tensor"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcf7b2a0e76f1ad8ca43aac248965e4b7448101954661f877a6e6ac7f3813dad"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "arrayvec",
  "derive-where",
@@ -10607,7 +10593,7 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-futures",
  "slop-matrix",
@@ -10617,18 +10603,16 @@ dependencies = [
 
 [[package]]
 name = "slop-uni-stark"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab33d6a10b1f4dc2edc26131bccd0955ccf5d76e7de6f15c50a9d0873f3f8603"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-uni-stark",
 ]
 
 [[package]]
 name = "slop-utils"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a9ff3ba185c57a0f4f3bc64e124f5c536d6db416f5f4930c46b278aade270e6"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "p3-util",
  "tracing-forest",
@@ -10637,9 +10621,8 @@ dependencies = [
 
 [[package]]
 name = "slop-whir"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07626b0cb8878f3884fa0f68e06ba37746181aa1e7ce0d6e95e53013c5c924e1"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "derive-where",
  "futures",
@@ -10647,7 +10630,7 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-baby-bear",
  "slop-basefold",
@@ -10723,7 +10706,7 @@ dependencies = [
 [[package]]
 name = "sov-accounts"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -10738,7 +10721,7 @@ dependencies = [
 [[package]]
 name = "sov-address"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -10759,7 +10742,7 @@ dependencies = [
 [[package]]
 name = "sov-api-spec"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "backon",
@@ -10783,7 +10766,7 @@ dependencies = [
 [[package]]
 name = "sov-attester-incentives"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -10803,7 +10786,7 @@ dependencies = [
 [[package]]
 name = "sov-bank"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -10823,7 +10806,7 @@ dependencies = [
 [[package]]
 name = "sov-blob-sender"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -10845,7 +10828,7 @@ dependencies = [
 [[package]]
 name = "sov-blob-storage"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -10864,7 +10847,7 @@ dependencies = [
 [[package]]
 name = "sov-build"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -10875,7 +10858,7 @@ dependencies = [
 [[package]]
 name = "sov-capabilities"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "sov-accounts",
@@ -10895,7 +10878,7 @@ dependencies = [
 [[package]]
 name = "sov-celestia-adapter"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -10929,7 +10912,7 @@ dependencies = [
 [[package]]
 name = "sov-chain-state"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -10945,7 +10928,7 @@ dependencies = [
 [[package]]
 name = "sov-cli"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -10968,7 +10951,7 @@ dependencies = [
 [[package]]
 name = "sov-db"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11000,7 +10983,7 @@ dependencies = [
 [[package]]
 name = "sov-db-types"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "arbitrary",
  "borsh",
@@ -11018,7 +11001,7 @@ dependencies = [
 [[package]]
 name = "sov-eip712-auth"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11033,7 +11016,7 @@ dependencies = [
 [[package]]
 name = "sov-eth-client"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "alloy",
  "alloy-consensus",
@@ -11060,7 +11043,7 @@ dependencies = [
 [[package]]
 name = "sov-eth-dev-signer"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -11071,7 +11054,7 @@ dependencies = [
 [[package]]
 name = "sov-ethereum"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -11102,7 +11085,7 @@ dependencies = [
 [[package]]
 name = "sov-evm"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -11143,7 +11126,7 @@ dependencies = [
 [[package]]
 name = "sov-evm-test-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "alloy",
  "alloy-contract",
@@ -11159,7 +11142,7 @@ dependencies = [
 [[package]]
 name = "sov-full-node-configs"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "ipnet",
@@ -11174,7 +11157,7 @@ dependencies = [
 [[package]]
 name = "sov-hyperlane-integration"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11198,7 +11181,7 @@ dependencies = [
 [[package]]
 name = "sov-kernels"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "sov-blob-storage",
@@ -11211,7 +11194,7 @@ dependencies = [
 [[package]]
 name = "sov-ledger-apis"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "axum 0.8.8",
@@ -11232,7 +11215,7 @@ dependencies = [
 [[package]]
 name = "sov-metrics"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "bincode",
@@ -11254,7 +11237,7 @@ dependencies = [
 [[package]]
 name = "sov-mock-da"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11288,7 +11271,7 @@ dependencies = [
 [[package]]
 name = "sov-mock-zkvm"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11308,7 +11291,7 @@ dependencies = [
 [[package]]
 name = "sov-modules-api"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11355,7 +11338,7 @@ dependencies = [
 [[package]]
 name = "sov-modules-macros"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "bech32",
@@ -11377,7 +11360,7 @@ dependencies = [
 [[package]]
 name = "sov-modules-rollup-blueprint"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11416,7 +11399,7 @@ dependencies = [
 [[package]]
 name = "sov-modules-stf-blueprint"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11433,7 +11416,7 @@ dependencies = [
 [[package]]
 name = "sov-node-client"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -11452,7 +11435,7 @@ dependencies = [
 [[package]]
 name = "sov-operator-incentives"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11465,7 +11448,7 @@ dependencies = [
 [[package]]
 name = "sov-paymaster"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11482,7 +11465,7 @@ dependencies = [
 [[package]]
 name = "sov-prover-incentives"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11502,7 +11485,7 @@ dependencies = [
 [[package]]
 name = "sov-proxy-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11519,7 +11502,7 @@ dependencies = [
 [[package]]
 name = "sov-rest-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "axum 0.8.8",
@@ -11543,7 +11526,7 @@ dependencies = [
 [[package]]
 name = "sov-revenue-share"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11558,7 +11541,7 @@ dependencies = [
 [[package]]
 name = "sov-risc0-adapter"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11586,7 +11569,7 @@ dependencies = [
 [[package]]
 name = "sov-rollup-apis"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "axum 0.8.8",
  "borsh",
@@ -11607,7 +11590,7 @@ dependencies = [
 [[package]]
 name = "sov-rollup-full-node-interface"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "derive_more 2.1.1",
  "rockbound",
@@ -11619,7 +11602,7 @@ dependencies = [
 [[package]]
 name = "sov-rollup-interface"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11665,7 +11648,7 @@ dependencies = [
 [[package]]
 name = "sov-rpc-eth-types"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -11685,7 +11668,7 @@ dependencies = [
 [[package]]
 name = "sov-sequencer"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11732,7 +11715,7 @@ dependencies = [
 [[package]]
 name = "sov-sequencer-registry"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11765,7 +11748,7 @@ dependencies = [
 [[package]]
 name = "sov-soak-testing-lib"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "clap",
@@ -11783,7 +11766,7 @@ dependencies = [
 [[package]]
 name = "sov-sp1-adapter"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11796,7 +11779,7 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "sha2 0.10.9",
- "slop-algebra",
+ "slop-algebra 6.2.2",
  "sov-metrics",
  "sov-rollup-interface",
  "sov-universal-wallet",
@@ -11812,7 +11795,7 @@ dependencies = [
 [[package]]
 name = "sov-state"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -11837,7 +11820,7 @@ dependencies = [
 [[package]]
 name = "sov-stf-runner"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11871,7 +11854,7 @@ dependencies = [
 [[package]]
 name = "sov-synthetic-load"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11887,7 +11870,7 @@ dependencies = [
 [[package]]
 name = "sov-test-modules"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11905,7 +11888,7 @@ dependencies = [
 [[package]]
 name = "sov-test-state-consistency"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -11920,7 +11903,7 @@ dependencies = [
 [[package]]
 name = "sov-test-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11981,7 +11964,7 @@ dependencies = [
 [[package]]
 name = "sov-transaction-generator"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -12014,7 +11997,7 @@ dependencies = [
 [[package]]
 name = "sov-uniqueness"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -12025,7 +12008,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet"
 version = "0.4.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -12047,7 +12030,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet-macro-helpers"
 version = "0.4.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "bech32",
  "borsh",
@@ -12062,7 +12045,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet-macros"
 version = "0.4.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "sov-universal-wallet-macro-helpers",
  "syn 2.0.117",
@@ -12071,7 +12054,7 @@ dependencies = [
 [[package]]
 name = "sov-value-setter"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "borsh",
@@ -12096,7 +12079,7 @@ dependencies = [
 [[package]]
 name = "sov-zkvm-utils"
 version = "0.3.0"
-source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=f2a966a4756bdeeee885fc3174886791f501e3c6#f2a966a4756bdeeee885fc3174886791f501e3c6"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3f364598c1d7cb14b305dc19cd0c51d89263c4ba#3f364598c1d7cb14b305dc19cd0c51d89263c4ba"
 dependencies = [
  "anyhow",
  "convert_case 0.6.0",
@@ -12104,9 +12087,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-build"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69df543394c6d587b0f04a281606a94721d4ea9532866204126a5c0a3a12a45c"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.18.1",
@@ -12118,9 +12100,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-core-executor"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ead1f498f7763a3b27740d77db7ef07a737cf568a3c3c85efa72bb1a4858ea6a"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -12141,7 +12122,7 @@ dependencies = [
  "serde_arrays",
  "serde_json",
  "slop-air",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-maybe-rayon",
  "slop-symmetric",
  "sp1-curves",
@@ -12159,9 +12140,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-core-executor-runner"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14d0e9425daa3f50fcfa9b434e6030b64b3dfacaed3d97fd47314e5ddd851603"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -12181,9 +12161,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-core-executor-runner-binary"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6671dac7abe0391d28669cbf6b08806c07feb757c0a5fc29bac8ef6882a642df"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "bincode",
  "crash-handler",
@@ -12196,9 +12175,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-core-machine"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e479b3999aa550b5ef9cadaa950a3ccbfb16ff226c5598fe632a6ee6ea1749d"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "bincode",
  "cfg-if",
@@ -12215,7 +12193,7 @@ dependencies = [
  "serde",
  "serde_json",
  "slop-air",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-challenger",
  "slop-futures",
  "slop-keccak-air",
@@ -12245,9 +12223,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-curves"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4376b39a9d40040b826555984b013bd887c4505a354993a27988a6a394155fe7"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "cfg-if",
  "dashu",
@@ -12258,7 +12235,7 @@ dependencies = [
  "num",
  "p256",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "snowbridge-amcl",
  "sp1-primitives",
  "typenum",
@@ -12266,9 +12243,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-derive"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe2bf01a986b185b4497d7386ce3fc35eba3fbeb5169aaa7645b61053c34f449"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -12277,9 +12253,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-hypercube"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecb3ffe4a61132c3277e00f85c532fbf38c3a9287ccf10a815339fe5be48af2b"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "arrayref",
  "deepsize2",
@@ -12294,7 +12269,7 @@ dependencies = [
  "rayon-scan",
  "serde",
  "slop-air",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-basefold",
  "slop-basefold-prover",
@@ -12326,9 +12301,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-jit"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "208902ad494f7a101e9c8420f493bc8c42fe4f1f6a3e21b7929d084f3c2e0dce"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "dynasmrt",
  "hashbrown 0.14.5",
@@ -12343,9 +12317,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-lib"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0d5f56efe1d2a980d0f46083863ef4fdf715ed70cc32668c9e5725af145b8d9"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "bincode",
  "elliptic-curve",
@@ -12355,9 +12328,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-primitives"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13ad00052921b993af682403b378c8fe23c40382f9790f093c8fac0f30433c5e"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "bincode",
  "blake3",
@@ -12368,7 +12340,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "serde",
  "sha2 0.10.9",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-bn254",
  "slop-challenger",
  "slop-koala-bear",
@@ -12379,9 +12351,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-prover"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ba6d960746f9a6038834893dc5c774812c004fd846fcbf5dc00f1ea294c02ef"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "anyhow",
  "bincode",
@@ -12407,7 +12378,7 @@ dependencies = [
  "serial_test",
  "sha2 0.10.9",
  "slop-air",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-basefold",
  "slop-bn254",
  "slop-challenger",
@@ -12443,9 +12414,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-prover-types"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff77aba505e762effc5de8258195f11279471fa9e8a3b0815aa251be22770fd3"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "anyhow",
  "async-scoped",
@@ -12467,9 +12437,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-circuit"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfe43147fe2a5604b1c14d10f44cb7d4304127275470f676b03593a2a00da4f2"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "bincode",
  "itertools 0.14.0",
@@ -12477,7 +12446,7 @@ dependencies = [
  "rayon",
  "serde",
  "slop-air",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-alloc",
  "slop-basefold",
  "slop-basefold-prover",
@@ -12507,15 +12476,14 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-compiler"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95f8488f5a4bd212f2498a8363d0f76378328aea5cbe69658c636016797c72ab"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "backtrace",
  "cfg-if",
  "itertools 0.14.0",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-bn254",
  "slop-symmetric",
  "sp1-core-machine",
@@ -12528,9 +12496,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-executor"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef824f774b7ffac1c3c4f58fe145e4b503ba30ef885993947d4186a448748a7c"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "backtrace",
  "cfg-if",
@@ -12538,7 +12505,7 @@ dependencies = [
  "itertools 0.14.0",
  "range-set-blaze",
  "serde",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-maybe-rayon",
  "slop-poseidon2",
  "slop-symmetric",
@@ -12552,9 +12519,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-gnark-ffi"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6961ae41bdca71e213d01aad4a7f664d0c95a760975a12816b2ac2d54e1e570"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "anyhow",
  "bincode",
@@ -12564,7 +12530,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-symmetric",
  "sp1-hypercube",
  "sp1-primitives",
@@ -12576,14 +12542,13 @@ dependencies = [
 
 [[package]]
 name = "sp1-recursion-machine"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d741527465de17de5c3ef4f9465e77117d2a15599398f97e8fb0cf8c3e57b2f4"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "itertools 0.14.0",
  "rand 0.8.5",
  "slop-air",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-basefold",
  "slop-matrix",
  "slop-maybe-rayon",
@@ -12598,9 +12563,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-sdk"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6af1816d3855a02b002a8be12a3c1856948e45bd5e04d24316aea08717c7405"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "alloy-primitives",
  "alloy-signer",
@@ -12658,9 +12622,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-verifier"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04eea9c69efabee3fff3c24f2946963d04b62af7fdd7fc6da06b1d4853f8aca6"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "bincode",
  "blake3",
@@ -12670,7 +12633,7 @@ dependencies = [
  "lazy_static",
  "serde",
  "sha2 0.10.9",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "slop-challenger",
  "slop-primitives",
  "slop-symmetric",
@@ -12685,9 +12648,8 @@ dependencies = [
 
 [[package]]
 name = "sp1-zkvm"
-version = "6.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb5732e5c4cf9e607f224a0b1a0fd90515897f731eaba33939bf9d5dcdecf4f8"
+version = "6.2.3"
+source = "git+https://github.com/succinctlabs/sp1.git?rev=df936473ab63dea702f9f6136ba35efab009f202#df936473ab63dea702f9f6136ba35efab009f202"
 dependencies = [
  "cfg-if",
  "critical-section",
@@ -12698,7 +12660,7 @@ dependencies = [
  "libm",
  "rand 0.8.5",
  "sha2 0.10.9",
- "slop-algebra",
+ "slop-algebra 6.2.3",
  "sp1-lib",
  "sp1-primitives",
 ]
