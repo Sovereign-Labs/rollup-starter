@@ -21,7 +21,7 @@ pub const VERSION_VARS_COMMIT_KEY: &str = "rollup_commit_hash";
 pub const VERSION_CONFIG_TEMPLATE_PATH: &str = "scripts/acceptance-test/rollup_config.toml";
 pub const SOAK_NUM_WORKERS: u32 = 20;
 pub const SOAK_SALT: u32 = 3; // existing acceptance-test-data started from 3 for some reason
-pub const SOAK_SAFETY_STOP_BLOCKS: u64 = 5;
+pub const SOAK_SAFETY_STOP_BLOCKS: u64 = 10;
 const ACCEPTANCE_TEST_FEATURES: [&str; 3] = ["acceptance-testing", "mock_da", "mock_zkvm"];
 const ACCEPTANCE_CONSTANTS_FILENAME: &str = "constants.testing.toml";
 
@@ -578,6 +578,18 @@ pub fn extend_last_stop_height(
         last.stop_height = Some(current_stop + extra_blocks);
     }
     extended
+}
+
+pub fn with_last_stop_height(
+    versions: &[RollupVersion],
+    stop_height: u64,
+) -> Result<Vec<RollupVersion>, anyhow::Error> {
+    let mut bounded = versions.to_vec();
+    let latest = bounded
+        .last_mut()
+        .ok_or_else(|| anyhow!("acceptance-test rollup versions must not be empty"))?;
+    latest.stop_height = Some(stop_height);
+    Ok(bounded)
 }
 
 pub fn latest_version_restart_manager_versions(

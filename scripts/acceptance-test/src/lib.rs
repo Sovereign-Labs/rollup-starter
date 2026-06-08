@@ -40,8 +40,8 @@ pub use config::{
 };
 pub use versioned_setup::{
     extend_last_stop_height, latest_version_restart_manager_versions, prepare_acceptance_run_plan,
-    prepare_acceptance_run_plan_with_constants, spawn_rollup_manager, write_manager_config,
-    AcceptanceRunPlan, LocalConstantsManifest,
+    prepare_acceptance_run_plan_with_constants, spawn_rollup_manager, with_last_stop_height,
+    write_manager_config, AcceptanceRunPlan, LocalConstantsManifest,
 };
 
 pub const API_URL: &str = "http://127.0.0.1:12348";
@@ -501,42 +501,6 @@ impl ManagedRollupProcess {
         ))
     }
 
-    pub async fn terminate_for_restart(&mut self) -> Result<(), anyhow::Error> {
-        if self.child.id().is_none() {
-            return Ok(());
-        }
-
-        self.request_shutdown();
-        if let Some(exit_status) = self.wait_for_exit(ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT).await? {
-            tracing::info!(
-                "Rollup process exited during planned restart with status: {exit_status}"
-            );
-            return Ok(());
-        }
-
-        let Some(rollup_id) = self.child.id() else {
-            return Ok(());
-        };
-        tracing::warn!(
-            "Timed out waiting {:?} for rollup process {} to exit for planned restart. Sending SIGKILL.",
-            ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT,
-            rollup_id
-        );
-        send_rollup_sigkill(rollup_id);
-        if let Some(exit_status) = self.wait_for_exit(ROLLUP_FORCED_SHUTDOWN_TIMEOUT).await? {
-            tracing::info!(
-                "Rollup process exited after SIGKILL during planned restart with status: {exit_status}"
-            );
-            return Ok(());
-        }
-
-        Err(anyhow!(
-            "Rollup process {} did not terminate within {:?} after SIGKILL",
-            rollup_id,
-            ROLLUP_FORCED_SHUTDOWN_TIMEOUT
-        ))
-    }
-
     pub async fn ensure_stopped(&mut self) -> Result<(), anyhow::Error> {
         if self.child.id().is_none() {
             return Ok(());
@@ -593,7 +557,8 @@ pub struct NomtBucketGrowthConfig {
     pub rollup_config_path: PathBuf,
     pub restart_manager_binary: PathBuf,
     pub restart_manager_config_path: PathBuf,
-    pub interval_batches: u64,
+    pub initial_rollup_stop_height: u64,
+    pub interval_blocks: u64,
     pub kernel_bucket_multiplier: u64,
     pub user_bucket_increment: u64,
 }
@@ -795,12 +760,21 @@ fn grow_nomt_buckets(
     Ok(NomtBucketGrowth { before, after })
 }
 
-fn soak_config_for_generation(base: &SoakManagerConfig, generation: u32) -> SoakManagerConfig {
+fn soak_config_for_generation(
+    base: &SoakManagerConfig,
+    generation: u32,
+    stop_height_override: Option<u64>,
+) -> SoakManagerConfig {
     let mut config = base.clone();
     config.config.salt = config
         .config
         .salt
         .saturating_add(config.config.num_workers.saturating_mul(generation));
+    if let Some(stop_height) = stop_height_override {
+        for (_, version_stop_height) in &mut config.versions {
+            *version_stop_height = stop_height;
+        }
+    }
     config
 }
 
@@ -870,20 +844,57 @@ async fn stop_background_tasks(
     errors
 }
 
-async fn grow_nomt_buckets_and_restart_rollup(
-    rollup: &mut ManagedRollupProcess,
+fn write_manager_config_stop_height(
+    manager_config_path: &Path,
+    stop_height: u64,
+) -> anyhow::Result<()> {
+    let raw = fs::read_to_string(manager_config_path).with_context(|| {
+        format!(
+            "failed to read restart manager config {}",
+            manager_config_path.display()
+        )
+    })?;
+    let mut manager_config: sov_rollup_manager::ManagerConfig = serde_json::from_str(&raw)
+        .with_context(|| {
+            format!(
+                "failed to parse restart manager config {}",
+                manager_config_path.display()
+            )
+        })?;
+    let version = manager_config.versions.last_mut().ok_or_else(|| {
+        anyhow!(
+            "restart manager config {} has no versions",
+            manager_config_path.display()
+        )
+    })?;
+    version.stop_height = Some(stop_height);
+    fs::write(
+        manager_config_path,
+        serde_json::to_string_pretty(&manager_config)?,
+    )
+    .with_context(|| {
+        format!(
+            "failed to write restart manager config {}",
+            manager_config_path.display()
+        )
+    })?;
+    Ok(())
+}
+
+async fn grow_nomt_buckets_and_start_next_rollup(
     growth_config: &NomtBucketGrowthConfig,
     directories: &Directories,
     slot_fetcher: &mut SlotFetcher,
     shutdown_rx: &mut ShutdownReceiver,
-    num_soak_batches: u64,
-) -> anyhow::Result<()> {
+    completed_stop_height: u64,
+    next_stop_height: u64,
+) -> anyhow::Result<ManagedRollupProcess> {
     info!(
-        num_soak_batches,
+        completed_stop_height,
+        next_stop_height,
         config_path = %growth_config.rollup_config_path.display(),
-        "Stopping rollup for NOMT bucket growth"
+        "Preparing next rollup segment after NOMT bucket growth stop height"
     );
-    rollup.terminate_for_restart().await?;
 
     let growth = grow_nomt_buckets(
         &growth_config.rollup_config_path,
@@ -899,21 +910,25 @@ async fn grow_nomt_buckets_and_restart_rollup(
         "Grew NOMT bucket counts"
     );
 
-    let restarted = spawn_rollup_manager(
+    write_manager_config_stop_height(&growth_config.restart_manager_config_path, next_stop_height)?;
+
+    let rollup = spawn_rollup_manager(
         &growth_config.restart_manager_binary,
         &growth_config.restart_manager_config_path,
         directories,
         None,
     )?;
-    *rollup = restarted;
 
     wait_for_sequencer_ready(shutdown_rx).await?;
     slot_fetcher
         .subscribe_slots(false)
         .await
         .context("failed to resubscribe to slots after NOMT bucket growth restart")?;
-    info!("Rollup restarted after NOMT bucket growth");
-    Ok(())
+    info!(
+        next_stop_height,
+        "Rollup restarted after NOMT bucket growth"
+    );
+    Ok(rollup)
 }
 
 pub async fn run_soak(
@@ -933,18 +948,29 @@ pub async fn run_soak(
     let target_soak_batches = rollup_stop_height.saturating_sub(throughput_start_batch);
     if let Some(growth_config) = &nomt_bucket_growth {
         anyhow::ensure!(
-            growth_config.interval_batches > 0,
+            growth_config.interval_blocks > 0,
             "NOMT bucket growth interval must be greater than zero"
         );
+        anyhow::ensure!(
+            growth_config.initial_rollup_stop_height <= rollup_stop_height,
+            "initial NOMT bucket growth stop height {} exceeds final rollup stop height {}",
+            growth_config.initial_rollup_stop_height,
+            rollup_stop_height
+        );
     }
+    let mut segment_stop_height = nomt_bucket_growth
+        .as_ref()
+        .map(|growth_config| growth_config.initial_rollup_stop_height)
+        .unwrap_or(rollup_stop_height);
+    let stop_height_override = nomt_bucket_growth.as_ref().map(|_| segment_stop_height);
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
     slot_fetcher.subscribe_slots(false).await?;
     let mut background_generation = 0_u32;
     let mut background_tasks = Some(spawn_soak_background_tasks(
         &directories,
-        soak_config_for_generation(&soak_config, background_generation),
-        rollup_stop_height,
+        soak_config_for_generation(&soak_config, background_generation, stop_height_override),
+        segment_stop_height,
     )?);
 
     let client = get_rollup_client()?;
@@ -954,9 +980,6 @@ pub async fn run_soak(
     let mut num_soak_slots = 0;
     let mut num_soak_batches = 0;
     let mut num_previous_txs: Option<u64> = None;
-    let mut next_nomt_bucket_growth_at = nomt_bucket_growth
-        .as_ref()
-        .map(|growth_config| growth_config.interval_batches);
 
     let run_result: anyhow::Result<()> = async {
         loop {
@@ -968,6 +991,50 @@ pub async fn run_soak(
                     .map_err(|e| anyhow!("Failed to wait for rollup process: {e}"))?;
                 ensure_rollup_exit_status(exit_status)?;
                 tracing::info!("Rollup process finished with successful status");
+                if let Some(growth_config) = &nomt_bucket_growth {
+                    if segment_stop_height < rollup_stop_height {
+                        let stopped_tasks = background_tasks
+                            .take()
+                            .expect("background tasks must be running before restart");
+                        let ignored_errors = stop_background_tasks(stopped_tasks, true).await;
+                        for err in ignored_errors {
+                            tracing::debug!(
+                                "Ignored background task error while preparing NOMT bucket growth restart: {err:#}"
+                            );
+                        }
+
+                        let next_stop_height = segment_stop_height
+                            .saturating_add(growth_config.interval_blocks)
+                            .min(rollup_stop_height);
+                        rollup = grow_nomt_buckets_and_start_next_rollup(
+                            growth_config,
+                            &directories,
+                            &mut slot_fetcher,
+                            &mut shutdown_rx,
+                            segment_stop_height,
+                            next_stop_height,
+                        )
+                        .await?;
+
+                        segment_stop_height = next_stop_height;
+                        background_generation = background_generation.saturating_add(1);
+                        background_tasks = Some(spawn_soak_background_tasks(
+                            &directories,
+                            soak_config_for_generation(
+                                &soak_config,
+                                background_generation,
+                                Some(segment_stop_height),
+                            ),
+                            segment_stop_height,
+                        )?);
+                        tracing::info!(
+                            generation = background_generation,
+                            segment_stop_height,
+                            "Restarted soak background tasks after NOMT bucket growth"
+                        );
+                        continue;
+                    }
+                }
                 break Ok(());
             }
             // Background task failure
@@ -1093,53 +1160,6 @@ pub async fn run_soak(
                     save_slot_snapshot_if_needed(&slot, &directories, save_slot_snapshots)?;
                 }
 
-                if let (Some(growth_config), Some(next_growth_at)) =
-                    (&nomt_bucket_growth, next_nomt_bucket_growth_at)
-                {
-                    if num_soak_batches >= next_growth_at {
-                        if is_very_close_to_soak_test_end(num_soak_batches, target_soak_batches) {
-                            tracing::info!(
-                                num_soak_batches,
-                                target_soak_batches,
-                                "Skipping NOMT bucket growth near expected soak end"
-                            );
-                            next_nomt_bucket_growth_at = None;
-                        } else {
-                            let stopped_tasks = background_tasks
-                                .take()
-                                .expect("background tasks must be running before restart");
-                            let ignored_errors = stop_background_tasks(stopped_tasks, true).await;
-                            for err in ignored_errors {
-                                tracing::debug!(
-                                    "Ignored background task error while preparing NOMT bucket growth restart: {err:#}"
-                                );
-                            }
-
-                            grow_nomt_buckets_and_restart_rollup(
-                                &mut rollup,
-                                growth_config,
-                                &directories,
-                                &mut slot_fetcher,
-                                &mut shutdown_rx,
-                                num_soak_batches,
-                            )
-                            .await?;
-
-                            background_generation = background_generation.saturating_add(1);
-                            background_tasks = Some(spawn_soak_background_tasks(
-                                &directories,
-                                soak_config_for_generation(&soak_config, background_generation),
-                                rollup_stop_height,
-                            )?);
-                            tracing::info!(
-                                generation = background_generation,
-                                "Restarted soak background tasks after NOMT bucket growth"
-                            );
-                            next_nomt_bucket_growth_at =
-                                Some(next_growth_at.saturating_add(growth_config.interval_batches));
-                        }
-                    }
-                }
             }
             shutdown_reason = wait_for_shutdown(&mut shutdown_rx) => {
                 tracing::info!("Received {shutdown_reason}, initiating soak shutdown");

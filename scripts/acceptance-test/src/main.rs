@@ -5,9 +5,9 @@ use acceptance_test::{
     generate_postgres_password, get_rollup_client, latest_version_restart_manager_versions,
     prepare_acceptance_run_plan_with_constants, prepare_rollup_state_dir, run_soak,
     run_until_shutdown_signal, shutdown_error, sleep_or_shutdown, spawn_rollup_manager,
-    wait_for_shutdown, write_manager_config, AcceptanceRunPlan, CommonArgs, Directories,
-    LocalConstantsManifest, NomtBucketGrowthConfig, PostgresContainerGuard, ResolvedRunSettings,
-    RunProfile, ShutdownReceiver, SoakRunOptions, API_URL,
+    wait_for_shutdown, with_last_stop_height, write_manager_config, AcceptanceRunPlan, CommonArgs,
+    Directories, LocalConstantsManifest, NomtBucketGrowthConfig, PostgresContainerGuard,
+    ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions, API_URL,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use anyhow::Context;
@@ -141,6 +141,12 @@ fn prepare_test_run(args: Args) -> Result<PreparedTestRun, anyhow::Error> {
     })
 }
 
+fn next_nomt_bucket_growth_stop_height(current_stop_height: u64, final_stop_height: u64) -> u64 {
+    current_stop_height
+        .saturating_add(NOMT_BUCKET_GROWTH_INTERVAL_BLOCKS)
+        .min(final_stop_height)
+}
+
 async fn run_test(
     prepared: PreparedTestRun,
     mut shutdown_rx: ShutdownReceiver,
@@ -170,10 +176,18 @@ async fn run_test(
         .saturating_sub(1);
     let manager_versions =
         extend_last_stop_height(&plan.manager_versions, settings.blocks_per_version);
+    let final_stop_at_height = manager_versions
+        .last()
+        .and_then(|version| version.stop_height)
+        .unwrap_or_default();
+    let initial_stop_at_height =
+        next_nomt_bucket_growth_stop_height(expected_setup_batches + 1, final_stop_at_height);
+    let initial_manager_versions =
+        with_last_stop_height(&manager_versions, initial_stop_at_height)?;
     let manager_config_path = directories
         .output_dir
         .join("acceptance_manager_config.json");
-    write_manager_config(&manager_config_path, &manager_versions)?;
+    write_manager_config(&manager_config_path, &initial_manager_versions)?;
     let restart_manager_versions = latest_version_restart_manager_versions(&manager_versions)?;
     let nomt_growth_rollup_config_path = restart_manager_versions
         .first()
@@ -187,10 +201,6 @@ async fn run_test(
 
     // Start the rollup. Run for 10 seconds
     info!("Starting rollup through sov-rollup-manager");
-    let stop_at_height = manager_versions
-        .last()
-        .and_then(|version| version.stop_height)
-        .unwrap_or_default();
     let rollup = spawn_rollup_manager(
         &plan.manager_binary,
         &manager_config_path,
@@ -276,14 +286,15 @@ async fn run_test(
         resync_soak_config,
         SoakRunOptions {
             throughput_start_batch: latest_batch_num,
-            rollup_stop_height: stop_at_height,
+            rollup_stop_height: final_stop_at_height,
             full_slot_save_interval: settings.full_slot_save_interval,
             save_slot_snapshots: false,
             nomt_bucket_growth: Some(NomtBucketGrowthConfig {
                 rollup_config_path: nomt_growth_rollup_config_path,
                 restart_manager_binary: plan.manager_binary.clone(),
                 restart_manager_config_path,
-                interval_batches: NOMT_BUCKET_GROWTH_INTERVAL_BLOCKS,
+                initial_rollup_stop_height: initial_stop_at_height,
+                interval_blocks: NOMT_BUCKET_GROWTH_INTERVAL_BLOCKS,
                 kernel_bucket_multiplier: NOMT_KERNEL_BUCKET_GROWTH_FACTOR,
                 user_bucket_increment: NOMT_USER_BUCKET_GROWTH_INCREMENT,
             }),
