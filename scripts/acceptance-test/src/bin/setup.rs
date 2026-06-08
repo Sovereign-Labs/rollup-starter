@@ -9,6 +9,7 @@ use acceptance_test::{
     CommonArgs, Directories, PostgresContainerGuard, ResolvedRunSettings, Runtime,
     ShutdownReceiver, SoakRunOptions, Spec, ThroughputReport, API_URL, SETUP_THROUGHPUT_FILE,
 };
+use anyhow::Context;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use clap::Parser;
@@ -67,13 +68,28 @@ fn should_overwrite_throughput(
                     false
                 }
             }
-            Err(_) => {
-                warn!("Existing throughput file is invalid, overwriting");
+            Err(err) => {
+                warn!(
+                    "Existing throughput file at {} is invalid, overwriting: {}",
+                    throughput_path.display(),
+                    err
+                );
                 true
             }
         },
-        Err(_) => {
-            info!("No existing throughput file, creating new one");
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            info!(
+                "No existing throughput file at {}, creating new one",
+                throughput_path.display()
+            );
+            true
+        }
+        Err(err) => {
+            warn!(
+                "Failed to read existing throughput file at {}, overwriting: {}",
+                throughput_path.display(),
+                err
+            );
             true
         }
     }
@@ -210,7 +226,13 @@ async fn run_setup(
         Ok(throughput_report) => {
             let throughput_path = directories.throughput_dir.join(SETUP_THROUGHPUT_FILE);
             if should_overwrite_throughput(&throughput_path, &throughput_report) {
-                std::fs::write(&throughput_path, serde_json::to_string(&throughput_report)?)?;
+                std::fs::write(&throughput_path, serde_json::to_string(&throughput_report)?)
+                    .with_context(|| {
+                        format!(
+                            "failed to write setup throughput baseline {}",
+                            throughput_path.display()
+                        )
+                    })?;
             }
             save_mock_data(directories.clone())?;
             if settings.cleanup_rollup_state_on_success() {
@@ -407,21 +429,28 @@ fn save_mock_data(directories: Directories) -> Result<(), anyhow::Error> {
     for input in ["mock_da.sqlite", "mock_da.sqlite-shm", "mock_da.sqlite-wal"] {
         let mut target = "persistent_".to_string();
         target.push_str(input);
-        if let Err(err) = std::fs::rename(
-            directories.output_dir.join(input),
-            directories.output_dir.join(target),
-        ) {
+        let input_path = directories.output_dir.join(input);
+        let target_path = directories.output_dir.join(target);
+        if let Err(err) = std::fs::rename(&input_path, &target_path) {
             if input == "mock_da.sqlite" {
                 tracing::error!(
-                    "Failed to rename {} for persistence accross runs: {}",
-                    input,
+                    "Failed to rename {} to {} for persistence across runs: {}",
+                    input_path.display(),
+                    target_path.display(),
                     err
                 );
-                return Err(anyhow::anyhow!("Failed to rename {}: {}", input, err));
+                return Err(err).with_context(|| {
+                    format!(
+                        "failed to rename mock DA database from {} to {} for persistence across runs",
+                        input_path.display(),
+                        target_path.display()
+                    )
+                });
             } else {
                 tracing::warn!(
-                    "Failed to rename {} for persistence accross runs: {}. Ignoring.",
-                    input,
+                    "Failed to rename {} to {} for persistence across runs: {}. Ignoring.",
+                    input_path.display(),
+                    target_path.display(),
                     err
                 );
             }
