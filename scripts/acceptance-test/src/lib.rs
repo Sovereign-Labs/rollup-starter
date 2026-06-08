@@ -7,6 +7,7 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rollup_starter::rollup::StarterRollup;
 use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
+use sov_api_spec::ClientInfo;
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::prelude::serde;
 use sov_modules_rollup_blueprint::RollupBlueprint;
@@ -50,6 +51,7 @@ pub const SETUP_THROUGHPUT_FILE: &str = "acceptance_throughput.json";
 const ROLLUP_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const ROLLUP_FORCED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 const TOP_LEVEL_SHUTDOWN_ABORT_TIMEOUT: Duration = Duration::from_secs(90);
+const EVM_SOAK_SAFETY_STOP_BLOCKS: u64 = 20;
 
 pub type Runtime = <StarterRollup<Native> as RollupBlueprint<Native>>::Runtime;
 pub type Spec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
@@ -559,7 +561,8 @@ pub struct NomtBucketGrowthConfig {
     pub restart_manager_config_path: PathBuf,
     pub initial_rollup_stop_height: u64,
     pub interval_blocks: u64,
-    pub kernel_bucket_multiplier: u64,
+    pub kernel_bucket_growth_numerator: u64,
+    pub kernel_bucket_growth_denominator: u64,
     pub user_bucket_increment: u64,
 }
 
@@ -653,6 +656,7 @@ struct NomtBucketGrowth {
 struct SoakBackgroundTasks {
     tasks: JoinSet<anyhow::Result<()>>,
     soak_shutdown_tx: Option<oneshot::Sender<()>>,
+    evm_shutdown_tx: Option<watch::Sender<bool>>,
 }
 
 fn read_bucket_count(storage: &Table, key: &str, config_path: &Path) -> anyhow::Result<u64> {
@@ -694,12 +698,17 @@ fn write_bucket_count(
 
 fn grow_nomt_buckets(
     config_path: &Path,
-    kernel_bucket_multiplier: u64,
+    kernel_bucket_growth_numerator: u64,
+    kernel_bucket_growth_denominator: u64,
     user_bucket_increment: u64,
 ) -> anyhow::Result<NomtBucketGrowth> {
     anyhow::ensure!(
-        kernel_bucket_multiplier > 0,
-        "kernel bucket multiplier must be greater than zero"
+        kernel_bucket_growth_numerator > 0,
+        "kernel bucket growth numerator must be greater than zero"
+    );
+    anyhow::ensure!(
+        kernel_bucket_growth_denominator > 0,
+        "kernel bucket growth denominator must be greater than zero"
     );
 
     let raw = fs::read_to_string(config_path)
@@ -724,17 +733,27 @@ fn grow_nomt_buckets(
         kernel: read_bucket_count(storage, "kernel_hashtable_buckets", config_path)?,
         user: read_bucket_count(storage, "user_hashtable_buckets", config_path)?,
     };
+    let scaled_kernel_buckets = before
+        .kernel
+        .checked_mul(kernel_bucket_growth_numerator)
+        .ok_or_else(|| {
+            anyhow!(
+                "kernel_hashtable_buckets overflow while multiplying {} by {}",
+                before.kernel,
+                kernel_bucket_growth_numerator
+            )
+        })?;
+    let rounded_scaled_kernel_buckets = scaled_kernel_buckets
+        .checked_add(kernel_bucket_growth_denominator - 1)
+        .ok_or_else(|| {
+            anyhow!(
+                "kernel_hashtable_buckets overflow while rounding {} / {} up",
+                scaled_kernel_buckets,
+                kernel_bucket_growth_denominator
+            )
+        })?;
     let after = NomtBucketSizes {
-        kernel: before
-            .kernel
-            .checked_mul(kernel_bucket_multiplier)
-            .ok_or_else(|| {
-                anyhow!(
-                    "kernel_hashtable_buckets overflow while multiplying {} by {}",
-                    before.kernel,
-                    kernel_bucket_multiplier
-                )
-            })?,
+        kernel: rounded_scaled_kernel_buckets / kernel_bucket_growth_denominator,
         user: before
             .user
             .checked_add(user_bucket_increment)
@@ -778,6 +797,51 @@ fn soak_config_for_generation(
     config
 }
 
+#[derive(serde::Deserialize)]
+struct ChainStateValueResponse<T> {
+    value: T,
+}
+
+async fn query_current_rollup_height(client: &sov_api_spec::Client) -> reqwest::Result<u64> {
+    let current_heights_url = format!("{}/modules/chain-state/state/current-heights/", API_URL);
+    client
+        .client()
+        .get(current_heights_url)
+        .send()
+        .await?
+        .json::<ChainStateValueResponse<(u64, u64)>>()
+        .await
+        .map(|resp| resp.value.0)
+}
+
+async fn request_evm_soak_shutdown_before_stop_height(
+    rollup_stop_height: u64,
+    evm_shutdown_tx: watch::Sender<bool>,
+) -> anyhow::Result<()> {
+    let evm_stop_height = rollup_stop_height.saturating_sub(EVM_SOAK_SAFETY_STOP_BLOCKS);
+    let client = get_rollup_client()?;
+
+    loop {
+        match query_current_rollup_height(&client).await {
+            Ok(current_height) if current_height >= evm_stop_height => {
+                info!(
+                    current_height,
+                    evm_stop_height,
+                    rollup_stop_height,
+                    "Stopping EVM soak workers before rollup stop height"
+                );
+                let _ = evm_shutdown_tx.send(true);
+                return Ok(());
+            }
+            Ok(_) => {}
+            Err(e) => {
+                debug!("Failed to query rollup height for EVM pre-stop coordination: {e}");
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 fn spawn_soak_background_tasks(
     directories: &Directories,
     soak_config: SoakManagerConfig,
@@ -798,22 +862,37 @@ fn spawn_soak_background_tasks(
         rollup_stop_height,
     ));
 
+    let (evm_shutdown_tx, evm_shutdown_rx) = watch::channel(false);
+    tasks.spawn(request_evm_soak_shutdown_before_stop_height(
+        rollup_stop_height,
+        evm_shutdown_tx.clone(),
+    ));
+
     let evm_contracts = load_state_consistency_contracts(directories)?;
     for (idx, address) in evm_contracts.pinned.into_iter().enumerate() {
         let worker_key = pinned_worker_key(idx)?;
-        tasks.spawn(evm_state_consistency_worker(address, worker_key, "pinned"));
+        tasks.spawn(evm_state_consistency_worker(
+            address,
+            worker_key,
+            "pinned",
+            evm_shutdown_rx.clone(),
+        ));
     }
 
     for (idx, address) in evm_contracts.unpinned.into_iter().enumerate() {
         let worker_key = unpinned_worker_key(idx)?;
         tasks.spawn(evm_state_consistency_worker(
-            address, worker_key, "unpinned",
+            address,
+            worker_key,
+            "unpinned",
+            evm_shutdown_rx.clone(),
         ));
     }
 
     Ok(SoakBackgroundTasks {
         tasks,
         soak_shutdown_tx: Some(soak_shutdown_tx),
+        evm_shutdown_tx: Some(evm_shutdown_tx),
     })
 }
 
@@ -823,6 +902,9 @@ async fn stop_background_tasks(
 ) -> Vec<anyhow::Error> {
     if let Some(soak_shutdown_tx) = background_tasks.soak_shutdown_tx.take() {
         let _ = soak_shutdown_tx.send(());
+    }
+    if let Some(evm_shutdown_tx) = background_tasks.evm_shutdown_tx.take() {
+        let _ = evm_shutdown_tx.send(true);
     }
     background_tasks.tasks.abort_all();
 
@@ -898,7 +980,8 @@ async fn grow_nomt_buckets_and_start_next_rollup(
 
     let growth = grow_nomt_buckets(
         &growth_config.rollup_config_path,
-        growth_config.kernel_bucket_multiplier,
+        growth_config.kernel_bucket_growth_numerator,
+        growth_config.kernel_bucket_growth_denominator,
         growth_config.user_bucket_increment,
     )?;
     info!(
@@ -1322,18 +1405,18 @@ user_hashtable_buckets = 2_000_000
         )
         .unwrap();
 
-        let growth = grow_nomt_buckets(&config_path, 2, 1_000_000).unwrap();
+        let growth = grow_nomt_buckets(&config_path, 3, 2, 1_000_000).unwrap();
 
         assert_eq!(growth.before.kernel, 16_000);
         assert_eq!(growth.before.user, 2_000_000);
-        assert_eq!(growth.after.kernel, 32_000);
+        assert_eq!(growth.after.kernel, 24_000);
         assert_eq!(growth.after.user, 3_000_000);
 
         let updated = fs::read_to_string(&config_path).unwrap();
         let doc = updated.parse::<DocumentMut>().unwrap();
         assert_eq!(
             doc["storage"]["kernel_hashtable_buckets"].as_integer(),
-            Some(32_000)
+            Some(24_000)
         );
         assert_eq!(
             doc["storage"]["user_hashtable_buckets"].as_integer(),

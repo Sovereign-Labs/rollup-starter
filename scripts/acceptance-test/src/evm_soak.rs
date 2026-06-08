@@ -11,6 +11,7 @@ use std::fs;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio::sync::watch;
 
 const STATE_CONSISTENCY_METADATA: &str = "state_consistency_contracts.json";
 pub const NUM_PINNED_CONTRACTS: usize = 5;
@@ -332,6 +333,7 @@ pub async fn evm_state_consistency_worker(
     contract_address: Address,
     signer_key: String,
     label: &'static str,
+    mut shutdown_rx: watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
     let rpc = RpcClient::new(&signer_key, evm_rpc_addr()).await;
     let from = rpc.address();
@@ -358,14 +360,33 @@ pub async fn evm_state_consistency_worker(
             (tx_count, sleep_ms)
         };
 
-        tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_millis(sleep_ms)) => {}
+            _ = shutdown_rx.changed() => {
+                tracing::info!("EVM worker received pre-stop signal, shutting down");
+                return Ok(());
+            }
+        }
 
         for _ in 0..tx_count {
+            if *shutdown_rx.borrow() {
+                tracing::info!("EVM worker received pre-stop signal, shutting down");
+                return Ok(());
+            }
+
             let new_value = expected_value + U256::from(1);
             let data = encode_update_call(expected_value, new_value);
             let tx = tx_request(from, nonce, Some(contract_address), data, UPDATE_GAS_LIMIT);
 
-            match rpc.eth_send_transaction(tx).await {
+            let send_result = tokio::select! {
+                result = rpc.eth_send_transaction(tx) => result,
+                _ = shutdown_rx.changed() => {
+                    tracing::info!("EVM worker received pre-stop signal, shutting down");
+                    return Ok(());
+                }
+            };
+
+            match send_result {
                 Ok(_) => {
                     nonce = nonce.saturating_add(1);
                     expected_value = new_value;

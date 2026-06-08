@@ -17,8 +17,9 @@ use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
 use std::time::Duration;
 use tracing::info;
 
-const NOMT_BUCKET_GROWTH_INTERVAL_BLOCKS: u64 = 200;
-const NOMT_KERNEL_BUCKET_GROWTH_FACTOR: u64 = 2;
+const NOMT_BUCKET_GROWTH_INTERVAL_BLOCKS: u64 = 100;
+const NOMT_KERNEL_BUCKET_GROWTH_NUMERATOR: u64 = 3;
+const NOMT_KERNEL_BUCKET_GROWTH_DENOMINATOR: u64 = 2;
 const NOMT_USER_BUCKET_GROWTH_INCREMENT: u64 = 1_000_000;
 
 struct PreparedTestRun {
@@ -295,7 +296,8 @@ async fn run_test(
                 restart_manager_config_path,
                 initial_rollup_stop_height: initial_stop_at_height,
                 interval_blocks: NOMT_BUCKET_GROWTH_INTERVAL_BLOCKS,
-                kernel_bucket_multiplier: NOMT_KERNEL_BUCKET_GROWTH_FACTOR,
+                kernel_bucket_growth_numerator: NOMT_KERNEL_BUCKET_GROWTH_NUMERATOR,
+                kernel_bucket_growth_denominator: NOMT_KERNEL_BUCKET_GROWTH_DENOMINATOR,
                 user_bucket_increment: NOMT_USER_BUCKET_GROWTH_INCREMENT,
             }),
         },
