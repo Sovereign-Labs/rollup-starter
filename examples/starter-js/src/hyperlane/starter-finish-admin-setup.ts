@@ -40,6 +40,7 @@ const paymasterUpdateCall: RuntimeCall = {
                     ["0xED1ce6bc5964ff4529A593Bf3ebab2Caf73c31dE", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     ["0x8a7a1774229CDcdE36b1E4A2321e702F25788698", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     ["0xeE1Bdc7095BD0bE36De7b33b9a32D5aFE86Ff36a", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0xbf654552Ce0cA004CE22351ddB908D4A15775871", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                 ]
             }
         }
