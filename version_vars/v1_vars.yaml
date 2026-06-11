@@ -1,6 +1,4 @@
 ---
 # Version v1 overrides.
-# Build of the rollup compiled with STATE_VERSION = 1 (post-migration).
-# Tip of nikolai/relay-devnet-multisig-upgrade as of the fork prep; code is
-# identical to c399d8d7 plus config/docs commits.
-rollup_commit_hash: "45ae5be40c5037d2daa37baa85c595fee8e3d9ba"
+
+rollup_commit_hash: "cb9ff692ec0c198f755085055572eb2212d49f24"
