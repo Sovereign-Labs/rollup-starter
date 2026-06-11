@@ -1,0 +1,29 @@
+---
+# Multi-version rollup specification.
+# Consumed by rollup-starter-ansible to build and select the rollup binary for
+# each block-height range, enabling coordinated hard-fork upgrades.
+#
+# Fork plan (multisig upgrade), fork at rollup height 1000:
+#   v0  -> current relay-devnet build (no STATE_VERSION tracking; on-disk state
+#          reads as version 0), runs from genesis up to and including height 999.
+#   (at the boundary the manager runs v1's generated `rollup-db-migration`
+#    binary to migrate on-disk state 0 -> 1; see build_db_migration below)
+#   v1  -> STATE_VERSION = 1, runs from height 1000 onward.
+rollup_versions:
+  - version_id: "v0"
+    ansible_commit: "cdk-deployment-april-2026"
+    vars_file: "version_vars/v0_vars.yaml"
+    start_height: null
+    stop_height: 149
+    migration_path: null
+    build_db_migration: false
+
+  - version_id: "v1"
+    ansible_commit: "nikolai/updates-for-multisig-upgrade"
+    vars_file: "version_vars/v1_vars.yaml"
+    start_height: 150
+    stop_height: null
+    migration_path: null
+    # Build this version's rollup-db-migration binary; the manager runs it at
+    # the v0 -> v1 boundary with --rollup-config-path of this version.
+    build_db_migration: true

@@ -1,0 +1,6 @@
+---
+# Version v0 overrides.
+# The build relay-devnet-01 runs today ("Constants for devnet"). It predates
+# STATE_VERSION tracking entirely; on-disk state defaults to version 0, which
+# is what the v0 -> v1 migration expects.
+rollup_commit_hash: "11e17237ec42d537cadf49fbbc536198258513b9"
