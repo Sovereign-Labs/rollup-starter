@@ -14,14 +14,14 @@ rollup_versions:
     ansible_commit: "cdk-deployment-april-2026"
     vars_file: "version_vars/v0_vars.yaml"
     start_height: null
-    stop_height: 999
+    stop_height: 149
     migration_path: null
     build_db_migration: false
 
   - version_id: "v1"
     ansible_commit: "nikolai/updates-for-multisig-upgrade"
     vars_file: "version_vars/v1_vars.yaml"
-    start_height: 1000
+    start_height: 150
     stop_height: null
     migration_path: null
     # Build this version's rollup-db-migration binary; the manager runs it at
