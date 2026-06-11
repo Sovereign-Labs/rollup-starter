@@ -38,11 +38,6 @@ update_revision() {
 # Define the list of files to update
 FILES=(
     "Cargo.toml"
-    "scripts/soak-test/Cargo.toml"
-    "crates/provers/risc0/guest-celestia/Cargo.toml"
-    "crates/provers/risc0/guest-mock/Cargo.toml"
-    "crates/provers/sp1/guest-celestia/Cargo.toml"
-    "crates/provers/sp1/guest-mock/Cargo.toml"
 )
 
 # Loop over the list and update each file
