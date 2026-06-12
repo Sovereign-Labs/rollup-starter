@@ -11,11 +11,10 @@ use sov_db::ledger_db::LedgerDb;
 use sov_db::storage_manager::NomtStorageManager;
 use sov_eip712_auth::Eip712AuthenticatorTrait;
 use sov_hyperlane_integration::HyperlaneAddress;
-use sov_mock_zkvm::MockCodeCommitment;
 use sov_modules_api::capabilities::TransactionAuthenticator;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
-use sov_modules_api::rest::StateUpdateReceiver;
-use sov_modules_api::{RawTx, SequencerType, Spec, ZkVerifier};
+use sov_modules_api::SequencerType;
+use sov_modules_api::{RawTx, Spec};
 use sov_modules_rollup_blueprint::pluggable_traits::PluggableSpec;
 use sov_modules_rollup_blueprint::proof_sender::SovApiProofSender;
 use sov_modules_rollup_blueprint::{FullNodeBlueprint, RollupBlueprint, SequencerCreationReceipt};
@@ -26,20 +25,28 @@ use sov_rollup_interface::node::da::DaService as DaServiceTrait;
 use sov_sequencer::rest_api::{AcceptTx, TxInfoWithConfirmation};
 use std::net::SocketAddr;
 
+use sov_mock_zkvm::MockZkVerifier;
+use sov_rollup_full_node_interface::StateUpdateReceiver;
+use sov_rollup_interface::common::SlotNumber;
 use sov_rollup_interface::execution_mode::Native;
+use sov_rollup_interface::node::ledger_api::LedgerStateProvider;
 use sov_rollup_interface::node::SyncStatus;
+use sov_rollup_interface::zk::aggregated_proof::{
+    AggregatedProofPublicData, SerializedAggregatedProof,
+};
+use sov_rollup_interface::zk::ZkVerifier;
 use sov_sequencer::{ProofBlobSender, SeqConfigExtension, Sequencer, TxStatus};
 use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
 use sov_state::Storage;
-use sov_stf_runner::processes::{ParallelProverService, ProverService, RollupProverConfig};
+use sov_stf_runner::processes::{ParallelProverService, RollupProverConfig};
 use sov_stf_runner::RollupConfig;
 use std::sync::Arc;
 use stf_starter::Runtime;
 use tokio::sync::watch;
 
 use crate::da::{new_da_service, new_verifier, DaService, DaSpec};
-use crate::zkvm::{create_inner_vm_from_config, get_outer_vm, Hasher, InnerZkvm, OuterZkvm};
+use crate::zkvm::{create_inner_vm, get_outer_vm, Hasher, InnerZkvm, OuterZkvm};
 
 type NativeStorage = NomtProverStorage<
     DefaultStorageSpec<Hasher>,
@@ -91,12 +98,6 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
 
     type ProofSender = SovApiProofSender<Self::Spec>;
 
-    fn create_outer_code_commitment(
-        &self,
-    ) -> <<Self::ProverService as ProverService>::Verifier as ZkVerifier>::CodeCommitment {
-        MockCodeCommitment::default()
-    }
-
     async fn create_endpoints(
         &self,
         state_update_receiver: StateUpdateReceiver<<Self::Spec as Spec>::Storage>,
@@ -128,22 +129,59 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
 
     async fn create_prover_service(
         &self,
-        prover_config: RollupProverConfig<<Self::Spec as Spec>::InnerZkvm>,
+        _prover_config: RollupProverConfig,
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
         _da_service: &Self::DaService,
-    ) -> Self::ProverService {
-        let inner_vm = create_inner_vm_from_config(prover_config.clone());
-        let (_, prover_config_disc) = prover_config.split();
-        let outer_vm = get_outer_vm();
+        ledger_db: &LedgerDb,
+        start_fresh_outer_proof_on_resync: bool,
+    ) -> anyhow::Result<(Self::ProverService, Option<SlotNumber>)> {
+        let previous_proof = read_latest_aggregated_proof(ledger_db).await;
+
+        let previous_public_data: Option<
+            AggregatedProofPublicData<
+                <Self::Spec as Spec>::Address,
+                DaSpec,
+                <<Self::Spec as Spec>::Storage as Storage>::Root,
+            >,
+        > = previous_proof
+            .as_ref()
+            .map(|proof| {
+                MockZkVerifier::extract_public_data(&proof.clone().to_serialized_zk_proof())
+            })
+            .transpose()
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to extract public data from persisted aggregated proof: {e:?}"
+                )
+            })?;
+
+        let latest_proof_final_slot = previous_public_data.as_ref().map(|p| p.final_slot_number);
+
+        let previous_for_outer = if start_fresh_outer_proof_on_resync {
+            None
+        } else {
+            previous_proof
+        };
+
+        let inner_vm = create_inner_vm().await;
+        let outer_vm = get_outer_vm(previous_for_outer);
         let da_verifier = new_verifier();
 
-        ParallelProverService::new_with_default_workers(
+        let proof_manager = rollup_config
+            .proof_manager
+            .as_ref()
+            .expect("proof_manager must be set when prover is enabled");
+        let num_threads = proof_manager.prover_thread_count();
+
+        let prover = ParallelProverService::new_with_default_workers(
             inner_vm,
             outer_vm,
             da_verifier,
-            prover_config_disc,
-            rollup_config.proof_manager.prover_address,
-        )
+            proof_manager.prover_address,
+            num_threads,
+        );
+
+        Ok((prover, latest_proof_final_slot))
     }
 
     fn create_storage_manager(
@@ -232,4 +270,14 @@ where
         status: TxStatus::Submitted,
     }
     .into())
+}
+
+async fn read_latest_aggregated_proof(ledger_db: &LedgerDb) -> Option<SerializedAggregatedProof> {
+    Some(
+        ledger_db
+            .get_latest_aggregated_proof()
+            .await
+            .expect("Failed to read latest aggregated proof from ledger DB")?
+            .proof,
+    )
 }

@@ -4,12 +4,11 @@ use anyhow::Context;
 use clap::Parser;
 use rollup_starter::da::DaService;
 use rollup_starter::rollup::StarterRollup;
-use rollup_starter::zkvm::{rollup_host_args, InnerZkvm};
 use sov_modules_rollup_blueprint::logging::initialize_logging;
 use sov_modules_rollup_blueprint::FullNodeBlueprint;
 use sov_modules_rollup_blueprint::Rollup;
 use sov_rollup_interface::execution_mode::Native;
-use sov_stf_runner::processes::{RollupProverConfig, RollupProverConfigDiscriminants};
+use sov_stf_runner::processes::RollupProverConfig;
 use sov_stf_runner::{from_toml_path, RollupConfig};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -51,11 +50,20 @@ struct Args {
     /// Stops the rollup at a given height.
     #[arg(long, default_value = None)]
     stop_at_rollup_height: Option<u64>,
+
+    /// When true, the rollup skips proving unsynced blocks; once it catches up,
+    /// it issues a fresh outer proof that replaces any previous one.
+    #[arg(long, default_value_t = false)]
+    start_fresh_outer_proof_on_resync: bool,
 }
 
 #[tokio::main]
 // Not returning a result here, so the error could be logged properly.
 async fn main() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls ring crypto provider");
+
     let args = Args::parse();
 
     let _guard = initialize_logging();
@@ -65,30 +73,26 @@ async fn main() {
     prometheus_exporter::start(address.parse().unwrap())
         .expect("Could not start prometheus server");
 
-    let prover_config_disc = parse_prover_config().expect("Malformed prover_config");
-    tracing::info!(
-        ?prover_config_disc,
-        "Running demo rollup with prover config"
-    );
+    let prover_config = parse_prover_config().expect("Malformed prover_config");
+    tracing::info!(?prover_config, "Running demo rollup with prover config");
 
-    let prover_config =
-        prover_config_disc.map(|config_disc| config_disc.into_config(rollup_host_args()));
     let rollup = new_rollup(
         args.genesis_path,
         args.rollup_config_path,
         prover_config,
         args.start_at_rollup_height.map(RollupHeight::new),
         args.stop_at_rollup_height.map(RollupHeight::new),
+        args.start_fresh_outer_proof_on_resync,
     )
     .await
     .expect("Couldn't start rollup");
     rollup.run().await.expect("Couldn't run rollup");
 }
 
-fn parse_prover_config() -> anyhow::Result<Option<RollupProverConfigDiscriminants>> {
+fn parse_prover_config() -> anyhow::Result<RollupProverConfig> {
     if let Some(value) = option_env!("SOV_PROVER_MODE") {
         tracing::warn!("SOV_PROVER_MODE is set to {}, but proving is not currently supported. Ignoring prover config.", value);
-        Ok(None)
+        Ok(RollupProverConfig::Disabled)
         // TODO: Re-enable proving once https://github.com/Sovereign-Labs/sovereign-sdk-wip/issues/2814 is resolved
         //
         // let config = std::str::FromStr::from_str(value).inspect_err(|&error| {
@@ -96,22 +100,23 @@ fn parse_prover_config() -> anyhow::Result<Option<RollupProverConfigDiscriminant
         // })?;
         // #[cfg(debug_assertions)]
         // {
-        //     if config == RollupProverConfigDiscriminants::Prove {
+        //     if config == RollupProverConfig::Prove {
         //         tracing::warn!(prover_config = ?config, "Given RollupProverConfig might cause slow rollup progression if not compiled in release mode.");
         //     }
         // }
-        // Ok(Some(config))
+        // Ok(config)
     } else {
-        Ok(None)
+        Ok(RollupProverConfig::Disabled)
     }
 }
 
 async fn new_rollup(
     genesis_path: PathBuf,
     rollup_config_path: PathBuf,
-    prover_config: Option<RollupProverConfig<InnerZkvm>>,
+    prover_config: RollupProverConfig,
     start_at_rollup_height: Option<RollupHeight>,
     stop_at_rollup_height: Option<RollupHeight>,
+    start_fresh_outer_proof_on_resync: bool,
 ) -> Result<Rollup<StarterRollup<Native>, Native>, anyhow::Error> {
     tracing::info!(
         ?rollup_config_path,
@@ -148,6 +153,7 @@ async fn new_rollup(
             start_at_rollup_height,
             stop_at_rollup_height,
             Some(evm_pinned_cache_config),
+            start_fresh_outer_proof_on_resync,
         )
         .await
 }

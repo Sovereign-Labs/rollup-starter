@@ -33,7 +33,8 @@ sov-sequencer = { workspace = true }
 sov-rest-utils = { workspace = true }
 sov-eip712-auth = { workspace = true }
 sov-rollup-interface = { workspace = true }
-sov-celestia-adapter = { workspace = true, features = ["native", ], optional = true }
+sov-rollup-full-node-interface = { workspace = true }
+sov-celestia-adapter = { workspace = true, features = ["native"], optional = true }
 
 axum = { workspace = true }
 anyhow = { workspace = true }
@@ -50,10 +51,11 @@ prometheus_exporter = { workspace = true }
 stf-starter = { workspace = true, default-features = false, features = ["native"] }
 
 # binary dependencies
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing-subscriber = { workspace = true }
 tracing-panic = "0.1.2"
 bytes = "1.7.2"
 rand = "0.8.5"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }
