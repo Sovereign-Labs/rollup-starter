@@ -8,16 +8,16 @@ freeze = [1, 1]
 
 [constants]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
-CHAIN_ID = 537713
-CHAIN_NAME = "Relay"
+CHAIN_ID = 537724
+CHAIN_NAME = "Relay-Dev"
 # Chain hash overrides by rollup block height range.
 # TODO: This is set to i64::MAX for resync tests to work after dev changed the chain_hash. Set to proper heights when doing a deployment with the new chain hash.
-CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 2887000, chain_hash = "0x30b30bc6849c4ae1429d117ddb4cd101aa32daa692889d14a630b9d25986fde0", grace_period = 50_000 }]
+CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 1337600, chain_hash = "0x49908b46753d1a4ac8834478cb3944cdad173fd2c14879d45780cce58da43e0a", grace_period = 40_000 }]
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert to ASCII bytes
 # Should be 10 bytes long for Celestia
-BATCH_NAMESPACE = { byte_string = "relay-data" }
+BATCH_NAMESPACE = { byte_string = "relay-dev1" }
 # The namespace used by the rollup to store aggregated ZK proofs.
 # This is "sov-test-p" encoded as ASCII bytes.
 # "hex" format is used as an example, that it is possible to define namespace as any sequence of bytes.
@@ -61,7 +61,7 @@ DEFERRED_SLOTS_COUNT = 17280
 # The maximum number of visible slots that the sequencer can advance the rollup in a single slot.
 # Larger values of this parameter mean that the soft-confirmations are less vulnerable to congestion on the DA layer,
 # but make it correspondingly easier for a malicious sequencer to grief other sequencers.
-MAX_VISIBLE_HEIGHT_INCREASE_PER_SLOT = 20
+MAX_VISIBLE_HEIGHT_INCREASE_PER_SLOT = 200
 # How many *rollup blocks* we wait before making a state root visible to the rollup.
 # This value should always be set to at least 1
 STATE_ROOT_DELAY_BLOCKS = 5
@@ -133,29 +133,13 @@ EVM_MAX_FEE_CHECK_HEIGHT = 172397
 
 # After this EVM (rollup) block height, RPC receipts derive `effectiveGasPrice` from the
 # actual fee charged by the Sovereign gas meter (instead of the legacy estimate).
-#
-# Target activation: ~Wed 2026-06-03, ~15:00 Central Europe (CEST = 13:00 UTC) — mid-day in
-# Europe, morning in the US.
-# That is ~Celestia DA height 11,373,300 (Celestia ~6s/block, ~14,400 blocks/day).
-#
-# This is a ROLLUP EVM block height (eth_blockNumber),
-# which is NOT (celestia_height - genesis_da_height):
-# the live Relay chain trails that mapping. As of 2026-05-27 12:51 UTC,
-# EVM height 1,991,204 was at Celestia height 11,271,244 -> measured offset 9,280,040
-# (~8,078 above genesis_da_height 9,271,962 in configs/celestia/genesis.json).
-# Hence: 11,373,300 - 9,280,040 = 2,093,260.
-#
-# To re-verify closer to the date, recompute the offset from live heights:
-#   curl -s https://rpc.chain.relay.link/ -X POST -H 'content-type: application/json' \
-#     -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'   # hex EVM height
-#   curl -s https://api-mainnet.celenium.io/v1/head                          # Celestia height
-# then: rollup_height = desired_celestia_height - (current_celestia_height - current_evm_height)
-EVM_RECEIPT_ACTUAL_FEE_HEIGHT = 2_093_260
+# Devnet: active since genesis.
+EVM_RECEIPT_ACTUAL_FEE_HEIGHT = 0
 
 # Before this rollup height, custom EVM precompiles are disabled without reading their enabled set.
 # Keep disabled until every node is running a compatibility-aware binary and an activation height
 # has been scheduled.
-ENABLE_EVM_CUSTOM_PRECOMPILES_AT = 2_946_000
+ENABLE_EVM_CUSTOM_PRECOMPILES_AT = 0
 
 # Maximum amount of gas the sequencer can pay for the tx execution ---
 MAX_SEQUENCER_EXEC_GAS_PER_TX = [1_000_000_000, 1_000_000_000]
