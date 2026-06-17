@@ -76,6 +76,11 @@ GAS_DIMENSIONS = { const = 2 }
 GAS_FORCED_SEQUENCER_REGISTRATION_COST = [100000, 100000]
 # The ID of the "native token" of the rollup, which is used to pay gas fees.
 GAS_TOKEN_ID = { bech32 = "token_1g26n9g2wfhs9y4v2a8h2e73yx232m3jl95snr4ndth04ut8a2qfqd5rvh4", type = "TokenId" }
+# The number of decimal places of the rollup's gas token. This is the authoritative source of
+# truth for the gas token's decimals: unlike normal tokens (whose decimals are encoded in the last
+# byte of their id), the gas token id is a fixed constant whose last byte does not encode the decimals.
+# Relay's gas token is ETH-denominated, so it uses 18 decimals.
+GAS_TOKEN_DECIMALS = 18
 # The HRP prefix that appears in all rollup addresses.
 ADDRESS_PREFIX = { const = "sov" }
 # --- Gas parameters to charge for state accesses ---
