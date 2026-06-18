@@ -1,0 +1,23 @@
+[package]
+description = "Relay price oracle EVM precompile for the Sovereign rollup."
+edition = { workspace = true }
+license = { workspace = true }
+name = "price-oracle"
+publish = false
+repository = { workspace = true }
+rust-version = { workspace = true }
+version = "1.0.0"
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["borsh"] }
+borsh = { workspace = true }
+sov-evm = { workspace = true }
+sov-modules-api = { workspace = true }
+
+[dev-dependencies]
+sov-test-utils = { workspace = true }
+sov-rollup-interface = { workspace = true }
+
+[features]
+default = []
+native = ["sov-evm/native", "sov-modules-api/native"]

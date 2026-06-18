@@ -1,14 +1,44 @@
 //! This is a technical only module to forward all necessary implementations to inner, non-authenticated Runtime
+use borsh::BorshDeserialize;
+use price_oracle::SerializedPriceUpdates;
+use price_oracle::UsedFeedKeys;
 use sov_address::{EthereumAddress, FromVmAddress};
+use sov_bank::Amount;
 use sov_capabilities::StandardProvenRollupCapabilities as StandardCapabilities;
 use sov_eip712_auth::{Eip712AuthenticatorTrait, Secp256k1CryptoSpec};
 use sov_evm::EthereumAuthenticator;
 use sov_hyperlane_integration::HyperlaneAddress;
 use sov_kernels::soft_confirmations::SoftConfirmationsKernel;
+use sov_modules_api::capabilities::AuthorizationData;
+use sov_modules_api::capabilities::GasEnforcer;
 #[cfg(feature = "native")]
 use sov_modules_api::capabilities::KernelWithSlotMapping;
-use sov_modules_api::capabilities::TransactionAuthenticator;
+use sov_modules_api::capabilities::ProofProcessor;
+use sov_modules_api::capabilities::SequencerAuthorization;
+use sov_modules_api::capabilities::SequencerRemuneration;
+use sov_modules_api::capabilities::TransactionAuthorizer;
 use sov_modules_api::capabilities::{Guard, HasCapabilities, HasKernel};
+use sov_modules_api::capabilities::{SequencingDataHandler, TransactionAuthenticator};
+use sov_modules_api::transaction::ProverReward;
+use sov_modules_api::transaction::RemainingFunds;
+use sov_modules_api::transaction::SequencerReward;
+use sov_modules_api::AggregatedProofPublicData;
+use sov_modules_api::ExecutionContext;
+use sov_modules_api::Gas;
+use sov_modules_api::GetGasPrice;
+use sov_modules_api::InfallibleStateAccessor;
+use sov_modules_api::InvalidProofError;
+use sov_modules_api::OperatingMode;
+use sov_modules_api::Rewards;
+use sov_modules_api::SequencerType;
+use sov_modules_api::SerializedAggregatedProof;
+use sov_modules_api::SerializedAttestation;
+use sov_modules_api::SerializedChallenge;
+use sov_modules_api::SovAttestation;
+use sov_modules_api::SovStateTransitionPublicData;
+use sov_modules_api::StateReader;
+use sov_modules_api::StateWriter;
+use sov_modules_api::VersionReader;
 use sov_modules_api::{prelude::*, RawTx};
 use sov_modules_api::{
     AuthenticatedTransactionData, BlockHooks, DispatchCall, EncodeCall, Genesis, GenesisState,
@@ -16,6 +46,10 @@ use sov_modules_api::{
 };
 use sov_modules_api::{ModuleError, ModuleId, ModuleInfo, NestedEnumUtils};
 use sov_rollup_interface::da::DaSpec;
+use sov_state::Kernel;
+use sov_state::User;
+use std::collections::BTreeSet;
+use std::convert::Infallible;
 
 use crate::authentication::EvmAndEip712AuthenticatorInput;
 use crate::Runtime;
@@ -201,20 +235,22 @@ impl<S: Spec> HasCapabilities<S> for Runtime<S>
 where
     S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
-    type Capabilities<'a> = StandardCapabilities<'a, S, &'a mut sov_paymaster::Paymaster<S>>;
-    type SequencingData = sov_modules_api::HDTimestamp;
+    type Capabilities<'a> = RelayChainCapabilities<'a, S>;
+    type SequencingData = SerializedPriceUpdates;
 
     fn capabilities(&mut self) -> Guard<Self::Capabilities<'_>> {
-        Guard::new(StandardCapabilities {
-            bank: &mut self.0.bank,
-            sequencer_registry: &mut self.0.sequencer_registry,
-            accounts: &mut self.0.accounts,
-            uniqueness: &mut self.0.uniqueness,
-            gas_payer: &mut self.0.paymaster,
-            chain_state: &mut self.0.chain_state,
-            operator_incentives: &mut self.0.operator_incentives,
-            attester_incentives: &mut self.0.attester_incentives,
-            prover_incentives: &mut self.0.prover_incentives,
+        Guard::new(RelayChainCapabilities {
+            standard: StandardCapabilities {
+                bank: &mut self.0.bank,
+                sequencer_registry: &mut self.0.sequencer_registry,
+                accounts: &mut self.0.accounts,
+                uniqueness: &mut self.0.uniqueness,
+                gas_payer: &mut self.0.paymaster,
+                chain_state: &mut self.0.chain_state,
+                operator_incentives: &mut self.0.operator_incentives,
+                attester_incentives: &mut self.0.attester_incentives,
+                prover_incentives: &mut self.0.prover_incentives,
+            },
         })
     }
 }
@@ -271,5 +307,326 @@ where
 {
     fn add_eip712_auth(tx: RawTx) -> <Self::Auth as TransactionAuthenticator<S>>::Input {
         EvmAndEip712AuthenticatorInput::Eip712(tx)
+    }
+}
+
+pub struct RelayChainCapabilities<'a, S: Spec> {
+    standard: StandardCapabilities<'a, S, &'a mut sov_paymaster::Paymaster<S>>,
+}
+
+impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
+    type SequencingData = SerializedPriceUpdates;
+
+    fn handle_sequencing_data(
+        &mut self,
+        _data: Self::SequencingData,
+        _context: &Context<S>,
+        _state: &mut impl TxState<S>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    #[cfg(feature = "native")]
+    fn create_sequencing_data(&self) -> Self::SequencingData {
+        crate::price_source::snapshot_prices()
+    }
+
+    #[cfg(feature = "native")]
+    fn finalize_sequencing_data(
+        &mut self,
+        data: Self::SequencingData,
+        scratchpad: Option<sov_rollup_interface::Bytes>,
+    ) -> Self::SequencingData {
+        prune_unused_price_updates(data, scratchpad)
+    }
+}
+
+#[cfg(feature = "native")]
+fn prune_unused_price_updates(
+    mut data: SerializedPriceUpdates,
+    scratchpad: Option<sov_rollup_interface::Bytes>,
+) -> SerializedPriceUpdates {
+    let Some(scratchpad) = scratchpad else {
+        return SerializedPriceUpdates::default();
+    };
+    match UsedFeedKeys::try_from_slice(&scratchpad) {
+        Ok(used) => {
+            let keep: BTreeSet<_> = used.0.into_iter().collect();
+            data.retain_keys(&keep);
+            data
+        }
+        Err(err) => {
+            tracing::error!(
+                %err,
+                "could not decode used-feed-key scratchpad, publishing full price snapshot"
+            );
+            data
+        }
+    }
+}
+
+#[cfg(all(test, feature = "native"))]
+mod prune_tests {
+    use std::collections::BTreeMap;
+
+    use alloy_primitives::{keccak256, B256};
+    use price_oracle::FeedKey;
+
+    use super::*;
+
+    fn key(suffix: u8) -> FeedKey {
+        let mut feed = [0u8; 32];
+        feed[31] = suffix;
+        FeedKey::new(keccak256("chainlink"), B256::from(feed))
+    }
+
+    fn snapshot(keys: &[FeedKey]) -> SerializedPriceUpdates {
+        SerializedPriceUpdates(
+            keys.iter()
+                .map(|k| (*k, b"payload".to_vec()))
+                .collect::<BTreeMap<_, _>>(),
+        )
+    }
+
+    #[test]
+    fn none_scratchpad_prunes_every_update() {
+        let pruned = prune_unused_price_updates(snapshot(&[key(1), key(2)]), None);
+        assert!(pruned.0.is_empty());
+    }
+
+    #[test]
+    fn decoded_scratchpad_keeps_only_used_feeds() {
+        let used = UsedFeedKeys(vec![key(2)]);
+        let scratchpad = sov_rollup_interface::Bytes::from(borsh::to_vec(&used).unwrap());
+        let pruned =
+            prune_unused_price_updates(snapshot(&[key(1), key(2), key(3)]), Some(scratchpad));
+        assert_eq!(pruned.0.len(), 1);
+        assert!(pruned.get(&key(2)).is_some());
+    }
+
+    #[test]
+    fn undecodable_scratchpad_keeps_full_snapshot() {
+        let garbage = sov_rollup_interface::Bytes::from(vec![0x01u8]);
+        let pruned = prune_unused_price_updates(snapshot(&[key(1), key(2)]), Some(garbage));
+        assert_eq!(pruned.0.len(), 2);
+    }
+}
+
+impl<S: Spec> GasEnforcer<S> for RelayChainCapabilities<'_, S> {
+    fn try_reserve_gas(
+        &mut self,
+        tx: &AuthenticatedTransactionData<S>,
+        gas_price: <S::Gas as Gas>::Price,
+        ctx: &mut Context<S>,
+        state: &mut impl StateAccessor,
+    ) -> anyhow::Result<()> {
+        self.standard.try_reserve_gas(tx, gas_price, ctx, state)
+    }
+
+    fn try_reserve_gas_for_proof(
+        &mut self,
+        tx: &AuthenticatedTransactionData<S>,
+        gas_price: <S::Gas as Gas>::Price,
+        sender: &S::Address,
+        state: &mut impl StateAccessor,
+    ) -> anyhow::Result<()> {
+        self.standard
+            .try_reserve_gas_for_proof(tx, gas_price, sender, state)
+    }
+
+    fn reward_prover(
+        &mut self,
+        prover_rewards: &ProverReward,
+        operating_mode: OperatingMode,
+        state: &mut impl InfallibleStateAccessor,
+    ) {
+        self.standard
+            .reward_prover(prover_rewards, operating_mode, state);
+    }
+
+    fn refund_remaining_gas(
+        &mut self,
+        recipient: &S::Address,
+        remaining_funds: &RemainingFunds,
+        state: &mut impl InfallibleStateAccessor,
+    ) {
+        self.standard
+            .refund_remaining_gas(recipient, remaining_funds, state);
+    }
+
+    fn reward_prover_from_sequencer_balance(
+        &mut self,
+        amount: Amount,
+        sequencer: &S::Address,
+        operating_mode: OperatingMode,
+        state: &mut impl InfallibleStateAccessor,
+    ) -> anyhow::Result<()> {
+        self.standard
+            .reward_prover_from_sequencer_balance(amount, sequencer, operating_mode, state)
+    }
+
+    fn return_escrowed_funds_to_sequencer<
+        Accessor: StateReader<Kernel, Error = Infallible>
+            + StateWriter<Kernel, Error = Infallible>
+            + StateWriter<User, Error = Infallible>
+            + StateReader<User, Error = Infallible>
+            + VersionReader,
+    >(
+        &mut self,
+        bond_amount: Amount,
+        reward: Rewards,
+        sequencer: &<S::Da as DaSpec>::Address,
+        state: &mut Accessor,
+    ) {
+        self.standard
+            .return_escrowed_funds_to_sequencer(bond_amount, reward, sequencer, state);
+    }
+}
+
+impl<S: Spec> SequencerAuthorization<S> for RelayChainCapabilities<'_, S> {
+    fn is_preferred_sequencer(
+        &self,
+        sequencer: &<S::Da as DaSpec>::Address,
+        state: &mut impl InfallibleStateAccessor,
+    ) -> bool {
+        self.standard.is_preferred_sequencer(sequencer, state)
+    }
+}
+
+impl<S: Spec> TransactionAuthorizer<S> for RelayChainCapabilities<'_, S> {
+    fn resolve_context(
+        &mut self,
+        auth_data: &AuthorizationData<S>,
+        sequencer: &<S::Da as DaSpec>::Address,
+        sequencer_rollup_address: S::Address,
+        state: &mut impl StateAccessor,
+        sequencing_data: Option<sov_rollup_interface::Bytes>,
+        execution_context: ExecutionContext,
+        sequencer_type: SequencerType,
+    ) -> anyhow::Result<Context<S>> {
+        self.standard.resolve_context(
+            auth_data,
+            sequencer,
+            sequencer_rollup_address,
+            state,
+            sequencing_data,
+            execution_context,
+            sequencer_type,
+        )
+    }
+
+    fn resolve_unregistered_context(
+        &mut self,
+        auth_data: &AuthorizationData<S>,
+        sequencer: &<S::Da as DaSpec>::Address,
+        state: &mut impl StateAccessor,
+        execution_context: ExecutionContext,
+    ) -> anyhow::Result<Context<S>> {
+        self.standard
+            .resolve_unregistered_context(auth_data, sequencer, state, execution_context)
+    }
+
+    fn check_uniqueness(
+        &self,
+        auth_data: &AuthorizationData<S>,
+        context: &Context<S>,
+        execution_context: &ExecutionContext,
+        state: &mut impl StateAccessor,
+    ) -> anyhow::Result<()> {
+        self.standard
+            .check_uniqueness(auth_data, context, execution_context, state)
+    }
+
+    fn mark_tx_attempted(
+        &mut self,
+        auth_data: &AuthorizationData<S>,
+        sequencer: &<S::Da as DaSpec>::Address,
+        state: &mut impl StateAccessor,
+    ) -> anyhow::Result<()> {
+        self.standard.mark_tx_attempted(auth_data, sequencer, state)
+    }
+}
+
+impl<'a, S: Spec> ProofProcessor<S> for RelayChainCapabilities<'a, S> {
+    type BondingProofService<K: HasKernel<S>> = <StandardCapabilities<
+        'a,
+        S,
+        &'a mut sov_paymaster::Paymaster<S>,
+    > as ProofProcessor<S>>::BondingProofService<K>;
+
+    fn create_bonding_proof_service<K: HasKernel<S>>(
+        &self,
+        attester_address: S::Address,
+        storage_receiver: tokio::sync::watch::Receiver<S::Storage>,
+    ) -> Self::BondingProofService<K> {
+        self.standard
+            .create_bonding_proof_service::<K>(attester_address, storage_receiver)
+    }
+
+    fn process_aggregated_proof<ST: TxState<S> + GetGasPrice<Spec = S>>(
+        &mut self,
+        proof: SerializedAggregatedProof,
+        prover_address: &S::Address,
+        execution_context: ExecutionContext,
+        state: &mut ST,
+    ) -> Result<
+        (
+            AggregatedProofPublicData<S::Address, S::Da, <S::Storage as Storage>::Root>,
+            SerializedAggregatedProof,
+        ),
+        InvalidProofError,
+    > {
+        self.standard
+            .process_aggregated_proof(proof, prover_address, execution_context, state)
+    }
+
+    fn process_attestation<ST: TxState<S> + GetGasPrice<Spec = S>>(
+        &mut self,
+        proof: SerializedAttestation,
+        prover_address: &S::Address,
+        state: &mut ST,
+    ) -> Result<SovAttestation<S>, InvalidProofError> {
+        self.standard
+            .process_attestation(proof, prover_address, state)
+    }
+
+    fn process_challenge<ST: TxState<S> + GetGasPrice<Spec = S>>(
+        &mut self,
+        proof: SerializedChallenge,
+        rollup_height: sov_rollup_interface::common::SlotNumber,
+        prover_address: &S::Address,
+        state: &mut ST,
+    ) -> Result<SovStateTransitionPublicData<S>, InvalidProofError> {
+        self.standard
+            .process_challenge(proof, rollup_height, prover_address, state)
+    }
+}
+
+impl<S: Spec> SequencerRemuneration<S> for RelayChainCapabilities<'_, S> {
+    fn reward_sequencer_or_refund<
+        Accessor: StateReader<Kernel, Error = Infallible>
+            + StateWriter<Kernel, Error = Infallible>
+            + StateWriter<User, Error = Infallible>
+            + StateReader<User, Error = Infallible>,
+    >(
+        &mut self,
+        sequencer: &<S::Da as DaSpec>::Address,
+        sequencer_rollup_address: &S::Address,
+        reward: SequencerReward,
+        state: &mut Accessor,
+    ) {
+        self.standard.reward_sequencer_or_refund(
+            sequencer,
+            sequencer_rollup_address,
+            reward,
+            state,
+        );
+    }
+
+    fn preferred_sequencer(
+        &self,
+        state: &mut impl InfallibleStateAccessor,
+    ) -> Option<<S::Da as DaSpec>::Address> {
+        self.standard.preferred_sequencer(state)
     }
 }

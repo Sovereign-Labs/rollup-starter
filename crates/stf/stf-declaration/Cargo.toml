@@ -31,6 +31,7 @@ sov-rollup-apis = { workspace = true, optional = true }
 sov-hyperlane-integration = { workspace = true }
 sov-evm = { workspace = true }
 sov-address = { workspace = true }
+price-oracle = { workspace = true }
 
 tracing = { workspace = true }
 value-setter = { workspace = true }
@@ -72,7 +73,8 @@ native = [
 	"sov-revenue-share/native",
 	"sov-address/native",
 	"sov-evm/native",
-	"sov-test-state-consistency/native"
+	"sov-test-state-consistency/native",
+	"price-oracle/native"
 ]
 bench = [
     "sov-modules-api/bench",

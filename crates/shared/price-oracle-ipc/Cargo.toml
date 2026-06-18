@@ -1,0 +1,21 @@
+[package]
+description = "Provider-agnostic IPC protocol for oracle provider services"
+edition = { workspace = true }
+license = { workspace = true }
+name = "price-oracle-ipc"
+publish = false
+repository = { workspace = true }
+rust-version = { workspace = true }
+version = { workspace = true }
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["borsh"] }
+borsh = { workspace = true }
+socket2 = { version = "0.5", default-features = false, features = ["all"] }
+thiserror = { version = "1", default-features = false }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }

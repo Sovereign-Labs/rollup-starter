@@ -218,6 +218,7 @@ checksum = "de3b431b4e72cd8bd0ec7a50b4be18e73dab74de0dba180eef171055e5d5926e"
 dependencies = [
  "alloy-rlp",
  "arbitrary",
+ "borsh",
  "bytes",
  "cfg-if",
  "const-hex",
@@ -5011,6 +5012,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "price-oracle"
+version = "1.0.0"
+dependencies = [
+ "alloy-primitives",
+ "borsh",
+ "sov-evm",
+ "sov-modules-api",
+ "sov-rollup-interface",
+ "sov-test-utils",
+]
+
+[[package]]
+name = "price-oracle-ipc"
+version = "0.3.0"
+dependencies = [
+ "alloy-primitives",
+ "borsh",
+ "socket2 0.5.10",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "primeorder"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6019,6 +6045,7 @@ dependencies = [
 name = "rollup-starter"
 version = "0.3.0"
 dependencies = [
+ "alloy-primitives",
  "anyhow",
  "async-trait",
  "axum",
@@ -6026,6 +6053,9 @@ dependencies = [
  "bytes",
  "clap",
  "futures",
+ "hex",
+ "price-oracle",
+ "price-oracle-ipc",
  "prometheus_exporter",
  "rand 0.8.5",
  "rustls",
@@ -6059,6 +6089,7 @@ dependencies = [
  "stf-starter",
  "tempfile",
  "tokio",
+ "toml",
  "tracing",
  "tracing-panic",
  "tracing-subscriber 0.3.23",
@@ -6113,6 +6144,7 @@ dependencies = [
  "ark-ff 0.3.0",
  "ark-ff 0.4.2",
  "ark-ff 0.5.0",
+ "borsh",
  "bytes",
  "fastrlp 0.3.1",
  "fastrlp 0.4.0",
@@ -8310,8 +8342,10 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "stf-starter"
 version = "0.3.0"
 dependencies = [
+ "alloy-primitives",
  "anyhow",
  "borsh",
+ "price-oracle",
  "serde_json",
  "sov-address",
  "sov-bank",
@@ -8334,6 +8368,7 @@ dependencies = [
  "sov-test-state-consistency",
  "sov-universal-wallet",
  "stf-starter-declaration",
+ "tracing",
 ]
 
 [[package]]
@@ -8344,6 +8379,7 @@ dependencies = [
  "borsh",
  "clap",
  "jsonrpsee",
+ "price-oracle",
  "serde",
  "sov-accounts",
  "sov-address",

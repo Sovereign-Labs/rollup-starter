@@ -16,6 +16,12 @@ use sov_modules_api::{DispatchCall, Event, Genesis, Hooks, MessageCodec, Spec};
 
 pub type Mailbox<S> = RawMailbox<S, Warp<S>>;
 
+sov_evm::generate_precompile_set! {
+    pub struct RelayEvmPrecompiles<S> {
+        price_oracle: price_oracle::PriceOraclePrecompile<S>,
+    }
+}
+
 /// The runtime defines the logic of the rollup.
 ///
 /// At a high level, the rollup node receives serialized "call messages" from the DA layer and executes them as atomic transactions.
@@ -89,5 +95,5 @@ where
     pub state_consistency: sov_test_state_consistency::StateConsistency<S>,
     #[cfg_attr(feature = "native", cli_skip)]
     /// The EVM module.
-    pub evm: sov_evm::Evm<S>,
+    pub evm: sov_evm::Evm<S, RelayEvmPrecompiles<S>>,
 }

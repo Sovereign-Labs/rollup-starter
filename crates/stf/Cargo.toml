@@ -27,9 +27,14 @@ sov-test-state-consistency = { workspace = true }
 sov-address = { workspace = true }
 sov-evm = { workspace = true }
 sov-eip712-auth = { workspace = true }
+price-oracle = { workspace = true }
 
 anyhow = { workspace = true }
 borsh = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+alloy-primitives = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -65,7 +70,8 @@ native = [
 	"sov-test-state-consistency/native",
 	"sov-eip712-auth/native",
 	"sov-state/native",
-	"sov-chain-state/native"
+	"sov-chain-state/native",
+	"price-oracle/native"
 ]
 
 bench = [
