@@ -123,6 +123,65 @@ pub fn load_snapshot_json(
     Ok(serde_json::from_str(&snapshot_json).expect("Failed to parse snapshot JSON"))
 }
 
+/// Parse the slot number out of a snapshot filename like `slot_1002_with_children.json`.
+/// Returns `None` for files that don't match the snapshot naming scheme.
+fn parse_snapshot_slot_number(file_name: &str) -> Option<u64> {
+    file_name
+        .strip_prefix("slot_")?
+        .strip_suffix("_with_children.json")?
+        .parse::<u64>()
+        .ok()
+}
+
+/// Returns the highest batch number present in the saved snapshots, or `None` if there are no
+/// snapshots. This is the max *batch* number (`batch_range.end - 1`), NOT a slot number: slot
+/// numbers run ahead of batch/rollup heights because of empty DA slots and the variable number of
+/// genesis setup slots. We read it from the highest-numbered snapshot, whose `batch_range.end` is
+/// the cumulative batch count for the whole dataset (monotonic, unaffected by trailing empty slots).
+pub fn latest_snapshot_batch_number(snapshots_dir: &Path) -> Result<Option<u64>, anyhow::Error> {
+    let read_dir = match std::fs::read_dir(snapshots_dir) {
+        Ok(read_dir) => read_dir,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(err).with_context(|| {
+                format!("failed to read snapshots directory {}", snapshots_dir.display())
+            })
+        }
+    };
+
+    let mut highest: Option<u64> = None;
+    for entry in read_dir {
+        let entry = entry.with_context(|| {
+            format!("failed to read entry in snapshots directory {}", snapshots_dir.display())
+        })?;
+        if let Some(slot_number) = entry
+            .file_name()
+            .to_str()
+            .and_then(parse_snapshot_slot_number)
+        {
+            if highest.is_none_or(|current| slot_number > current) {
+                highest = Some(slot_number);
+            }
+        }
+    }
+
+    let Some(highest_slot) = highest else {
+        return Ok(None);
+    };
+
+    let snapshot = load_snapshot_json(highest_slot, snapshots_dir).with_context(|| {
+        format!("failed to load highest snapshot slot_{highest_slot} for batch-number lookup")
+    })?;
+    let batch_end = snapshot
+        .get("batch_range")
+        .and_then(|range| range.get("end"))
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| {
+            anyhow::anyhow!("snapshot slot_{highest_slot} is missing a numeric batch_range.end")
+        })?;
+    Ok(Some(batch_end.saturating_sub(1)))
+}
+
 pub fn validate_against_snapshot(
     slot: &Slot,
     output_dir: &Path,
@@ -489,5 +548,56 @@ impl SlotFetcher {
         )?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn write_snapshot(dir: &Path, slot: u64, batch_start: u64, batch_end: u64) {
+        let json = serde_json::json!({
+            "number": slot,
+            "batch_range": { "start": batch_start, "end": batch_end },
+        });
+        let path = dir.join(format!("slot_{:04}_with_children.json", slot));
+        fs::write(path, serde_json::to_string(&json).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn latest_snapshot_batch_number_reads_highest_slot() {
+        let dir = tempfile::tempdir().unwrap();
+        write_snapshot(dir.path(), 1, 0, 1);
+        write_snapshot(dir.path(), 500, 499, 500);
+        write_snapshot(dir.path(), 1002, 999, 1000);
+        // A trailing empty slot (no new batch): cumulative batch_range.end stays at 1000.
+        write_snapshot(dir.path(), 1003, 1000, 1000);
+        // Stray files that don't match the snapshot scheme must be ignored.
+        fs::write(dir.path().join("evm_pinned_cache.json"), "{}").unwrap();
+        fs::write(dir.path().join("notes.txt"), "ignore me").unwrap();
+
+        // Highest slot is 1003 with batch_range.end == 1000, so the max *batch* number is 999 — even
+        // though slot 1003 itself added no batch. This is the slot≠batch distinction the guard
+        // relies on.
+        assert_eq!(latest_snapshot_batch_number(dir.path()).unwrap(), Some(999));
+    }
+
+    #[test]
+    fn latest_snapshot_batch_number_compares_numerically_not_lexically() {
+        let dir = tempfile::tempdir().unwrap();
+        write_snapshot(dir.path(), 9999, 9000, 9100);
+        write_snapshot(dir.path(), 12345, 12000, 12100);
+        // 12345 > 9999 numerically, though "slot_12345" < "slot_9999" lexically.
+        assert_eq!(latest_snapshot_batch_number(dir.path()).unwrap(), Some(12099));
+    }
+
+    #[test]
+    fn latest_snapshot_batch_number_none_when_empty_or_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(latest_snapshot_batch_number(dir.path()).unwrap(), None);
+
+        let missing = dir.path().join("does-not-exist");
+        assert_eq!(latest_snapshot_batch_number(&missing).unwrap(), None);
     }
 }

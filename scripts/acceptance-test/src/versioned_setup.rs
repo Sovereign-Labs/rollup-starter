@@ -563,6 +563,29 @@ pub fn prepare_acceptance_run_plan_with_constants(
     })
 }
 
+/// Build a soak config that runs ONLY the last version, at its configured stop height, using the
+/// salt that a full from-genesis run would have assigned to that version
+/// (`base_salt + num_workers * (num_versions - 1)`).
+///
+/// Used by `setup` in append mode: the historical versions are resynced from the existing DA and
+/// only the last (new) version is generated, so its soak worker accounts must use the next salt
+/// segment to avoid colliding with the resynced historical accounts. This mirrors the external
+/// [`SoakManagerConfig::for_resync`], except it keeps the last version's configured stop height
+/// (no extension) and targets the last version itself rather than the segment after it.
+///
+/// Returns `None` if the config has no versions.
+pub fn last_version_soak_config(soak_config: &SoakManagerConfig) -> Option<SoakManagerConfig> {
+    let (last_binary, last_stop_height) = soak_config.versions.last()?;
+    let num_versions = soak_config.versions.len() as u32;
+    let mut config = soak_config.config.clone();
+    config.salt += config.num_workers * num_versions.saturating_sub(1);
+    Some(SoakManagerConfig::new(
+        config,
+        vec![(last_binary.clone(), *last_stop_height)],
+        soak_config.safety_stop_blocks,
+    ))
+}
+
 pub fn extend_last_stop_height(
     versions: &[RollupVersion],
     extra_blocks: u64,
@@ -672,4 +695,73 @@ pub fn spawn_rollup_manager(
         )
     })?;
     Ok(ManagedRollupProcess::new(child))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn last_version_soak_config_uses_last_version_and_offsets_salt() {
+        let config = SoakManagerConfig::new(
+            SoakWorkerConfig {
+                num_workers: 20,
+                salt: 3,
+            },
+            vec![
+                (PathBuf::from("/bin/soak-v0"), 1000),
+                (PathBuf::from("/bin/soak-v1"), 2000),
+                (PathBuf::from("/bin/soak-v2"), 3000),
+            ],
+            5,
+        );
+
+        let appended = last_version_soak_config(&config).expect("config has versions");
+
+        assert_eq!(appended.versions.len(), 1);
+        assert_eq!(appended.versions[0].0, PathBuf::from("/bin/soak-v2"));
+        // Last version keeps its configured stop height (no extension, unlike `for_resync`).
+        assert_eq!(appended.versions[0].1, 3000);
+        // base salt 3 + num_workers 20 * (3 versions - 1) = 43, matching the salt a from-genesis run
+        // would assign to the third version (index 2), so worker accounts don't collide with the
+        // resynced historical accounts.
+        assert_eq!(appended.config.salt, 43);
+        assert_eq!(appended.config.num_workers, 20);
+        assert_eq!(appended.safety_stop_blocks, 5);
+    }
+
+    #[test]
+    fn last_version_soak_config_two_versions_offsets_by_one_segment() {
+        let config = SoakManagerConfig::new(
+            SoakWorkerConfig {
+                num_workers: 20,
+                salt: 3,
+            },
+            vec![
+                (PathBuf::from("/bin/soak-v0"), 1000),
+                (PathBuf::from("/bin/soak-v1"), 2000),
+            ],
+            5,
+        );
+
+        let appended = last_version_soak_config(&config).expect("config has versions");
+
+        assert_eq!(appended.versions[0].0, PathBuf::from("/bin/soak-v1"));
+        // base salt 3 + 20 * (2 - 1) = 23.
+        assert_eq!(appended.config.salt, 23);
+    }
+
+    #[test]
+    fn last_version_soak_config_empty_is_none() {
+        let config = SoakManagerConfig::new(
+            SoakWorkerConfig {
+                num_workers: 1,
+                salt: 0,
+            },
+            vec![],
+            0,
+        );
+
+        assert!(last_version_soak_config(&config).is_none());
+    }
 }
