@@ -22,7 +22,7 @@ CHAIN_NAME = "TestChain"
 # The optional `grace_period` field (defaults to 0) specifies how many blocks after end_height
 # the old hash will still be accepted alongside the new hash, allowing for smooth transitions.
 # Example: CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 1000, chain_hash = "0xabc...32_bytes_hex", grace_period = 100 }]
-CHAIN_HASH_OVERRIDES = []
+CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 1003, chain_hash = "0x4198ee1412a2cb2305b8fc99de14751865bdad680ee4a67cd28301ce8f2de753" }]
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert to ASCII bytes
@@ -86,7 +86,7 @@ GAS_DIMENSIONS = { const = 2 }
 GAS_FORCED_SEQUENCER_REGISTRATION_COST = [100000, 100000]
 # The ID of the "native token" of the rollup, which is used to pay gas fees.
 GAS_TOKEN_ID = { bech32 = "token_1nyl0e0yweragfsatygt24zmd8jrr2vqtvdfptzjhxkguz2xxx3vs0y07u7", type = "TokenId" }
-GAS_TOKEN_DECIMALS = 89
+GAS_TOKEN_DECIMALS = 18
 # The HRP prefix that appears in all rollup addresses.
 ADDRESS_PREFIX = { const = "sov" }
 # --- Gas parameters to charge for state accesses ---
