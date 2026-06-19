@@ -11,14 +11,8 @@ freeze = [1, 1]
 CHAIN_ID = 537713
 CHAIN_NAME = "Relay"
 # Chain hash overrides by rollup block height range.
-# TODO: i64::MAX (blanket) so resync keeps working after the SDK changed the chain_hash. Set to proper
-# heights when doing a deployment with the new chain hash.
-# Value = CHAIN_HASH of relay-chain-upgrade @ SDK d0564580 (celestia_da) = the hash the pre-upgrade
-# chain signs with. The acceptance-test SDK port to 243aac4 changes Runtime::CHAIN_HASH to
-# 0x5456f26c831e9922d68f11ccb99b2080c4a7da46f6ab38abb37dd62ebe43f88b; this blanket override keeps the
-# old hash accepted across the upgrade so resync validates pre-upgrade blocks.
-# (Refreshed from the stale 0x30b30b..., which was built at the older SDK eaf746a0.)
-CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 9_223_372_036_854_775_807, chain_hash = "0x08deaafc47ef8b11ee9f8efd705a70a70e27c6ef5002727229d50d18aa86d221", grace_period = 20_000 }]
+# TODO: This is set to i64::MAX for resync tests to work after dev changed the chain_hash. Set to proper heights when doing a deployment with the new chain hash.
+CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 9_223_372_036_854_775_807, chain_hash = "0x30b30bc6849c4ae1429d117ddb4cd101aa32daa692889d14a630b9d25986fde0", grace_period = 20_000 }]
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert to ASCII bytes
