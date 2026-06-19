@@ -16,7 +16,7 @@ services:
       - "8545:8545"
 
   hyperlane-core-deploy:
-    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3
+    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-12
     depends_on:
       anvil:
         condition: service_healthy
@@ -34,7 +34,7 @@ services:
       --yes
 
   hyperlane-warp-deploy:
-    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3
+    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-12
     depends_on:
       hyperlane-core-deploy:
         condition: service_completed_successfully
@@ -51,7 +51,7 @@ services:
       --yes
 
   validator-ethtest:
-    image: ghcr.io/ross-weir/hyperlane-agent:integration-10
+    image: ghcr.io/ross-weir/hyperlane-agent:integration-lander-2
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
@@ -97,7 +97,7 @@ services:
   # TODO: validator-sovstarter
 
   relayer:
-    image: ghcr.io/ross-weir/hyperlane-agent:integration-10
+    image: ghcr.io/ross-weir/hyperlane-agent:integration-lander-2
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
@@ -142,7 +142,7 @@ services:
 
   # Utility service for running hyperlane-cli commands
   hyperlane-cli:
-    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-3
+    image: ghcr.io/sovereign-labs/hyperlane-cli:sov-integration-12
     profiles: ["cli"]
     depends_on:
       anvil:
