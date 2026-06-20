@@ -36,6 +36,16 @@ const paymasterUpdateCall: RuntimeCall = {
                     // ["0xeE1Bdc7095BD0bE36De7b33b9a32D5aFE86Ff36a", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     // ["0xbf654552Ce0cA004CE22351ddB908D4A15775871", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     // ["0xc97f2248153772d58cd618de76810f3afd50f9f3", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0xB5f248f687C6A969E6AC9CeA1e3D65381b1F5d19", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0x748F61A525B5D796d12B6E4D92b37b6c68A0A50c", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0x3ecc9b73705b3BB0486Ad24CFBD499ED0A8dBccA", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0x806991eFd4A67D0178387D0fAf04945422FbBc2e", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0xA60Ea19dac2ea8d9830eA2cE9d6F4AfB487F4Cc8", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0x6f7294a553c4e9474f01B1be7cF72ab1938F8A0e", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0x9f9365A88b571593dB1e0CA05cEEFd2F3E020f8e", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0x6c942525544eAaE2e3361704B2f596122b718D8E", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0xf8ffaA5c3812659D832Ea866526F76A3B7F3b298", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0x6BC717Cf27F85df0446e76Bc65eE602E001e0eb0", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     // Add more allowed payees here. Do not uncomment previous payees - it will just bloat the callmessage. 
                 ]
             }
