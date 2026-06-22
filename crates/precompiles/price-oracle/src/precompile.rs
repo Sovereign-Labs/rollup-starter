@@ -11,7 +11,6 @@ use crate::prices::lookup_feed_update;
 use crate::types::SerializedPriceUpdates;
 
 /// Precompile address 0x0000000000000000000000000000000000010002.
-/// Continues the sequence used by sov-bank-balance (0x..010000) and sov-sequencing-timestamp (0x..010001).
 pub const PRICE_ORACLE_PRECOMPILE_ADDRESS: Address = Address::new([
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x00, 0x02,
 ]);
@@ -107,18 +106,18 @@ fn record_used_feed_key<S: Spec>(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::LazyLock;
+
     use alloy_primitives::{keccak256, B256};
 
     use super::*;
 
-    fn provider_id() -> B256 {
-        keccak256("chainlink")
-    }
+    static PROVIDER_ID: LazyLock<B256> = LazyLock::new(|| keccak256("chainlink"));
 
-    fn feed_id() -> B256 {
+    fn feed_id(suffix: u8) -> B256 {
         let mut bytes = [0u8; 32];
         bytes[1] = 0x03;
-        bytes[31] = 0x01;
+        bytes[31] = suffix;
         B256::from(bytes)
     }
 
@@ -130,15 +129,15 @@ mod tests {
     }
 
     #[test]
-    fn decode_feed_request_splits_provider_and_feed() {
+    fn decode_splits_provider_and_feed() {
         let (provider, feed) =
-            decode_feed_request(&request(provider_id(), feed_id())).expect("decode");
-        assert_eq!(provider, provider_id());
-        assert_eq!(feed, feed_id());
+            decode_feed_request(&request(*PROVIDER_ID, feed_id(1))).expect("decode");
+        assert_eq!(provider, *PROVIDER_ID);
+        assert_eq!(feed, feed_id(1));
     }
 
     #[test]
-    fn decode_feed_request_rejects_non_64_byte_input() {
+    fn decode_rejects_non_64_byte_input() {
         for len in [0usize, 3, 32, 63, 65, 68, 96] {
             let err = decode_feed_request(&vec![0u8; len]).unwrap_err();
             assert!(
