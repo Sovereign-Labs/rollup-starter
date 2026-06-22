@@ -65,7 +65,7 @@ $ make print-hyperlane-ethtest-warp
       symbol: ETH
       decimals: 18
       isNft: false
-      contractVersion: 9.0.6
+      contractVersion: 10.1.5
       type: native
       allowedRebalancers: []
       allowedRebalancingBridges: {}
@@ -202,7 +202,7 @@ $ cd ../../ && make print-hyperlane-ethtest-warp
       symbol: ETH
       decimals: 18
       isNft: false
-      contractVersion: 9.0.6
+      contractVersion: 10.1.5
       type: native
       allowedRebalancers: []
       allowedRebalancingBridges: {}
