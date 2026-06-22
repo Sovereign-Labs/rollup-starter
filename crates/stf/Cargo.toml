@@ -31,7 +31,7 @@ price-oracle = { workspace = true }
 
 anyhow = { workspace = true }
 borsh = { workspace = true }
-tracing = { workspace = true }
+tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true }
@@ -71,7 +71,8 @@ native = [
 	"sov-eip712-auth/native",
 	"sov-state/native",
 	"sov-chain-state/native",
-	"price-oracle/native"
+	"price-oracle/native",
+	"dep:tracing"
 ]
 
 bench = [
