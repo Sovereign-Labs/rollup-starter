@@ -8,8 +8,9 @@ mod celestia {
         types::Namespace,
         verifier::{CelestiaVerifier, RollupParams},
     };
-    use sov_modules_api::{prelude::tokio::sync::watch::Receiver, Spec};
+    use sov_modules_api::Spec;
     use sov_rollup_interface::da::DaVerifier;
+    use sov_rollup_interface::node::SecondaryShutdownController;
     use sov_stf_runner::RollupConfig;
 
     pub const ROLLUP_BATCH_NAMESPACE: Namespace =
@@ -27,7 +28,7 @@ mod celestia {
 
     pub async fn new_da_service<S: Spec>(
         rollup_config: &RollupConfig<S::Address, DaService>,
-        shutdown_receiver: Receiver<()>,
+        secondary_shutdown_controller: &SecondaryShutdownController,
     ) -> DaService {
         DaService::new(
             rollup_config.da.clone(),
@@ -35,7 +36,7 @@ mod celestia {
                 rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,
                 rollup_proof_namespace: ROLLUP_PROOF_NAMESPACE,
             },
-            shutdown_receiver,
+            secondary_shutdown_controller,
         )
         .await
     }
@@ -46,7 +47,8 @@ mod mock {
     pub use sov_mock_da::storable::local_service::StorableMockDaService as DaService;
     pub use sov_mock_da::MockDaSpec as DaSpec;
     use sov_mock_da::MockDaVerifier;
-    use sov_modules_api::{prelude::tokio::sync::watch::Receiver, Spec};
+    use sov_modules_api::Spec;
+    use sov_rollup_interface::node::SecondaryShutdownController;
     use sov_stf_runner::RollupConfig;
 
     pub fn new_verifier() -> MockDaVerifier {
@@ -55,9 +57,9 @@ mod mock {
 
     pub async fn new_da_service<S: Spec>(
         rollup_config: &RollupConfig<S::Address, DaService>,
-        shutdown_receiver: Receiver<()>,
+        secondary_shutdown_controller: &SecondaryShutdownController,
     ) -> DaService {
-        DaService::from_config(rollup_config.da.clone(), shutdown_receiver).await
+        DaService::from_config(rollup_config.da.clone(), secondary_shutdown_controller).await
     }
 }
 
@@ -66,7 +68,8 @@ mod mock_external {
     pub use sov_mock_da::storable::rpc::StorableMockDaClient as DaService;
     pub use sov_mock_da::MockDaSpec as DaSpec;
     use sov_mock_da::MockDaVerifier;
-    use sov_modules_api::{prelude::tokio::sync::watch::Receiver, Spec};
+    use sov_modules_api::Spec;
+    use sov_rollup_interface::node::SecondaryShutdownController;
     use sov_stf_runner::RollupConfig;
 
     pub fn new_verifier() -> MockDaVerifier {
@@ -75,7 +78,7 @@ mod mock_external {
 
     pub async fn new_da_service<S: Spec>(
         rollup_config: &RollupConfig<S::Address, DaService>,
-        _shutdown_receiver: Receiver<()>,
+        _secondary_shutdown_controller: &SecondaryShutdownController,
     ) -> DaService {
         DaService::from_config(rollup_config.da.clone())
             .expect("Failed to create DA service: Invalid URLs")
