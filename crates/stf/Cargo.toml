@@ -28,9 +28,11 @@ sov-address = { workspace = true }
 sov-evm = { workspace = true }
 sov-eip712-auth = { workspace = true }
 price-oracle = { workspace = true }
+sequencing-registry = { workspace = true }
 
 anyhow = { workspace = true }
 borsh = { workspace = true }
+bytes = { workspace = true }
 tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -72,6 +74,7 @@ native = [
 	"sov-state/native",
 	"sov-chain-state/native",
 	"price-oracle/native",
+	"sequencing-registry/native",
 	"dep:tracing"
 ]
 

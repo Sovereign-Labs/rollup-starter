@@ -1,4 +1,5 @@
 use alloy_primitives::B256;
+use bytes::Bytes;
 
 use crate::types::{FeedKey, SerializedPriceUpdates};
 
@@ -6,7 +7,7 @@ pub fn lookup_feed_update(
     updates: &SerializedPriceUpdates,
     provider_id: B256,
     feed_id: B256,
-) -> Option<&Vec<u8>> {
+) -> Option<&Bytes> {
     updates.get(&FeedKey::new(provider_id, feed_id))
 }
 
@@ -31,18 +32,18 @@ mod tests {
     fn updates_with(entries: &[(B256, B256, &[u8])]) -> SerializedPriceUpdates {
         let map = entries
             .iter()
-            .map(|(p, f, payload)| (FeedKey::new(*p, *f), payload.to_vec()))
+            .map(|(p, f, payload)| (FeedKey::new(*p, *f), Bytes::copy_from_slice(payload)))
             .collect::<BTreeMap<_, _>>();
         SerializedPriceUpdates(map)
     }
 
     #[test]
     fn returns_payload_on_hit() {
-        let payload = b"opaque-provider-update".to_vec();
-        let updates = updates_with(&[(*PROVIDER_ID, feed_id(1), &payload)]);
+        let payload = b"opaque-provider-update";
+        let updates = updates_with(&[(*PROVIDER_ID, feed_id(1), payload)]);
 
         let got = lookup_feed_update(&updates, *PROVIDER_ID, feed_id(1)).unwrap();
-        assert_eq!(got, &payload);
+        assert_eq!(got.as_ref(), payload.as_slice());
     }
 
     #[test]

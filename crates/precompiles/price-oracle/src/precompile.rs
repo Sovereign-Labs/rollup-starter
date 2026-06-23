@@ -2,13 +2,14 @@ use std::marker::PhantomData;
 
 use alloy_primitives::{Address, Bytes};
 use borsh::BorshDeserialize;
+use sequencing_registry::SequencingRegistry;
 use sov_evm::precompiles::{
     EvmPrecompile, EvmPrecompileEnv, PrecompileError, PrecompileOutput, PrecompileResult,
 };
 use sov_modules_api::{Spec, TxState};
 
 use crate::prices::lookup_feed_update;
-use crate::types::SerializedPriceUpdates;
+use crate::types::PriceOracleSequencing;
 
 /// Precompile address 0x0000000000000000000000000000000000010002.
 pub const PRICE_ORACLE_PRECOMPILE_ADDRESS: Address = Address::new([
@@ -43,9 +44,15 @@ impl<S: Spec> EvmPrecompile<S> for PriceOraclePrecompile<S> {
             .sequencing_data()
             .as_ref()
             .ok_or_else(|| PrecompileError::State("price oracle data unavailable".to_string()))?;
-        let updates = SerializedPriceUpdates::try_from_slice(sequencing_data).map_err(|err| {
-            PrecompileError::State(format!("could not decode price oracle data: {err}"))
+        let registry = SequencingRegistry::try_from_slice(sequencing_data).map_err(|err| {
+            PrecompileError::State(format!("could not decode sequencing data: {err}"))
         })?;
+        let updates = registry
+            .section::<PriceOracleSequencing>()
+            .map_err(|err| {
+                PrecompileError::State(format!("could not decode price oracle data: {err}"))
+            })?
+            .unwrap_or_default();
 
         let payload = lookup_feed_update(&updates, provider_id, feed_id).ok_or_else(|| {
             PrecompileError::InvalidInput(format!(
@@ -53,14 +60,17 @@ impl<S: Spec> EvmPrecompile<S> for PriceOraclePrecompile<S> {
             ))
         })?;
 
+        // Record the feed before the gas check. The payload length affects gas,
+        // so a feed read here must be kept even if the call then runs out of gas,
+        // otherwise replay from the DA layer would diverge.
+        #[cfg(feature = "native")]
+        record_used_feed_key(context, crate::types::FeedKey::new(provider_id, feed_id))?;
+
         let words = payload.len().div_ceil(32) as u64;
         let gas_used = PRICE_ORACLE_PRECOMPILE_BASE_GAS + PRICE_ORACLE_PRECOMPILE_WORD_GAS * words;
         if gas_used > gas_limit {
             return Err(PrecompileError::OutOfGas);
         }
-
-        #[cfg(feature = "native")]
-        record_used_feed_key(context, crate::types::FeedKey::new(provider_id, feed_id))?;
 
         Ok(PrecompileOutput {
             gas_used,
@@ -88,20 +98,8 @@ fn record_used_feed_key<S: Spec>(
     context: &sov_modules_api::Context<S>,
     key: crate::types::FeedKey,
 ) -> Result<(), PrecompileError> {
-    context.sequencing_scratchpad().with_value(|scratchpad| {
-        let mut used = match scratchpad.as_deref() {
-            Some(bytes) => crate::types::UsedFeedKeys::try_from_slice(bytes).map_err(|err| {
-                PrecompileError::State(format!("could not decode used feed keys: {err}"))
-            })?,
-            None => crate::types::UsedFeedKeys::default(),
-        };
-        used.0.push(key);
-        let encoded = borsh::to_vec(&used).map_err(|err| {
-            PrecompileError::State(format!("could not encode used feed keys: {err}"))
-        })?;
-        *scratchpad = Some(encoded.into());
-        Ok(())
-    })
+    sequencing_registry::record_used::<S, PriceOracleSequencing>(context, |used| used.0.push(key))
+        .map_err(|err| PrecompileError::State(format!("could not record used feed key: {err}")))
 }
 
 #[cfg(test)]

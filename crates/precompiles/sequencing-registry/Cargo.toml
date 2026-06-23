@@ -1,8 +1,8 @@
 [package]
-description = "Relay price oracle EVM precompile for the Relay Chain"
+description = "Generic per-precompile sequencing-data registry for the Relay Chain"
 edition = { workspace = true }
 license = { workspace = true }
-name = "price-oracle"
+name = "sequencing-registry"
 publish = false
 repository = { workspace = true }
 rust-version = { workspace = true }
@@ -12,14 +12,9 @@ version = "1.0.0"
 alloy-primitives = { workspace = true, features = ["borsh"] }
 borsh = { workspace = true }
 bytes = { workspace = true }
-sequencing-registry = { workspace = true }
-sov-evm = { workspace = true }
 sov-modules-api = { workspace = true }
-
-[dev-dependencies]
-sov-rollup-interface = { workspace = true }
-sov-test-utils = { workspace = true }
+tracing = { workspace = true }
 
 [features]
 default = []
-native = ["sov-evm/native", "sov-modules-api/native", "sequencing-registry/native"]
+native = ["sov-modules-api/native"]

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::{LazyLock, Mutex};
 
+use bytes::Bytes;
 use price_oracle::{FeedKey, SerializedPriceUpdates, B256};
 
 static PRICE_SOURCE: LazyLock<Mutex<SerializedPriceUpdates>> =
@@ -18,5 +19,5 @@ pub fn insert(provider_id: B256, feed_id: B256, payload: Vec<u8>) {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .0
-        .insert(FeedKey::new(provider_id, feed_id), payload);
+        .insert(FeedKey::new(provider_id, feed_id), Bytes::from(payload));
 }

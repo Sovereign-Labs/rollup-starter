@@ -8,6 +8,7 @@ members = [
   "crates/stf/stf-declaration",
   "crates/utils/node-discovery",
   "crates/precompiles/price-oracle",
+  "crates/precompiles/sequencing-registry",
   "crates/shared/price-oracle-ipc",
   "examples/value-setter",
 ]
@@ -75,6 +76,7 @@ stf-starter = { path = "./crates/stf", default-features = false }
 stf-starter-declaration = { path = "./crates/stf/stf-declaration", default-features = false }
 node-discovery = { path = "./crates/utils/node-discovery", default-features = false }
 price-oracle = { path = "./crates/precompiles/price-oracle", default-features = false }
+sequencing-registry = { path = "./crates/precompiles/sequencing-registry", default-features = false }
 price-oracle-ipc = { path = "./crates/shared/price-oracle-ipc", default-features = false }
 value-setter = { path = "./examples/value-setter" }
 strum = { version = "0.28", features = ["derive"] }
@@ -96,6 +98,7 @@ anyhow = { version = "1.0.95" }
 clap = { version = "4.4.10", features = ["derive"] }
 async-trait = "0.1.71"
 borsh = { version = "1", features = ["rc", "bytes"] }
+bytes = { version = "1", default-features = false }
 tracing = { version = "0.1.40", default-features = false }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing-appender = "0.2"

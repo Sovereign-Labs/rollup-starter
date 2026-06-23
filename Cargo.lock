@@ -5017,6 +5017,8 @@ version = "1.0.0"
 dependencies = [
  "alloy-primitives",
  "borsh",
+ "bytes",
+ "sequencing-registry",
  "sov-evm",
  "sov-modules-api",
  "sov-rollup-interface",
@@ -6592,6 +6594,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
 dependencies = [
  "futures-core",
+]
+
+[[package]]
+name = "sequencing-registry"
+version = "1.0.0"
+dependencies = [
+ "alloy-primitives",
+ "borsh",
+ "bytes",
+ "sov-modules-api",
+ "tracing",
 ]
 
 [[package]]
@@ -8345,7 +8358,9 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "borsh",
+ "bytes",
  "price-oracle",
+ "sequencing-registry",
  "serde_json",
  "sov-address",
  "sov-bank",

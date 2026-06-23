@@ -1,7 +1,5 @@
 //! This is a technical only module to forward all necessary implementations to inner, non-authenticated Runtime
-use borsh::BorshDeserialize;
-use price_oracle::SerializedPriceUpdates;
-use price_oracle::UsedFeedKeys;
+use sequencing_registry::SequencingRegistry;
 use sov_address::{EthereumAddress, FromVmAddress};
 use sov_bank::Amount;
 use sov_capabilities::StandardProvenRollupCapabilities as StandardCapabilities;
@@ -48,7 +46,6 @@ use sov_modules_api::{ModuleError, ModuleId, ModuleInfo, NestedEnumUtils};
 use sov_rollup_interface::da::DaSpec;
 use sov_state::Kernel;
 use sov_state::User;
-use std::collections::BTreeSet;
 use std::convert::Infallible;
 
 use crate::authentication::EvmAndEip712AuthenticatorInput;
@@ -236,7 +233,7 @@ where
     S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Capabilities<'a> = RelayChainCapabilities<'a, S>;
-    type SequencingData = SerializedPriceUpdates;
+    type SequencingData = SequencingRegistry;
 
     fn capabilities(&mut self) -> Guard<Self::Capabilities<'_>> {
         Guard::new(RelayChainCapabilities {
@@ -315,7 +312,7 @@ pub struct RelayChainCapabilities<'a, S: Spec> {
 }
 
 impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
-    type SequencingData = SerializedPriceUpdates;
+    type SequencingData = SequencingRegistry;
 
     fn handle_sequencing_data(
         &mut self,
@@ -328,7 +325,15 @@ impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
 
     #[cfg(feature = "native")]
     fn create_sequencing_data(&self) -> Self::SequencingData {
-        crate::price_source::snapshot_prices()
+        // This snapshot is attached to every transaction and pruned later by
+        // finalize_sequencing_data before it reaches the DA layer. The SDK sizes
+        // transactions for batch limits using this pre-pruned size, so keep the
+        // snapshot bounded to avoid reducing batch throughput.
+        let mut registry = SequencingRegistry::default();
+        registry.set_section::<price_oracle::PriceOracleSequencing>(
+            &crate::price_source::snapshot_prices(),
+        );
+        registry
     }
 
     #[cfg(feature = "native")]
@@ -337,78 +342,8 @@ impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
         data: Self::SequencingData,
         scratchpad: Option<sov_rollup_interface::Bytes>,
     ) -> Self::SequencingData {
-        prune_unused_price_updates(data, scratchpad)
-    }
-}
-
-#[cfg(feature = "native")]
-fn prune_unused_price_updates(
-    mut data: SerializedPriceUpdates,
-    scratchpad: Option<sov_rollup_interface::Bytes>,
-) -> SerializedPriceUpdates {
-    let Some(scratchpad) = scratchpad else {
-        return SerializedPriceUpdates::default();
-    };
-    match UsedFeedKeys::try_from_slice(&scratchpad) {
-        Ok(used) => {
-            let keep: BTreeSet<_> = used.0.into_iter().collect();
-            data.retain_keys(&keep);
-            data
-        }
-        Err(err) => {
-            tracing::error!(
-                %err,
-                "could not decode used-feed-key scratchpad, publishing full price snapshot"
-            );
-            data
-        }
-    }
-}
-
-#[cfg(all(test, feature = "native"))]
-mod prune_tests {
-    use std::collections::BTreeMap;
-
-    use alloy_primitives::{keccak256, B256};
-    use price_oracle::FeedKey;
-
-    use super::*;
-
-    fn key(suffix: u8) -> FeedKey {
-        let mut feed = [0u8; 32];
-        feed[31] = suffix;
-        FeedKey::new(keccak256("chainlink"), B256::from(feed))
-    }
-
-    fn snapshot(keys: &[FeedKey]) -> SerializedPriceUpdates {
-        SerializedPriceUpdates(
-            keys.iter()
-                .map(|k| (*k, b"payload".to_vec()))
-                .collect::<BTreeMap<_, _>>(),
-        )
-    }
-
-    #[test]
-    fn none_scratchpad_prunes_every_update() {
-        let pruned = prune_unused_price_updates(snapshot(&[key(1), key(2)]), None);
-        assert!(pruned.0.is_empty());
-    }
-
-    #[test]
-    fn decoded_scratchpad_keeps_only_used_feeds() {
-        let used = UsedFeedKeys(vec![key(2)]);
-        let scratchpad = sov_rollup_interface::Bytes::from(borsh::to_vec(&used).unwrap());
-        let pruned =
-            prune_unused_price_updates(snapshot(&[key(1), key(2), key(3)]), Some(scratchpad));
-        assert_eq!(pruned.0.len(), 1);
-        assert!(pruned.get(&key(2)).is_some());
-    }
-
-    #[test]
-    fn undecodable_scratchpad_keeps_full_snapshot() {
-        let garbage = sov_rollup_interface::Bytes::from(vec![0x01u8]);
-        let pruned = prune_unused_price_updates(snapshot(&[key(1), key(2)]), Some(garbage));
-        assert_eq!(pruned.0.len(), 2);
+        let pruners = [sequencing_registry::pruner::<price_oracle::PriceOracleSequencing>()];
+        sequencing_registry::finalize(data, scratchpad, &pruners)
     }
 }
 

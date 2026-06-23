@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 
 use alloy_primitives::{keccak256, B256};
 use borsh::BorshDeserialize;
+use bytes::Bytes;
 use price_oracle::{FeedKey, SerializedPriceUpdates};
 
 static PROVIDER_ID: LazyLock<B256> = LazyLock::new(|| keccak256("chainlink"));
@@ -16,7 +17,10 @@ fn feed_id(suffix: u8) -> B256 {
 }
 
 fn updates_with(entries: &[(FeedKey, &[u8])]) -> SerializedPriceUpdates {
-    let map: BTreeMap<FeedKey, Vec<u8>> = entries.iter().map(|(k, p)| (*k, p.to_vec())).collect();
+    let map: BTreeMap<FeedKey, Bytes> = entries
+        .iter()
+        .map(|(k, p)| (*k, Bytes::copy_from_slice(p)))
+        .collect();
     SerializedPriceUpdates(map)
 }
 
@@ -57,8 +61,14 @@ fn retain_keys_ignores_unknown_keys() {
 #[test]
 fn borsh_round_trip_is_canonical() {
     let mut entries = BTreeMap::new();
-    entries.insert(FeedKey::new(*PROVIDER_ID, feed_id(2)), b"second".to_vec());
-    entries.insert(FeedKey::new(*PROVIDER_ID, feed_id(1)), b"first".to_vec());
+    entries.insert(
+        FeedKey::new(*PROVIDER_ID, feed_id(2)),
+        Bytes::from_static(b"second"),
+    );
+    entries.insert(
+        FeedKey::new(*PROVIDER_ID, feed_id(1)),
+        Bytes::from_static(b"first"),
+    );
     let updates = SerializedPriceUpdates(entries);
 
     let bytes = borsh::to_vec(&updates).expect("borsh encode");

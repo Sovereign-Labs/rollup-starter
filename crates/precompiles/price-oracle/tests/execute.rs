@@ -4,10 +4,13 @@ use std::sync::LazyLock;
 
 use alloy_primitives::{keccak256, B256};
 use borsh::BorshDeserialize;
+use bytes::Bytes;
 use price_oracle::{
-    FeedKey, PriceOraclePrecompile, SerializedPriceUpdates, UsedFeedKeys,
-    PRICE_ORACLE_PRECOMPILE_BASE_GAS, PRICE_ORACLE_PRECOMPILE_WORD_GAS,
+    FeedKey, PriceOraclePrecompile, PriceOracleSequencing, SerializedPriceUpdates, UsedFeedKeys,
+    PRICE_ORACLE_PRECOMPILE_ADDRESS, PRICE_ORACLE_PRECOMPILE_BASE_GAS,
+    PRICE_ORACLE_PRECOMPILE_WORD_GAS,
 };
+use sequencing_registry::SequencingRegistry;
 use sov_evm::precompiles::{EvmPrecompile, EvmPrecompileEnv, PrecompileError, PrecompileResult};
 use sov_modules_api::capabilities::mocks::MockKernel;
 use sov_modules_api::transaction::Credentials;
@@ -36,7 +39,12 @@ fn request(provider_id: B256, feed_id: B256) -> Vec<u8> {
 }
 
 fn updates_with(entries: &[(FeedKey, &[u8])]) -> SerializedPriceUpdates {
-    SerializedPriceUpdates(entries.iter().map(|(k, p)| (*k, p.to_vec())).collect())
+    SerializedPriceUpdates(
+        entries
+            .iter()
+            .map(|(k, p)| (*k, Bytes::copy_from_slice(p)))
+            .collect(),
+    )
 }
 
 fn expected_gas(payload_len: usize) -> u64 {
@@ -46,7 +54,9 @@ fn expected_gas(payload_len: usize) -> u64 {
 
 fn context(updates: Option<&SerializedPriceUpdates>) -> Context<S> {
     let sequencing_data = updates.map(|u| {
-        sov_rollup_interface::Bytes::from(borsh::to_vec(u).expect("encode sequencing data"))
+        let mut registry = SequencingRegistry::default();
+        registry.set_section::<PriceOracleSequencing>(u);
+        sov_rollup_interface::Bytes::from(borsh::to_vec(&registry).expect("encode sequencing data"))
     });
     context_with_raw_sequencing_data(sequencing_data)
 }
@@ -84,7 +94,13 @@ fn used_feed_keys(ctx: &Context<S>) -> Vec<FeedKey> {
         let bytes = scratchpad
             .as_deref()
             .expect("scratchpad should be populated");
-        UsedFeedKeys::try_from_slice(bytes)
+        let registry =
+            SequencingRegistry::try_from_slice(bytes).expect("decode scratchpad registry");
+        let used = registry
+            .0
+            .get(&PRICE_ORACLE_PRECOMPILE_ADDRESS)
+            .expect("price oracle scratchpad section should be present");
+        UsedFeedKeys::try_from_slice(used)
             .expect("decode used feed keys")
             .0
     })
@@ -237,4 +253,25 @@ fn accumulates_used_feed_keys() {
         .expect("second feed should resolve");
 
     assert_eq!(used_feed_keys(&ctx), vec![key1, key2]);
+}
+
+#[test]
+fn records_used_feed_key_even_when_out_of_gas() {
+    // A feed read here still runs out of gas, but it must be recorded so the
+    // sequencer keeps it and replay from the DA layer reaches the same outcome.
+    let payload = vec![0xab; 64];
+    let key = FeedKey::new(*PROVIDER_ID, feed_id(1));
+    let updates = updates_with(&[(key, &payload)]);
+    let ctx = context(Some(&updates));
+
+    let one_word_short = expected_gas(payload.len()) - PRICE_ORACLE_PRECOMPILE_WORD_GAS;
+    let err = run(
+        Some(&ctx),
+        &request(*PROVIDER_ID, feed_id(1)),
+        one_word_short,
+    )
+    .unwrap_err();
+    assert!(matches!(err, PrecompileError::OutOfGas));
+
+    assert_eq!(used_feed_keys(&ctx), vec![key]);
 }
