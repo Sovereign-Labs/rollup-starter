@@ -72,10 +72,9 @@ async fn main() {
     let prover_config = parse_prover_config().expect("Malformed prover_config");
     tracing::info!(?prover_config, "Running demo rollup with prover config");
 
-    if let Err(err) = spawn_oracle_clients(&args).await {
-        tracing::error!(?err, "failed to start oracle price-feed clients");
-        std::process::exit(1);
-    }
+    spawn_oracle_clients(&args)
+        .await
+        .expect("failed to start oracle price-feed clients");
 
     let rollup = new_rollup(
         args.genesis_path,
