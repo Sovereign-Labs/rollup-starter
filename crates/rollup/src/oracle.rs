@@ -16,6 +16,8 @@ use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace, warn};
 
+use stf_starter::prices;
+
 const ORACLE_CONFIG_FILE: &str = "oracle.toml";
 const ORACLE_CONFIG_CONTENT: &str = "[oracle]\nenabled = false\n";
 const DEADLINE_HEARTBEAT_MULTIPLIER: u32 = 3;
@@ -566,7 +568,7 @@ async fn consume(source: &SourceConfig, mut stream: OracleStream) -> SessionOutc
                     stale = false;
                     info!(source = %source.name, "Oracle source data freshness recovered");
                 }
-                stf_starter::price_source::insert(provider_id, feed_id, payload);
+                prices::insert(provider_id, feed_id, payload);
             }
             OracleFrame::Heartbeat { sent_at_unix } => {
                 trace!(

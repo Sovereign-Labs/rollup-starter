@@ -4,18 +4,18 @@ use std::sync::{LazyLock, Mutex};
 use bytes::Bytes;
 use price_oracle::{FeedKey, SerializedPriceUpdates, B256};
 
-static PRICE_SOURCE: LazyLock<Mutex<SerializedPriceUpdates>> =
+static ORACLE_PRICES: LazyLock<Mutex<SerializedPriceUpdates>> =
     LazyLock::new(|| Mutex::new(SerializedPriceUpdates(BTreeMap::new())));
 
 pub fn snapshot_prices() -> SerializedPriceUpdates {
-    PRICE_SOURCE
+    ORACLE_PRICES
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .clone()
 }
 
 pub fn insert(provider_id: B256, feed_id: B256, payload: Vec<u8>) {
-    PRICE_SOURCE
+    ORACLE_PRICES
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .0

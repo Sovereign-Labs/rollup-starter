@@ -1,4 +1,4 @@
-//! This is a technical only module to forward all necessary implementations to inner, non-authenticated Runtime
+//! Forwards the required trait implementations to the inner non-authenticated runtime.
 use sequencing_registry::SequencingRegistry;
 use sov_address::{EthereumAddress, FromVmAddress};
 use sov_bank::Amount;
@@ -326,13 +326,12 @@ impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
     #[cfg(feature = "native")]
     fn create_sequencing_data(&self) -> Self::SequencingData {
         // This snapshot is attached to every transaction and pruned later by
-        // finalize_sequencing_data before it reaches the DA layer. The SDK sizes
-        // transactions for batch limits using this pre-pruned size, so keep the
-        // snapshot bounded to avoid reducing batch throughput.
+        // finalize_sequencing_data before it reaches the DA layer.
+        // The SDK sizes transactions for batch limits using this pre-pruned size.
+        // Its best to keep the snapshot bounded to avoid reducing batch throughput.
         let mut registry = SequencingRegistry::default();
-        registry.set_section::<price_oracle::PriceOracleSequencing>(
-            &crate::price_source::snapshot_prices(),
-        );
+        registry
+            .set_section::<price_oracle::PriceOracleSequencing>(&crate::prices::snapshot_prices());
         registry
     }
 
@@ -342,7 +341,9 @@ impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
         data: Self::SequencingData,
         scratchpad: Option<sov_rollup_interface::Bytes>,
     ) -> Self::SequencingData {
-        let pruners = [sequencing_registry::pruner::<price_oracle::PriceOracleSequencing>()];
+        let pruners = [sequencing_registry::pruner::<
+            price_oracle::PriceOracleSequencing,
+        >()];
         sequencing_registry::finalize(data, scratchpad, &pruners)
     }
 }

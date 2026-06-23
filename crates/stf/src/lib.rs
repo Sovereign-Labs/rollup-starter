@@ -3,7 +3,7 @@
 pub mod authentication;
 mod delegation;
 #[cfg(feature = "native")]
-pub mod price_source;
+pub mod prices;
 pub mod runtime;
 
 pub use runtime::*;
