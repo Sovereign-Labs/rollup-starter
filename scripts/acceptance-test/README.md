@@ -29,9 +29,12 @@ The binaries support a default `full` profile and an optional `--short` profile.
 `blocks-per-version=1000` and `full-slot-save-interval=25`; `short` uses
 `blocks-per-version=30` and `full-slot-save-interval=5`.
 
-`acceptance-test` builds the local rollup and soak binaries with `constants.testing.toml`
-from this directory so historical transactions can be replayed with their original chain
-hash. `setup` uses the root `constants.toml`, since it generates fresh transactions.
+`acceptance-test` builds the local rollup and soak binaries with a generated
+`constants.testing.toml` from this directory so historical transactions can be replayed with
+their original chain hash. Before building those binaries, `acceptance-test` renders the
+gitignored file from `constants.testing.template.toml` for the selected profile:
+`full` uses `1003`, `2003`, etc. and `short` uses `33`, `63`, etc. `setup` uses the root
+`constants.toml`, since it generates fresh transactions.
 
 The acceptance data and throughput roots are profile-scoped. By default they are stored under:
 

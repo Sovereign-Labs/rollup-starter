@@ -31,7 +31,7 @@ Before making changes, understand what's new in the SDK:
    ```bash
    gh api repos/Sovereign-Labs/sovereign-sdk/compare/{prev}...{new} --jq '.files[] | select(.filename | startswith("examples/demo-rollup/")) | .filename'
    ```
-3. **Check for new constants**: Look for changes to the SDK's constants files that might require new entries in our `constants.toml` and in `scripts/acceptance-test/constants.testing.toml`.
+3. **Check for new constants**: Look for changes to the SDK's constants files that might require new entries in our `constants.toml` and in `scripts/acceptance-test/constants.testing.template.toml` (the `constants.testing.toml` consumed by the acceptance test is generated from this template at runtime and is gitignored).
 
 Report findings to the user before proceeding.
 

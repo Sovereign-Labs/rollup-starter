@@ -24,6 +24,8 @@ pub const SOAK_SALT: u32 = 3; // existing acceptance-test-data started from 3 fo
 pub const SOAK_SAFETY_STOP_BLOCKS: u64 = 5;
 const ACCEPTANCE_TEST_FEATURES: [&str; 3] = ["acceptance-testing", "mock_da", "mock_zkvm"];
 const ACCEPTANCE_CONSTANTS_FILENAME: &str = "constants.testing.toml";
+const ACCEPTANCE_CONSTANTS_TEMPLATE_FILENAME: &str = "constants.testing.template.toml";
+const ACCEPTANCE_DATA_HEIGHT_OFFSET: u64 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LocalConstantsManifest {
@@ -104,6 +106,80 @@ fn run_checked(cmd: &mut StdCommand, context: &str) -> Result<(), anyhow::Error>
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     ))
+}
+
+fn render_acceptance_constants_manifest(
+    directories: &Directories,
+    blocks_per_version: u64,
+) -> Result<(), anyhow::Error> {
+    let constants_path = directories
+        .acceptance_test_dir
+        .join(ACCEPTANCE_CONSTANTS_FILENAME);
+    let template_path = directories
+        .acceptance_test_dir
+        .join(ACCEPTANCE_CONSTANTS_TEMPLATE_FILENAME);
+    if !template_path.is_file() {
+        return Err(anyhow!(
+            "acceptance-test constants template not found at {}",
+            template_path.display()
+        ));
+    }
+
+    let template = fs::read_to_string(&template_path).with_context(|| {
+        format!(
+            "failed to read acceptance-test constants template {}",
+            template_path.display()
+        )
+    })?;
+    let rendered = render_acceptance_constants_template(&template, blocks_per_version)
+        .with_context(|| format!("failed to render {}", template_path.display()))?;
+    fs::write(&constants_path, rendered).with_context(|| {
+        format!(
+            "failed to write generated acceptance-test constants manifest {}",
+            constants_path.display()
+        )
+    })?;
+
+    Ok(())
+}
+
+fn render_acceptance_constants_template(
+    template: &str,
+    blocks_per_version: u64,
+) -> Result<String, anyhow::Error> {
+    let mut rendered = String::with_capacity(template.len());
+    let mut rest = template;
+
+    while let Some(start) = rest.find("{{") {
+        rendered.push_str(&rest[..start]);
+        let after_open = &rest[start + 2..];
+        let Some(end) = after_open.find("}}") else {
+            return Err(anyhow!("unterminated constants template placeholder"));
+        };
+        let placeholder = after_open[..end].trim();
+        if placeholder.is_empty() {
+            return Err(anyhow!("empty constants template placeholder"));
+        }
+        let boundary_idx: u64 = placeholder.parse().with_context(|| {
+            format!(
+                "constants template placeholder `{{{{{placeholder}}}}}` must contain a positive integer"
+            )
+        })?;
+        if boundary_idx == 0 {
+            return Err(anyhow!(
+                "constants template placeholder `{{{{0}}}}` must be at least 1"
+            ));
+        }
+        let height = boundary_idx
+            .checked_mul(blocks_per_version)
+            .and_then(|height| height.checked_add(ACCEPTANCE_DATA_HEIGHT_OFFSET))
+            .ok_or_else(|| anyhow!("rendered constants template height overflows u64"))?;
+        rendered.push_str(&height.to_string());
+        rest = &after_open[end + 2..];
+    }
+
+    rendered.push_str(rest);
+    Ok(rendered)
 }
 
 fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<ResolvedVersion>> {
@@ -370,6 +446,10 @@ pub fn prepare_acceptance_run_plan_with_constants(
     blocks_per_version: u64,
     local_constants_manifest: LocalConstantsManifest,
 ) -> Result<AcceptanceRunPlan, anyhow::Error> {
+    if local_constants_manifest == LocalConstantsManifest::AcceptanceTest {
+        render_acceptance_constants_manifest(directories, blocks_per_version)?;
+    }
+
     let binary_cache_dir = &directories.rollup_build_cache_dir;
     fs::create_dir_all(binary_cache_dir).with_context(|| {
         format!(
@@ -672,4 +752,111 @@ pub fn spawn_rollup_manager(
         )
     })?;
     Ok(ManagedRollupProcess::new(child))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn renders_single_boundary_for_short_profile() {
+        let template = r#"[constants]
+CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = {{1}}, chain_hash = "0xabc" }]
+"#;
+        let rendered = render_acceptance_constants_template(template, 30).unwrap();
+
+        assert!(rendered.contains(
+            r#"CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 33, chain_hash = "0xabc" }]"#
+        ));
+    }
+
+    #[test]
+    fn renders_single_boundary_for_full_profile() {
+        let template = r#"[constants]
+CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = {{1}}, chain_hash = "0xabc" }]
+"#;
+        let rendered = render_acceptance_constants_template(template, 1000).unwrap();
+
+        assert!(rendered.contains(
+            r#"CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 1003, chain_hash = "0xabc" }]"#
+        ));
+    }
+
+    #[test]
+    fn renders_multi_version_override_boundaries() {
+        let template = r#"[constants]
+CHAIN_HASH_OVERRIDES = [
+    { start_height = 0, end_height = {{1}}, chain_hash = "0xabc" },
+    { start_height = {{1}}, end_height = {{2}}, chain_hash = "0xdef", grace_period = 4 },
+]
+"#;
+        let rendered = render_acceptance_constants_template(template, 30).unwrap();
+
+        assert!(rendered.contains(r#"{ start_height = 0, end_height = 33, chain_hash = "0xabc" }"#));
+        assert!(rendered.contains(
+            r#"{ start_height = 33, end_height = 63, chain_hash = "0xdef", grace_period = 4 }"#
+        ));
+    }
+
+    #[test]
+    fn leaves_templates_without_placeholders_unchanged() {
+        let template = "[constants]\nCHAIN_HASH_OVERRIDES = []\n";
+
+        let rendered = render_acceptance_constants_template(template, 30).unwrap();
+
+        assert_eq!(rendered, template);
+    }
+
+    #[test]
+    fn rejects_malformed_placeholders() {
+        let err = render_acceptance_constants_template("end_height = {{next}}", 30)
+            .expect_err("non-numeric placeholder should fail");
+
+        assert!(err.to_string().contains("positive integer"));
+    }
+
+    #[test]
+    fn rejects_zero_placeholders() {
+        let err = render_acceptance_constants_template("end_height = {{0}}", 30)
+            .expect_err("zero placeholder should fail");
+
+        assert!(err.to_string().contains("at least 1"));
+    }
+
+    #[test]
+    fn render_manifest_replaces_existing_generated_file() {
+        let temp = tempfile::tempdir().unwrap();
+        let acceptance_test_dir = temp.path().to_path_buf();
+        fs::write(
+            acceptance_test_dir.join(ACCEPTANCE_CONSTANTS_TEMPLATE_FILENAME),
+            "CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = {{1}}, chain_hash = \"0xabc\" }]\n",
+        )
+        .unwrap();
+        fs::write(
+            acceptance_test_dir.join(ACCEPTANCE_CONSTANTS_FILENAME),
+            "stale generated constants\n",
+        )
+        .unwrap();
+        let directories = Directories {
+            rollup_root: acceptance_test_dir.clone(),
+            acceptance_test_dir: acceptance_test_dir.clone(),
+            rollup_build_cache_dir: acceptance_test_dir.clone(),
+            manager_build_dir: acceptance_test_dir.clone(),
+            output_dir: acceptance_test_dir.clone(),
+            rollup_data_path: acceptance_test_dir.clone(),
+            snapshots_dir: acceptance_test_dir.clone(),
+            throughput_dir: acceptance_test_dir,
+        };
+
+        render_acceptance_constants_manifest(&directories, 30).unwrap();
+
+        let rendered = fs::read_to_string(
+            directories
+                .acceptance_test_dir
+                .join(ACCEPTANCE_CONSTANTS_FILENAME),
+        )
+        .unwrap();
+        assert!(rendered.contains("end_height = 33"));
+        assert!(!rendered.contains("stale"));
+    }
 }
