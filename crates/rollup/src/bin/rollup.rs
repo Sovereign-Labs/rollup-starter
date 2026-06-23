@@ -40,10 +40,6 @@ struct Args {
     #[arg(long, default_value = default_genesis_path().into_os_string())]
     genesis_path: PathBuf,
 
-    // UDP port on 127.0.0.1 where Telegraf service suppose to listen.
-    #[arg(long, default_value_t = 9845)]
-    metrics: u64,
-
     /// Start the rollup at a given height.
     #[arg(long, default_value = None)]
     start_at_rollup_height: Option<u64>,
@@ -72,11 +68,6 @@ async fn main() {
     let args = Args::parse();
 
     let _guard = initialize_logging();
-
-    let metrics_port = args.metrics;
-    let address = format!("127.0.0.1:{metrics_port}");
-    prometheus_exporter::start(address.parse().unwrap())
-        .expect("Could not start prometheus server");
 
     let prover_config = parse_prover_config().expect("Malformed prover_config");
     tracing::info!(?prover_config, "Running demo rollup with prover config");

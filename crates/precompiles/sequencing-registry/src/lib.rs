@@ -115,7 +115,7 @@ pub fn finalize(
     let used = match SequencingRegistry::try_from_slice(&scratchpad) {
         Ok(used) => used,
         Err(err) => {
-            tracing::error!(%err, "sequencing scratchpad is malformed; publishing full sequencing data");
+            tracing::error!(%err, "sequencing scratchpad is malformed, publishing full sequencing data");
             return data;
         }
     };
@@ -123,7 +123,7 @@ pub fn finalize(
     let mut out = BTreeMap::new();
     for (addr, data_section) in data.0 {
         let Some((_, prune)) = pruners.iter().find(|(a, _)| *a == addr) else {
-            tracing::warn!(%addr, "no pruner registered for sequencing section; keeping it in full");
+            tracing::warn!(%addr, "no pruner registered for sequencing section, keeping it in full");
             out.insert(addr, data_section);
             continue;
         };
@@ -134,7 +134,7 @@ pub fn finalize(
             }
             Ok(None) => {}
             Err(err) => {
-                tracing::error!(%addr, %err, "could not prune sequencing section; keeping it in full");
+                tracing::error!(%addr, %err, "could not prune sequencing section, keeping it in full");
                 out.insert(addr, data_section);
             }
         }

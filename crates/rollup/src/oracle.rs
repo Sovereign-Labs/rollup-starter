@@ -27,6 +27,7 @@ const SUPERVISOR_GUARD_MAX: Duration = Duration::from_secs(30);
 const HEALTHY_CONNECTION_THRESHOLD: Duration = Duration::from_secs(10);
 const STALENESS_WARN_SEC: u64 = 30;
 const REQUIRE_SOURCES_TIMEOUT: Duration = Duration::from_secs(5);
+const METRICS_REPORT_INTERVAL: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -205,6 +206,7 @@ pub async fn spawn_clients(config: OracleConfig, path: PathBuf) -> anyhow::Resul
         info!("All required oracle sources connected");
     }
 
+    tokio::spawn(metrics::run_reporter(METRICS_REPORT_INTERVAL));
     tokio::spawn(reload_manager(path, startup_config, registry));
     Ok(())
 }
@@ -590,64 +592,118 @@ fn now_unix() -> u64 {
 }
 
 mod metrics {
-    use std::sync::LazyLock;
+    use std::collections::BTreeMap;
+    use std::io::Write;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::{Arc, LazyLock, Mutex, PoisonError};
+    use std::time::Duration;
 
-    use prometheus_exporter::prometheus::{
-        register_int_counter_vec, register_int_gauge_vec, IntCounterVec, IntGaugeVec,
-    };
+    use sov_metrics::Metric;
+    use tracing::info;
 
-    static CONNECTED: LazyLock<IntGaugeVec> = LazyLock::new(|| {
-        register_int_gauge_vec!(
-            "oracle_source_connected",
-            "1 if the oracle source connection is currently established, else 0",
-            &["source"]
-        )
-        .expect("register connected gauge")
-    });
-
-    static RECONNECTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
-        register_int_counter_vec!(
-            "oracle_reconnects_total",
-            "Number of times an oracle source connection was re-established",
-            &["source"]
-        )
-        .expect("register reconnects counter")
-    });
-
-    static FRAMES: LazyLock<IntCounterVec> = LazyLock::new(|| {
-        register_int_counter_vec!(
-            "oracle_frames_total",
-            "Number of frames received from an oracle source",
-            &["source"]
-        )
-        .expect("register frames counter")
-    });
-
-    static LAST_FRAME_TIMESTAMP: LazyLock<IntGaugeVec> = LazyLock::new(|| {
-        register_int_gauge_vec!(
-            "oracle_last_frame_timestamp_seconds",
-            "Unix timestamp of the last frame received from an oracle source",
-            &["source"]
-        )
-        .expect("register last-frame timestamp gauge")
-    });
-
-    pub fn set_connected(source: &str, connected: bool) {
-        CONNECTED.with_label_values(&[source]).set(connected as i64);
+    #[derive(Default)]
+    struct SourceMetrics {
+        connected: AtomicBool,
+        reconnects: AtomicU64,
+        frames: AtomicU64,
+        last_frame_unix: AtomicU64,
     }
 
-    pub fn inc_reconnects(source: &str) {
-        RECONNECTS.with_label_values(&[source]).inc();
+    static SOURCES: LazyLock<Mutex<BTreeMap<String, Arc<SourceMetrics>>>> =
+        LazyLock::new(|| Mutex::new(BTreeMap::new()));
+
+    fn source(name: &str) -> Arc<SourceMetrics> {
+        SOURCES
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(name.to_owned())
+            .or_default()
+            .clone()
     }
 
-    pub fn inc_frames(source: &str) {
-        FRAMES.with_label_values(&[source]).inc();
+    pub fn set_connected(name: &str, connected: bool) {
+        source(name).connected.store(connected, Ordering::Relaxed);
     }
 
-    pub fn set_last_frame(source: &str, unix_secs: u64) {
-        LAST_FRAME_TIMESTAMP
-            .with_label_values(&[source])
-            .set(unix_secs as i64);
+    pub fn inc_reconnects(name: &str) {
+        source(name).reconnects.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn inc_frames(name: &str) {
+        source(name).frames.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn set_last_frame(name: &str, unix_secs: u64) {
+        source(name)
+            .last_frame_unix
+            .store(unix_secs, Ordering::Relaxed);
+    }
+
+    // One InfluxDB measurement per source, tagged by source name.
+    #[derive(Debug)]
+    struct OracleMetric {
+        source: String,
+        connected: bool,
+        reconnects: u64,
+        frames: u64,
+        last_frame_unix: u64,
+    }
+
+    impl Metric for OracleMetric {
+        fn measurement_name(&self) -> &'static str {
+            "oracle"
+        }
+
+        fn serialize_for_telegraf(&self, buffer: &mut Vec<u8>) -> std::io::Result<()> {
+            write!(
+                buffer,
+                "{},source={} connected={},reconnects={},frames={},last_frame={}",
+                self.measurement_name(),
+                sov_metrics::safe_telegraf_string(&self.source),
+                self.connected as u8,
+                self.reconnects,
+                self.frames,
+                self.last_frame_unix,
+            )
+        }
+    }
+
+    /// Submits a snapshot of every source's counters to sov-metrics and logs it.
+    pub async fn run_reporter(interval: Duration) {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            report_once();
+        }
+    }
+
+    fn report_once() {
+        let snapshot: Vec<OracleMetric> = {
+            let sources = SOURCES.lock().unwrap_or_else(PoisonError::into_inner);
+            sources
+                .iter()
+                .map(|(name, metrics)| OracleMetric {
+                    source: name.clone(),
+                    connected: metrics.connected.load(Ordering::Relaxed),
+                    reconnects: metrics.reconnects.load(Ordering::Relaxed),
+                    frames: metrics.frames.load(Ordering::Relaxed),
+                    last_frame_unix: metrics.last_frame_unix.load(Ordering::Relaxed),
+                })
+                .collect()
+        };
+
+        for metric in snapshot {
+            info!(
+                source = %metric.source,
+                connected = metric.connected,
+                reconnects = metric.reconnects,
+                frames = metric.frames,
+                last_frame = metric.last_frame_unix,
+                "oracle source metrics"
+            );
+            sov_metrics::track_metrics(|tracker| tracker.submit(metric));
+        }
     }
 }
 

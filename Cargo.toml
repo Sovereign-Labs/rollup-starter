@@ -90,7 +90,6 @@ axum = { version = "0.8.8", default-features = false }
 serde = { version = "1.0.192", features = ["derive", "rc"] }
 serde_json = { version = "1.0" }
 
-prometheus_exporter = "0.8.5"
 sha2 = { version = "=0.10.9", default-features = false }
 
 schemars = { version = "1.2", features = ["derive"] }
