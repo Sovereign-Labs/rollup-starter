@@ -122,9 +122,9 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
     async fn create_da_service(
         &self,
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
-        shutdown_receiver: tokio::sync::watch::Receiver<()>,
+        secondary_shutdown_controller: &sov_rollup_interface::node::SecondaryShutdownController,
     ) -> Self::DaService {
-        new_da_service::<Self::Spec>(rollup_config, shutdown_receiver).await
+        new_da_service::<Self::Spec>(rollup_config, secondary_shutdown_controller).await
     }
 
     async fn create_prover_service(
