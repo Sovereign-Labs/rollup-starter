@@ -8,8 +8,7 @@ pub use codec::{
 };
 pub use error::IpcError;
 pub use transport::{
-    bind, connect, Backoff, BoundListener, Endpoint, OracleListener, OracleStream,
-    DEFAULT_CONNECT_TIMEOUT,
+    bind, connect, Backoff, BoundListener, OracleListener, OracleStream, DEFAULT_CONNECT_TIMEOUT,
 };
 pub use types::{FeedKey, OracleFrame, PROTOCOL_VERSION};
 

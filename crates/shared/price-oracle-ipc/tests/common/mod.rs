@@ -1,32 +1,12 @@
 use std::time::Duration;
 
 use price_oracle_ipc::{
-    connect, read_frame_with_timeout, write_frame, Backoff, BoundListener, Endpoint, OracleFrame,
-    B256, PROTOCOL_VERSION,
+    connect, read_frame_with_timeout, write_frame, Backoff, BoundListener, OracleFrame, B256,
+    PROTOCOL_VERSION,
 };
-use tempfile::TempDir;
 
-#[derive(Clone, Copy)]
-pub enum Kind {
-    Unix,
-    Tcp,
-}
-
-pub async fn listener(kind: Kind) -> (BoundListener, Option<TempDir>) {
-    match kind {
-        Kind::Tcp => (
-            BoundListener::bind(Endpoint::tcp("127.0.0.1:0"))
-                .await
-                .unwrap(),
-            None,
-        ),
-        Kind::Unix => {
-            let dir = tempfile::tempdir().unwrap();
-            let path = dir.path().join("oracle.sock");
-            let listener = BoundListener::bind(Endpoint::unix(path)).await.unwrap();
-            (listener, Some(dir))
-        }
-    }
+pub async fn listener() -> BoundListener {
+    BoundListener::bind("127.0.0.1:0").await.unwrap()
 }
 
 pub fn hello() -> OracleFrame {
@@ -44,6 +24,7 @@ pub fn update(feed: u8, payload: &[u8]) -> OracleFrame {
         feed_id: B256::repeat_byte(feed),
         payload: payload.to_vec(),
         ingested_at: 1_700_000_000,
+        source_time: 1_700_000_000,
     }
 }
 
@@ -63,11 +44,11 @@ pub fn serve_once(
     })
 }
 
-pub async fn run_consumer(endpoint: Endpoint, deadline: Duration, want: usize) -> Vec<OracleFrame> {
+pub async fn run_consumer(address: String, deadline: Duration, want: usize) -> Vec<OracleFrame> {
     let mut backoff = Backoff::new(Duration::from_millis(1), Duration::from_millis(20));
     let mut collected = Vec::new();
     loop {
-        let mut stream = match connect(&endpoint).await {
+        let mut stream = match connect(&address).await {
             Ok(stream) => {
                 backoff.reset();
                 stream

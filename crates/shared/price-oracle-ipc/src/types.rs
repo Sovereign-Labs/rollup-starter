@@ -33,6 +33,7 @@ pub enum OracleFrame {
         feed_id: B256,
         payload: Vec<u8>,
         ingested_at: u64,
+        source_time: u64,
     },
     Heartbeat {
         sent_at_unix: u64,

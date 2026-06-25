@@ -3,11 +3,12 @@ use std::fs;
 use std::future;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Context};
 use price_oracle_ipc::{
-    connect, read_frame_with_timeout, Backoff, Endpoint, IpcError, OracleFrame, OracleStream,
+    connect, read_frame_with_timeout, Backoff, IpcError, OracleFrame, OracleStream,
     PROTOCOL_VERSION,
 };
 use serde::Deserialize;
@@ -28,6 +29,20 @@ const HEALTHY_CONNECTION_THRESHOLD: Duration = Duration::from_secs(10);
 const STALENESS_WARN_SEC: u64 = 30;
 const REQUIRE_SOURCES_TIMEOUT: Duration = Duration::from_secs(5);
 const METRICS_REPORT_INTERVAL: Duration = Duration::from_secs(15);
+const PROVIDER_FEEDS_MAX: usize = 512;
+const THROTTLE_WARN_SEC: u64 = 60;
+
+static LAST_DROPPED_WARN_AT: AtomicU64 = AtomicU64::new(0);
+static LAST_DIVERGENCE_WARN_AT: AtomicU64 = AtomicU64::new(0);
+
+fn warn_allowed(last: &AtomicU64) -> bool {
+    let now = now_unix();
+    let prev = last.load(Ordering::Relaxed);
+    now.saturating_sub(prev) >= THROTTLE_WARN_SEC
+        && last
+            .compare_exchange(prev, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,7 +65,6 @@ pub struct OracleConfig {
 #[serde(rename_all = "snake_case")]
 pub enum Transport {
     #[default]
-    Unix,
     Tcp,
 }
 
@@ -61,44 +75,18 @@ pub struct SourceConfig {
     #[serde(default)]
     pub transport: Transport,
     #[serde(default)]
-    pub socket_path: Option<PathBuf>,
-    #[serde(default)]
     pub socket_address: Option<String>,
 }
 
 impl SourceConfig {
-    fn endpoint(&self) -> anyhow::Result<Endpoint> {
+    fn address(&self) -> anyhow::Result<String> {
         match self.transport {
-            Transport::Unix => {
-                if self.socket_address.is_some() {
-                    return Err(anyhow!(
-                        "oracle source '{}': transport = \"unix\" but socket_address is set",
-                        self.name
-                    ));
-                }
-                let path = self.socket_path.clone().ok_or_else(|| {
-                    anyhow!(
-                        "oracle source '{}': transport = \"unix\" requires socket_path",
-                        self.name
-                    )
-                })?;
-                Ok(Endpoint::Unix(path))
-            }
-            Transport::Tcp => {
-                if self.socket_path.is_some() {
-                    return Err(anyhow!(
-                        "oracle source '{}': transport = \"tcp\" but socket_path is set",
-                        self.name
-                    ));
-                }
-                let address = self.socket_address.clone().ok_or_else(|| {
-                    anyhow!(
-                        "oracle source '{}': transport = \"tcp\" requires socket_address",
-                        self.name
-                    )
-                })?;
-                Ok(Endpoint::Tcp(address))
-            }
+            Transport::Tcp => self.socket_address.clone().ok_or_else(|| {
+                anyhow!(
+                    "oracle source '{}': transport = \"tcp\" requires socket_address",
+                    self.name
+                )
+            }),
         }
     }
 }
@@ -121,7 +109,7 @@ fn validate(config: &OracleConfig) -> anyhow::Result<()> {
         if !seen.insert(source.name.as_str()) {
             return Err(anyhow!("duplicate oracle source name '{}'", source.name));
         }
-        source.endpoint()?;
+        source.address()?;
     }
     Ok(())
 }
@@ -177,7 +165,7 @@ impl SourceHandle {
 pub async fn spawn_clients(config: OracleConfig, path: PathBuf) -> anyhow::Result<()> {
     if !config.enabled {
         info!("Price oracle disabled via config, not connecting to any source");
-        tokio::spawn(ignore_sighup_while_disabled());
+        tokio::spawn(ignore_sighup());
         return Ok(());
     }
 
@@ -242,16 +230,16 @@ fn spawn_source(
     source: SourceConfig,
     ready: Option<mpsc::UnboundedSender<String>>,
 ) -> Option<SourceHandle> {
-    let endpoint = match source.endpoint() {
-        Ok(endpoint) => endpoint,
+    let address = match source.address() {
+        Ok(address) => address,
         Err(e) => {
-            error!(source = %source.name, error = %e, "Skipping oracle source with invalid endpoint");
+            error!(source = %source.name, error = %e, "Skipping oracle source with invalid address");
             return None;
         }
     };
-    info!(source = %source.name, endpoint = %endpoint, "Starting oracle source client");
+    info!(source = %source.name, address = %address, "Starting oracle source client");
     let (cancel_tx, cancel_rx) = watch::channel(());
-    let join = tokio::spawn(supervise_source(source.clone(), endpoint, ready, cancel_rx));
+    let join = tokio::spawn(supervise_source(source.clone(), address, ready, cancel_rx));
     Some(SourceHandle {
         config: source,
         cancel: cancel_tx,
@@ -259,7 +247,7 @@ fn spawn_source(
     })
 }
 
-async fn ignore_sighup_while_disabled() {
+async fn ignore_sighup() {
     let mut sighup = match signal(SignalKind::hangup()) {
         Ok(sighup) => sighup,
         Err(e) => {
@@ -365,6 +353,10 @@ async fn apply_source_diff(
         if let Some(handle) = registry.remove(&name) {
             info!(source = %name, "Removing oracle source (config reload)");
             handle.shutdown().await;
+            let evicted = prices::remove_source(&name);
+            if evicted > 0 {
+                info!(source = %name, evicted, "Evicted feeds for removed oracle source");
+            }
         }
     }
     for source in diff.to_restart {
@@ -390,14 +382,14 @@ async fn apply_source_diff(
 
 async fn supervise_source(
     source: SourceConfig,
-    endpoint: Endpoint,
+    address: String,
     ready: Option<mpsc::UnboundedSender<String>>,
     mut cancel: watch::Receiver<()>,
 ) {
     let mut guard = Backoff::new(SUPERVISOR_GUARD_MIN, SUPERVISOR_GUARD_MAX);
     loop {
         let started = Instant::now();
-        let mut child = tokio::spawn(run_source(source.clone(), endpoint.clone(), ready.clone()));
+        let mut child = tokio::spawn(run_source(source.clone(), address.clone(), ready.clone()));
 
         tokio::select! {
             biased;
@@ -445,19 +437,17 @@ fn heartbeat_deadline(heartbeat_interval_sec: u32) -> Duration {
 
 async fn run_source(
     source: SourceConfig,
-    endpoint: Endpoint,
-    ready: Option<mpsc::UnboundedSender<String>>,
+    address: String,
+    mut ready: Option<mpsc::UnboundedSender<String>>,
 ) {
     let mut backoff = Backoff::default();
     let mut reconnect = false;
     loop {
-        let stream = match connect(&endpoint).await {
+        let stream = match connect(&address).await {
             Ok(stream) => {
                 if reconnect {
                     metrics::inc_reconnects(&source.name);
                     info!(source = %source.name, "Connected to oracle source");
-                } else if let Some(ready) = &ready {
-                    let _ = ready.send(source.name.clone());
                 }
                 stream
             }
@@ -477,7 +467,7 @@ async fn run_source(
 
         metrics::set_connected(&source.name, true);
         let started = Instant::now();
-        let outcome = consume(&source, stream).await;
+        let outcome = consume(&source, stream, &mut ready).await;
         metrics::set_connected(&source.name, false);
 
         if outcome.hello && started.elapsed() >= HEALTHY_CONNECTION_THRESHOLD {
@@ -501,7 +491,11 @@ struct SessionOutcome {
     error: IpcError,
 }
 
-async fn consume(source: &SourceConfig, mut stream: OracleStream) -> SessionOutcome {
+async fn consume(
+    source: &SourceConfig,
+    mut stream: OracleStream,
+    ready: &mut Option<mpsc::UnboundedSender<String>>,
+) -> SessionOutcome {
     let mut read_deadline = BOOTSTRAP_DEADLINE;
     let mut stale = false;
     let mut hello = false;
@@ -531,21 +525,50 @@ async fn consume(source: &SourceConfig, mut stream: OracleStream) -> SessionOutc
                         error: IpcError::Closed,
                     };
                 }
+                let feed_count = feeds.len();
+                if feed_count > PROVIDER_FEEDS_MAX {
+                    warn!(
+                        source = %source.name,
+                        feed_count,
+                        max = PROVIDER_FEEDS_MAX,
+                        "Oracle source advertised too many feeds, dropping connection"
+                    );
+                    return SessionOutcome {
+                        hello,
+                        error: IpcError::Closed,
+                    };
+                }
+                let registration = prices::register_feeds(&source.name, provider_id, feeds);
+                if registration.feeds_diverged {
+                    metrics::inc_divergent_feeds(&source.name);
+                    if warn_allowed(&LAST_DIVERGENCE_WARN_AT) {
+                        warn!(
+                            source = %source.name,
+                            %provider_id,
+                            "Oracle provider replicas advertise divergent feed sets"
+                        );
+                    }
+                }
                 hello = true;
                 read_deadline = heartbeat_deadline(heartbeat_interval_sec);
                 info!(
                     source = %source.name,
                     %provider_id,
-                    feed_count = feeds.len(),
+                    feed_count,
+                    evicted = registration.evicted,
                     heartbeat_interval_sec,
                     "Oracle source handshake"
                 );
+                if let Some(ready) = ready.take() {
+                    let _ = ready.send(source.name.clone());
+                }
             }
             OracleFrame::PriceUpdate {
                 provider_id,
                 feed_id,
                 payload,
                 ingested_at,
+                source_time,
             } => {
                 let age = now_unix().saturating_sub(ingested_at);
                 trace!(
@@ -570,7 +593,24 @@ async fn consume(source: &SourceConfig, mut stream: OracleStream) -> SessionOutc
                     stale = false;
                     info!(source = %source.name, "Oracle source data freshness recovered");
                 }
-                prices::insert(provider_id, feed_id, payload);
+                let order_time = if source_time != 0 {
+                    source_time
+                } else {
+                    ingested_at
+                };
+                match prices::insert_if_newer(provider_id, feed_id, payload, order_time) {
+                    prices::InsertOutcome::Inserted | prices::InsertOutcome::Stale => {}
+                    prices::InsertOutcome::Unexpected => {
+                        metrics::inc_dropped_unexpected(&source.name);
+                        if warn_allowed(&LAST_DROPPED_WARN_AT) {
+                            warn!(
+                                source = %source.name,
+                                %feed_id,
+                                "Oracle source sent an update for an unexpected feed, dropping"
+                            );
+                        }
+                    }
+                }
             }
             OracleFrame::Heartbeat { sent_at_unix } => {
                 trace!(
@@ -593,7 +633,7 @@ fn now_unix() -> u64 {
 
 mod metrics {
     use std::collections::BTreeMap;
-    use std::io::Write;
+    use std::io::{self, Write};
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::{Arc, LazyLock, Mutex, PoisonError};
     use std::time::Duration;
@@ -607,6 +647,8 @@ mod metrics {
         reconnects: AtomicU64,
         frames: AtomicU64,
         last_frame_unix: AtomicU64,
+        dropped_unexpected: AtomicU64,
+        divergent_feeds: AtomicU64,
     }
 
     static SOURCES: LazyLock<Mutex<BTreeMap<String, Arc<SourceMetrics>>>> =
@@ -639,6 +681,16 @@ mod metrics {
             .store(unix_secs, Ordering::Relaxed);
     }
 
+    pub fn inc_dropped_unexpected(name: &str) {
+        source(name)
+            .dropped_unexpected
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn inc_divergent_feeds(name: &str) {
+        source(name).divergent_feeds.fetch_add(1, Ordering::Relaxed);
+    }
+
     // One InfluxDB measurement per source, tagged by source name.
     #[derive(Debug)]
     struct OracleMetric {
@@ -647,6 +699,8 @@ mod metrics {
         reconnects: u64,
         frames: u64,
         last_frame_unix: u64,
+        dropped_unexpected: u64,
+        divergent_feeds: u64,
     }
 
     impl Metric for OracleMetric {
@@ -654,16 +708,18 @@ mod metrics {
             "oracle"
         }
 
-        fn serialize_for_telegraf(&self, buffer: &mut Vec<u8>) -> std::io::Result<()> {
+        fn serialize_for_telegraf(&self, buffer: &mut Vec<u8>) -> io::Result<()> {
             write!(
                 buffer,
-                "{},source={} connected={},reconnects={},frames={},last_frame={}",
+                "{},source={} connected={},reconnects={},frames={},last_frame={},dropped_unexpected={},divergent_feeds={}",
                 self.measurement_name(),
                 sov_metrics::safe_telegraf_string(&self.source),
                 self.connected as u8,
                 self.reconnects,
                 self.frames,
                 self.last_frame_unix,
+                self.dropped_unexpected,
+                self.divergent_feeds,
             )
         }
     }
@@ -689,6 +745,8 @@ mod metrics {
                     reconnects: metrics.reconnects.load(Ordering::Relaxed),
                     frames: metrics.frames.load(Ordering::Relaxed),
                     last_frame_unix: metrics.last_frame_unix.load(Ordering::Relaxed),
+                    dropped_unexpected: metrics.dropped_unexpected.load(Ordering::Relaxed),
+                    divergent_feeds: metrics.divergent_feeds.load(Ordering::Relaxed),
                 })
                 .collect()
         };
@@ -700,6 +758,8 @@ mod metrics {
                 reconnects = metric.reconnects,
                 frames = metric.frames,
                 last_frame = metric.last_frame_unix,
+                dropped_unexpected = metric.dropped_unexpected,
+                divergent_feeds = metric.divergent_feeds,
                 "oracle source metrics"
             );
             sov_metrics::track_metrics(|tracker| tracker.submit(metric));
@@ -720,15 +780,15 @@ mod tests {
     }
 
     #[test]
-    fn transport_defaults_to_unix() {
+    fn transport_defaults_to_tcp() {
         let toml = r#"
             [oracle]
             [[oracle.source]]
             name = "chainlink"
-            socket_path = "/run/relay/chainlink.sock"
+            socket_address = "127.0.0.1:9801"
         "#;
         let config = toml::from_str::<OracleConfigFile>(toml).unwrap().oracle;
-        assert_eq!(config.sources[0].transport, Transport::Unix);
+        assert_eq!(config.sources[0].transport, Transport::Tcp);
     }
 
     fn source(toml: &str) -> SourceConfig {
@@ -746,61 +806,44 @@ mod tests {
             enabled = true
             require_sources = true
             [[oracle.source]]
-            name = "chainlink"
-            transport = "unix"
-            socket_path = "/run/relay/chainlink.sock"
-            [[oracle.source]]
-            name = "pyth"
+            name = "chainlink-1"
             transport = "tcp"
+            socket_address = "127.0.0.1:9801"
+            [[oracle.source]]
+            name = "chainlink-2"
             socket_address = "127.0.0.1:9802"
         "#;
         let config = toml::from_str::<OracleConfigFile>(toml).unwrap().oracle;
         assert!(config.enabled);
         assert!(config.require_sources);
         assert_eq!(config.sources.len(), 2);
-        assert_eq!(config.sources[0].name, "chainlink");
-        assert_eq!(config.sources[0].transport, Transport::Unix);
+        assert_eq!(config.sources[0].name, "chainlink-1");
+        assert_eq!(config.sources[0].transport, Transport::Tcp);
         assert_eq!(config.sources[1].transport, Transport::Tcp);
     }
 
     #[test]
-    fn unix_source_resolves_to_unix_endpoint() {
-        let s = source("name = \"a\"\nsocket_path = \"/run/a.sock\"");
-        assert_eq!(s.endpoint().unwrap(), Endpoint::unix("/run/a.sock"));
-    }
-
-    #[test]
-    fn tcp_source_resolves_to_tcp_endpoint() {
+    fn tcp_source_resolves_to_address() {
         let s = source("name = \"a\"\ntransport = \"tcp\"\nsocket_address = \"127.0.0.1:9802\"");
-        assert_eq!(s.endpoint().unwrap(), Endpoint::tcp("127.0.0.1:9802"));
+        assert_eq!(s.address().unwrap(), "127.0.0.1:9802");
     }
 
     #[test]
-    fn unix_without_socket_path_is_an_error() {
-        let s = source("name = \"a\"");
-        assert!(s.endpoint().is_err());
+    fn default_transport_resolves_to_address() {
+        let s = source("name = \"a\"\nsocket_address = \"127.0.0.1:9802\"");
+        assert_eq!(s.address().unwrap(), "127.0.0.1:9802");
     }
 
     #[test]
     fn tcp_without_socket_address_is_an_error() {
         let s = source("name = \"a\"\ntransport = \"tcp\"");
-        assert!(s.endpoint().is_err());
+        assert!(s.address().is_err());
     }
 
     #[test]
-    fn tcp_with_stray_socket_path_is_an_error() {
-        let s = source(
-            "name = \"a\"\ntransport = \"tcp\"\nsocket_address = \"127.0.0.1:9802\"\nsocket_path = \"/run/a.sock\"",
-        );
-        assert!(s.endpoint().is_err());
-    }
-
-    #[test]
-    fn unix_with_stray_socket_address_is_an_error() {
-        let s = source(
-            "name = \"a\"\nsocket_path = \"/run/a.sock\"\nsocket_address = \"127.0.0.1:9802\"",
-        );
-        assert!(s.endpoint().is_err());
+    fn default_transport_without_address_is_an_error() {
+        let s = source("name = \"a\"");
+        assert!(s.address().is_err());
     }
 
     #[test]
@@ -855,19 +898,18 @@ mod tests {
         assert!(load_config(&path).is_err());
     }
 
-    fn unix_src(name: &str, path: &str) -> SourceConfig {
+    fn tcp_src(name: &str, address: &str) -> SourceConfig {
         SourceConfig {
             name: name.to_string(),
-            transport: Transport::Unix,
-            socket_path: Some(PathBuf::from(path)),
-            socket_address: None,
+            transport: Transport::Tcp,
+            socket_address: Some(address.to_string()),
         }
     }
 
     #[test]
     fn duplicate_source_names_are_rejected() {
         let config = OracleConfig {
-            sources: vec![unix_src("dup", "/a.sock"), unix_src("dup", "/b.sock")],
+            sources: vec![tcp_src("dup", "127.0.0.1:1"), tcp_src("dup", "127.0.0.1:2")],
             ..Default::default()
         };
         assert!(validate(&config).is_err());
@@ -876,7 +918,7 @@ mod tests {
     #[test]
     fn unique_source_names_pass_validation() {
         let config = OracleConfig {
-            sources: vec![unix_src("a", "/a.sock"), unix_src("b", "/b.sock")],
+            sources: vec![tcp_src("a", "127.0.0.1:1"), tcp_src("b", "127.0.0.1:2")],
             ..Default::default()
         };
         assert!(validate(&config).is_ok());
@@ -885,14 +927,14 @@ mod tests {
     #[test]
     fn diff_add_remove_restart() {
         let mut current = HashMap::new();
-        current.insert("keep".to_string(), unix_src("keep", "/keep.sock"));
-        current.insert("change".to_string(), unix_src("change", "/old.sock"));
-        current.insert("drop".to_string(), unix_src("drop", "/drop.sock"));
+        current.insert("keep".to_string(), tcp_src("keep", "127.0.0.1:1"));
+        current.insert("change".to_string(), tcp_src("change", "127.0.0.1:2"));
+        current.insert("drop".to_string(), tcp_src("drop", "127.0.0.1:3"));
 
         let new_sources = vec![
-            unix_src("keep", "/keep.sock"),
-            unix_src("change", "/new.sock"),
-            unix_src("add", "/add.sock"),
+            tcp_src("keep", "127.0.0.1:1"),
+            tcp_src("change", "127.0.0.1:9"),
+            tcp_src("add", "127.0.0.1:4"),
         ];
         let diff = diff_sources(&current, new_sources);
 
