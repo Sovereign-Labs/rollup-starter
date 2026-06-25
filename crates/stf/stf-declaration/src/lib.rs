@@ -40,14 +40,14 @@ sov_evm::generate_precompile_set! {
 /// Runtime lifecycle:
 ///
 /// 1. Initialization:
-///     When a rollup is deployed for the first time, it needs to set its genesis state.
-///     The `#[derive(Genesis)]` macro will generate a `Runtime::genesis(config)` method which returns
-///     `Storage` with the initialized state.
+///    When a rollup is deployed for the first time, it needs to set its genesis state.
+///    The `#[derive(Genesis)]` macro will generate a `Runtime::genesis(config)` method which returns
+///    `Storage` with the initialized state.
 ///
 /// 2. Calls:
-///     The `Module` interface defines a `call` method which accepts a module-defined type and triggers the specific `module logic.`
-///     In general, the point of a call is to change the module state, but if the call throws an error,
-///     no state is updated (the transaction is reverted).
+///    The `Module` interface defines a `call` method which accepts a module-defined type and triggers the specific `module logic.`
+///    In general, the point of a call is to change the module state, but if the call throws an error,
+///    no state is updated (the transaction is reverted).
 ///
 /// `#[derive(MessageCodec)]` adds deserialization capabilities to the `Runtime` (by implementing the `decode_call` method).
 /// `Runtime::decode_call` accepts a serialized call message and returns a type that implements the `DispatchCall` trait.

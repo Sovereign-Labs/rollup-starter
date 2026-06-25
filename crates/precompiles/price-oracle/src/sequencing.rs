@@ -1,7 +1,5 @@
 //! Integration with the per-transaction sequencing data and scratchpad.
 
-use std::collections::BTreeSet;
-
 use borsh::BorshDeserialize;
 use bytes::Bytes;
 use sov_modules_api::{Context, Spec};
@@ -10,17 +8,18 @@ use crate::types::{FeedKey, PriceReports, UsedFeedKeys};
 
 pub fn prune_unused(mut data: PriceReports, scratchpad: Option<Bytes>) -> PriceReports {
     let Some(scratchpad) = scratchpad else {
+        // No scratchpad means the precompile recorded no reads, so every report is unused and safe to drop.
         return PriceReports::default();
     };
     let used = match UsedFeedKeys::try_from_slice(&scratchpad) {
         Ok(used) => used,
         Err(err) => {
+            // A malformed scratchpad hides which feeds were read, we keep all reports because a superset is safer.
             tracing::error!(%err, "sequencing scratchpad is malformed, publishing full sequencing data");
             return data;
         }
     };
-    let keep: BTreeSet<FeedKey> = used.0.into_iter().collect();
-    data.retain_keys(&keep);
+    data.retain_keys(&used.0);
     data
 }
 
@@ -33,7 +32,9 @@ pub(crate) fn record_used_feed_key<S: Spec>(
             Some(bytes) => UsedFeedKeys::try_from_slice(bytes)?,
             None => UsedFeedKeys::default(),
         };
-        used.0.push(key);
+        if !used.0.insert(key) {
+            return Ok(());
+        }
         let bytes = borsh::to_vec(&used).expect("in-memory borsh serialization is infallible");
         *slot = Some(Bytes::from(bytes));
         Ok(())
@@ -61,7 +62,7 @@ mod tests {
     }
 
     fn scratchpad(used: &[FeedKey]) -> Bytes {
-        Bytes::from(borsh::to_vec(&UsedFeedKeys(used.to_vec())).unwrap())
+        Bytes::from(borsh::to_vec(&UsedFeedKeys(used.iter().copied().collect())).unwrap())
     }
 
     #[test]
@@ -80,12 +81,14 @@ mod tests {
     #[test]
     fn prunes_to_used_subset() {
         let kept = feed_key(1);
+        let dropped = feed_key(2);
         let pruned = prune_unused(
-            prices(&[feed_key(1), feed_key(2), feed_key(3)]),
+            prices(&[kept, dropped, feed_key(3)]),
             Some(scratchpad(&[kept])),
         );
         assert_eq!(pruned.0.len(), 1);
-        assert!(pruned.get(&kept).is_some());
+        assert_eq!(pruned.get(&kept), Some(&Bytes::from_static(b"payload")));
+        assert_eq!(pruned.get(&dropped), None);
     }
 
     #[test]

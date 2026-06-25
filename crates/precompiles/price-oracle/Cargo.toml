@@ -17,7 +17,6 @@ sov-modules-api = { workspace = true }
 tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
-sov-address = { workspace = true, features = ["native"] }
 sov-evm = { workspace = true, features = ["native"] }
 sov-modules-api = { workspace = true, features = ["native"] }
 sov-rollup-interface = { workspace = true }

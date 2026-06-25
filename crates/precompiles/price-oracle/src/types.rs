@@ -49,4 +49,4 @@ impl SequencingDataTrait for PriceReports {
 /// Feed keys a transaction actually read.
 /// Recorded in the sequencing scratchpad during execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct UsedFeedKeys(pub Vec<FeedKey>);
+pub struct UsedFeedKeys(pub BTreeSet<FeedKey>);

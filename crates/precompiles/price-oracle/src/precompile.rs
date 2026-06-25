@@ -7,8 +7,7 @@ use sov_evm::precompiles::{
 };
 use sov_modules_api::{Spec, TxState};
 
-use crate::prices::lookup_feed_report;
-use crate::types::PriceReports;
+use crate::types::{FeedKey, PriceReports};
 
 /// Precompile address 0x0000000000000000000000000000000000010002.
 pub const PRICE_ORACLE_PRECOMPILE_ADDRESS: Address = Address::new([
@@ -38,30 +37,30 @@ impl<S: Spec> EvmPrecompile<S> for PriceOraclePrecompile<S> {
 
         let context = env
             .sov_context
-            .ok_or_else(|| PrecompileError::State("price oracle data unavailable".to_string()))?;
-        let sequencing_data = context
-            .sequencing_data()
-            .as_ref()
-            .ok_or_else(|| PrecompileError::State("price oracle data unavailable".to_string()))?;
+            .ok_or_else(|| PrecompileError::State("missing transaction context".to_string()))?;
+        let sequencing_data = context.sequencing_data().as_ref().ok_or_else(|| {
+            PrecompileError::State("no sequencing data attached to transaction".to_string())
+        })?;
         let reports = PriceReports::try_from_slice(sequencing_data).map_err(|err| {
             PrecompileError::State(format!("could not decode sequencing data: {err}"))
         })?;
 
-        let payload = lookup_feed_report(&reports, provider_id, feed_id).ok_or_else(|| {
-            PrecompileError::InvalidInput(format!(
-                "no price report for provider {provider_id} feed {feed_id}"
-            ))
-        })?;
+        let payload = reports
+            .get(&FeedKey::new(provider_id, feed_id))
+            .ok_or_else(|| {
+                PrecompileError::InvalidInput(format!(
+                    "no price report for provider {provider_id} feed {feed_id}"
+                ))
+            })?;
 
         // Record the feed before the gas check. The payload length affects gas,
         // so a feed read here must be kept even if the call then runs out of gas,
         // otherwise replay from the DA layer would diverge.
         #[cfg(feature = "native")]
-        crate::sequencing::record_used_feed_key(
-            context,
-            crate::types::FeedKey::new(provider_id, feed_id),
-        )
-        .map_err(|err| PrecompileError::State(format!("could not record used feed key: {err}")))?;
+        crate::sequencing::record_used_feed_key(context, FeedKey::new(provider_id, feed_id))
+            .map_err(|err| {
+                PrecompileError::State(format!("could not record used feed key: {err}"))
+            })?;
 
         let words = payload.len().div_ceil(32) as u64;
         let gas_used = PRICE_ORACLE_PRECOMPILE_BASE_GAS + PRICE_ORACLE_PRECOMPILE_WORD_GAS * words;

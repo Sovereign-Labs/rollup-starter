@@ -93,6 +93,8 @@ fn used_feed_keys(ctx: &Context<S>) -> Vec<FeedKey> {
         UsedFeedKeys::try_from_slice(bytes)
             .expect("decode used feed keys")
             .0
+            .into_iter()
+            .collect()
     })
 }
 

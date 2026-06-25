@@ -39,6 +39,7 @@ stf-starter-declaration = { workspace = true }
 sov-address = { workspace = true, features = ["evm"] }
 sov-modules-api = { workspace = true }
 sov-mock-zkvm = { workspace = true }
+sov-mock-da = { workspace = true }
 sov-celestia-adapter = { workspace = true, optional = true }
 serde_json = { workspace = true }
 sov-universal-wallet = { workspace = true, features = ["serde"] }
@@ -62,6 +63,7 @@ native = [
 	"sov-bank/native",
 	"sov-address/native",
 	"sov-celestia-adapter?/native",
+	"sov-mock-da/native",
 	"sov-mock-zkvm/native",
 	"sov-evm/native",
 	"sov-test-state-consistency/native",

@@ -478,12 +478,14 @@ impl<S: Spec> TransactionAuthorizer<S> for RelayChainCapabilities<'_, S> {
 }
 
 impl<'a, S: Spec> ProofProcessor<S> for RelayChainCapabilities<'a, S> {
+    #[cfg(feature = "native")]
     type BondingProofService<K: HasKernel<S>> = <StandardCapabilities<
         'a,
         S,
         &'a mut sov_paymaster::Paymaster<S>,
     > as ProofProcessor<S>>::BondingProofService<K>;
 
+    #[cfg(feature = "native")]
     fn create_bonding_proof_service<K: HasKernel<S>>(
         &self,
         attester_address: S::Address,
