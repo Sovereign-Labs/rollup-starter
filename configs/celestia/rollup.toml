@@ -13,7 +13,7 @@ signer_private_key = "aec34bb1cfae6e906594dc106af4057a9046f769e2eeed67d040f0107e
 # The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
 path = "./rollup-state/rollup-starter-data-celestia"
 user_commit_concurrency = 6
-kernel_commit_concurrency = 2
+kernel_commit_concurrency = 6
 state_cache_size = 10000000000
 # Disable pruning for now
 # pruner_block_interval = 100_000
