@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{LazyLock, Mutex};
 
 use bytes::Bytes;
-use price_oracle::{FeedKey, SerializedPriceUpdates, B256};
+use price_oracle::{FeedKey, PriceReports, B256};
 
 static ORACLE_STORE: LazyLock<Mutex<OracleStore>> =
     LazyLock::new(|| Mutex::new(OracleStore::default()));
@@ -33,8 +33,8 @@ struct OracleStore {
 }
 
 impl OracleStore {
-    fn snapshot(&self) -> SerializedPriceUpdates {
-        SerializedPriceUpdates(
+    fn snapshot(&self) -> PriceReports {
+        PriceReports(
             self.reports
                 .iter()
                 .map(|(key, (payload, _))| (*key, payload.clone()))
@@ -143,7 +143,7 @@ fn store() -> std::sync::MutexGuard<'static, OracleStore> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-pub fn snapshot_prices() -> SerializedPriceUpdates {
+pub fn snapshot_prices() -> PriceReports {
     store().snapshot()
 }
 

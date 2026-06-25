@@ -1,5 +1,5 @@
 //! Forwards the required trait implementations to the inner non-authenticated runtime.
-use sequencing_registry::SequencingRegistry;
+use price_oracle::PriceReports;
 use sov_address::{EthereumAddress, FromVmAddress};
 use sov_bank::Amount;
 use sov_capabilities::StandardProvenRollupCapabilities as StandardCapabilities;
@@ -233,7 +233,7 @@ where
     S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     type Capabilities<'a> = RelayChainCapabilities<'a, S>;
-    type SequencingData = SequencingRegistry;
+    type SequencingData = PriceReports;
 
     fn capabilities(&mut self) -> Guard<Self::Capabilities<'_>> {
         Guard::new(RelayChainCapabilities {
@@ -312,7 +312,7 @@ pub struct RelayChainCapabilities<'a, S: Spec> {
 }
 
 impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
-    type SequencingData = SequencingRegistry;
+    type SequencingData = PriceReports;
 
     fn handle_sequencing_data(
         &mut self,
@@ -329,7 +329,7 @@ impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
         // finalize_sequencing_data before it reaches the DA layer.
         // The SDK sizes transactions for batch limits using this pre-pruned size.
         // Its best to keep the snapshot bounded to avoid reducing batch throughput.
-        build_sequencing_data(crate::prices::snapshot_prices())
+        crate::prices::snapshot_prices()
     }
 
     #[cfg(feature = "native")]
@@ -338,26 +338,8 @@ impl<S: Spec> SequencingDataHandler<S> for RelayChainCapabilities<'_, S> {
         data: Self::SequencingData,
         scratchpad: Option<sov_rollup_interface::Bytes>,
     ) -> Self::SequencingData {
-        prune_sequencing_data(data, scratchpad)
+        price_oracle::prune_unused(data, scratchpad)
     }
-}
-
-#[cfg(feature = "native")]
-fn build_sequencing_data(prices: price_oracle::SerializedPriceUpdates) -> SequencingRegistry {
-    let mut registry = SequencingRegistry::default();
-    registry.set_section::<price_oracle::PriceOracleSequencing>(&prices);
-    registry
-}
-
-#[cfg(feature = "native")]
-fn prune_sequencing_data(
-    data: SequencingRegistry,
-    scratchpad: Option<sov_rollup_interface::Bytes>,
-) -> SequencingRegistry {
-    let pruners = [sequencing_registry::pruner::<
-        price_oracle::PriceOracleSequencing,
-    >()];
-    sequencing_registry::finalize(data, scratchpad, &pruners)
 }
 
 impl<S: Spec> GasEnforcer<S> for RelayChainCapabilities<'_, S> {
@@ -576,75 +558,5 @@ impl<S: Spec> SequencerRemuneration<S> for RelayChainCapabilities<'_, S> {
         state: &mut impl InfallibleStateAccessor,
     ) -> Option<<S::Da as DaSpec>::Address> {
         self.standard.preferred_sequencer(state)
-    }
-}
-
-#[cfg(all(test, feature = "native"))]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use bytes::Bytes;
-    use price_oracle::{
-        FeedKey, PriceOracleSequencing, SerializedPriceUpdates, UsedFeedKeys, B256,
-        PRICE_ORACLE_PRECOMPILE_ADDRESS,
-    };
-    use sequencing_registry::SequencingRegistry;
-
-    use super::{build_sequencing_data, prune_sequencing_data};
-
-    fn feed_key(suffix: u8) -> FeedKey {
-        FeedKey::new(B256::repeat_byte(0xc1), B256::repeat_byte(suffix))
-    }
-
-    fn prices(keys: &[FeedKey]) -> SerializedPriceUpdates {
-        SerializedPriceUpdates(
-            keys.iter()
-                .map(|k| (*k, Bytes::from_static(b"payload")))
-                .collect::<BTreeMap<_, _>>(),
-        )
-    }
-
-    fn scratchpad_with_used(used: &[FeedKey]) -> Bytes {
-        let mut registry = SequencingRegistry::default();
-        registry.0.insert(
-            PRICE_ORACLE_PRECOMPILE_ADDRESS,
-            Bytes::from(borsh::to_vec(&UsedFeedKeys(used.to_vec())).unwrap()),
-        );
-        Bytes::from(borsh::to_vec(&registry).unwrap())
-    }
-
-    #[test]
-    fn create_places_prices_in_price_section() {
-        let snapshot = prices(&[feed_key(1), feed_key(2)]);
-        let registry = build_sequencing_data(snapshot.clone());
-        let section = registry
-            .section::<PriceOracleSequencing>()
-            .expect("decode price section")
-            .expect("price section present");
-        assert_eq!(section, snapshot);
-    }
-
-    #[test]
-    fn finalize_keeps_only_used_price_feeds() {
-        let kept = feed_key(1);
-        let dropped = feed_key(2);
-        let registry = build_sequencing_data(prices(&[kept, dropped]));
-
-        let finalized = prune_sequencing_data(registry, Some(scratchpad_with_used(&[kept])));
-
-        let section = finalized
-            .section::<PriceOracleSequencing>()
-            .expect("decode price section")
-            .expect("price section present");
-        assert_eq!(section.0.len(), 1);
-        assert!(section.get(&kept).is_some());
-        assert!(section.get(&dropped).is_none());
-    }
-
-    #[test]
-    fn finalize_without_scratchpad_drops_all_prices() {
-        let registry = build_sequencing_data(prices(&[feed_key(1)]));
-        let finalized = prune_sequencing_data(registry, None);
-        assert_eq!(finalized, SequencingRegistry::default());
     }
 }

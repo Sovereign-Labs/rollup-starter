@@ -1,11 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use alloy_primitives::{Address, B256};
+use alloy_primitives::B256;
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytes::Bytes;
-use sequencing_registry::PrecompileSequencing;
-
-use crate::precompile::PRICE_ORACLE_PRECOMPILE_ADDRESS;
+use sov_modules_api::capabilities::SequencingDataTrait;
+use sov_modules_api::HDTimestamp;
 
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, BorshSerialize, BorshDeserialize,
@@ -24,12 +23,13 @@ impl FeedKey {
     }
 }
 
-/// Latest opaque signed payload per feed. Payloads are Bytes so cloning the map
-/// for each transaction only bumps refcounts instead of copying large blobs.
+/// Latest opaque signed report per feed.
+/// Reports are bytes so cloning the map for each transaction only bumps refcounts
+/// instead of copying large blobs.
 #[derive(Clone, Debug, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct SerializedPriceUpdates(pub BTreeMap<FeedKey, Bytes>);
+pub struct PriceReports(pub BTreeMap<FeedKey, Bytes>);
 
-impl SerializedPriceUpdates {
+impl PriceReports {
     pub fn get(&self, key: &FeedKey) -> Option<&Bytes> {
         self.0.get(key)
     }
@@ -39,23 +39,14 @@ impl SerializedPriceUpdates {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct UsedFeedKeys(pub Vec<FeedKey>);
-
-pub struct PriceOracleSequencing;
-
-impl PrecompileSequencing for PriceOracleSequencing {
-    const ADDRESS: Address = PRICE_ORACLE_PRECOMPILE_ADDRESS;
-    type Data = SerializedPriceUpdates;
-    type Used = UsedFeedKeys;
-
-    fn prune(mut data: Self::Data, used: Self::Used) -> Self::Data {
-        let keep: BTreeSet<FeedKey> = used.0.into_iter().collect();
-        data.retain_keys(&keep);
-        data
-    }
-
-    fn is_empty(data: &Self::Data) -> bool {
-        data.0.is_empty()
+impl SequencingDataTrait for PriceReports {
+    // Carries no sequencer timestamp hence this is always None.
+    fn get_maybe_timestamp(self) -> Option<HDTimestamp> {
+        None
     }
 }
+
+/// Feed keys a transaction actually read.
+/// Recorded in the sequencing scratchpad during execution.
+#[derive(Clone, Debug, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct UsedFeedKeys(pub Vec<FeedKey>);

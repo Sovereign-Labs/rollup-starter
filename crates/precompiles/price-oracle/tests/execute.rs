@@ -6,11 +6,9 @@ use alloy_primitives::{keccak256, B256};
 use borsh::BorshDeserialize;
 use bytes::Bytes;
 use price_oracle::{
-    FeedKey, PriceOraclePrecompile, PriceOracleSequencing, SerializedPriceUpdates, UsedFeedKeys,
-    PRICE_ORACLE_PRECOMPILE_ADDRESS, PRICE_ORACLE_PRECOMPILE_BASE_GAS,
+    FeedKey, PriceOraclePrecompile, PriceReports, UsedFeedKeys, PRICE_ORACLE_PRECOMPILE_BASE_GAS,
     PRICE_ORACLE_PRECOMPILE_WORD_GAS,
 };
-use sequencing_registry::SequencingRegistry;
 use sov_evm::precompiles::{EvmPrecompile, EvmPrecompileEnv, PrecompileError, PrecompileResult};
 use sov_modules_api::capabilities::mocks::MockKernel;
 use sov_modules_api::transaction::Credentials;
@@ -38,8 +36,8 @@ fn request(provider_id: B256, feed_id: B256) -> Vec<u8> {
     bytes
 }
 
-fn updates_with(entries: &[(FeedKey, &[u8])]) -> SerializedPriceUpdates {
-    SerializedPriceUpdates(
+fn reports_with(entries: &[(FeedKey, &[u8])]) -> PriceReports {
+    PriceReports(
         entries
             .iter()
             .map(|(k, p)| (*k, Bytes::copy_from_slice(p)))
@@ -52,11 +50,9 @@ fn expected_gas(payload_len: usize) -> u64 {
         + PRICE_ORACLE_PRECOMPILE_WORD_GAS * payload_len.div_ceil(32) as u64
 }
 
-fn context(updates: Option<&SerializedPriceUpdates>) -> Context<S> {
-    let sequencing_data = updates.map(|u| {
-        let mut registry = SequencingRegistry::default();
-        registry.set_section::<PriceOracleSequencing>(u);
-        sov_rollup_interface::Bytes::from(borsh::to_vec(&registry).expect("encode sequencing data"))
+fn context(reports: Option<&PriceReports>) -> Context<S> {
+    let sequencing_data = reports.map(|u| {
+        sov_rollup_interface::Bytes::from(borsh::to_vec(u).expect("encode sequencing data"))
     });
     context_with_raw_sequencing_data(sequencing_data)
 }
@@ -94,13 +90,7 @@ fn used_feed_keys(ctx: &Context<S>) -> Vec<FeedKey> {
         let bytes = scratchpad
             .as_deref()
             .expect("scratchpad should be populated");
-        let registry =
-            SequencingRegistry::try_from_slice(bytes).expect("decode scratchpad registry");
-        let used = registry
-            .0
-            .get(&PRICE_ORACLE_PRECOMPILE_ADDRESS)
-            .expect("price oracle scratchpad section should be present");
-        UsedFeedKeys::try_from_slice(used)
+        UsedFeedKeys::try_from_slice(bytes)
             .expect("decode used feed keys")
             .0
     })
@@ -109,8 +99,8 @@ fn used_feed_keys(ctx: &Context<S>) -> Vec<FeedKey> {
 #[test]
 fn present_feed_returns_payload_and_gas() {
     let payload = b"signed-update-bytes".to_vec();
-    let updates = updates_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), &payload)]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), &payload)]);
+    let ctx = context(Some(&reports));
 
     let output = run(Some(&ctx), &request(*PROVIDER_ID, feed_id(1)), GAS_LIMIT)
         .expect("present feed should resolve");
@@ -121,16 +111,16 @@ fn present_feed_returns_payload_and_gas() {
 
 #[test]
 fn missing_feed_is_invalid_input() {
-    let updates = updates_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), b"present")]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), b"present")]);
+    let ctx = context(Some(&reports));
 
     let err = run(Some(&ctx), &request(*PROVIDER_ID, feed_id(2)), GAS_LIMIT).unwrap_err();
     assert!(matches!(err, PrecompileError::InvalidInput(_)));
 }
 
 #[test]
-fn empty_updates_is_invalid_input() {
-    let ctx = context(Some(&updates_with(&[])));
+fn empty_reports_is_invalid_input() {
+    let ctx = context(Some(&reports_with(&[])));
 
     let err = run(Some(&ctx), &request(*PROVIDER_ID, feed_id(1)), GAS_LIMIT).unwrap_err();
     assert!(matches!(err, PrecompileError::InvalidInput(_)));
@@ -138,8 +128,8 @@ fn empty_updates_is_invalid_input() {
 
 #[test]
 fn wrong_length_request_is_invalid_input() {
-    let updates = updates_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), b"present")]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), b"present")]);
+    let ctx = context(Some(&reports));
 
     let err = run(Some(&ctx), &[0u8; 10], GAS_LIMIT).unwrap_err();
     assert!(matches!(err, PrecompileError::InvalidInput(_)));
@@ -170,8 +160,8 @@ fn undecodable_sequencing_data_is_state_error() {
 
 #[test]
 fn insufficient_base_gas_is_out_of_gas() {
-    let updates = updates_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), b"present")]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), b"present")]);
+    let ctx = context(Some(&reports));
 
     let err = run(
         Some(&ctx),
@@ -185,8 +175,8 @@ fn insufficient_base_gas_is_out_of_gas() {
 #[test]
 fn payload_gas_over_limit_is_out_of_gas() {
     let payload = vec![0xab; 64];
-    let updates = updates_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), &payload)]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), &payload)]);
+    let ctx = context(Some(&reports));
 
     let one_word_short = expected_gas(payload.len()) - PRICE_ORACLE_PRECOMPILE_WORD_GAS;
     let err = run(
@@ -201,8 +191,8 @@ fn payload_gas_over_limit_is_out_of_gas() {
 #[test]
 fn exact_gas_limit_succeeds() {
     let payload = b"signed-update-bytes".to_vec();
-    let updates = updates_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), &payload)]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), &payload)]);
+    let ctx = context(Some(&reports));
 
     let exact = expected_gas(payload.len());
     let output = run(Some(&ctx), &request(*PROVIDER_ID, feed_id(1)), exact)
@@ -214,8 +204,8 @@ fn exact_gas_limit_succeeds() {
 fn charges_gas_per_word() {
     for (len, words) in [(0usize, 0u64), (32, 1), (33, 2)] {
         let payload = vec![0xab; len];
-        let updates = updates_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), &payload)]);
-        let ctx = context(Some(&updates));
+        let reports = reports_with(&[(FeedKey::new(*PROVIDER_ID, feed_id(1)), &payload)]);
+        let ctx = context(Some(&reports));
 
         let output = run(Some(&ctx), &request(*PROVIDER_ID, feed_id(1)), GAS_LIMIT)
             .expect("present feed should resolve");
@@ -231,8 +221,8 @@ fn charges_gas_per_word() {
 #[test]
 fn records_used_feed_key() {
     let key = FeedKey::new(*PROVIDER_ID, feed_id(1));
-    let updates = updates_with(&[(key, b"present")]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(key, b"present")]);
+    let ctx = context(Some(&reports));
 
     run(Some(&ctx), &request(*PROVIDER_ID, feed_id(1)), GAS_LIMIT)
         .expect("present feed should resolve");
@@ -244,8 +234,8 @@ fn records_used_feed_key() {
 fn accumulates_used_feed_keys() {
     let key1 = FeedKey::new(*PROVIDER_ID, feed_id(1));
     let key2 = FeedKey::new(*PROVIDER_ID, feed_id(2));
-    let updates = updates_with(&[(key1, b"first"), (key2, b"second")]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(key1, b"first"), (key2, b"second")]);
+    let ctx = context(Some(&reports));
 
     run(Some(&ctx), &request(*PROVIDER_ID, feed_id(1)), GAS_LIMIT)
         .expect("first feed should resolve");
@@ -261,8 +251,8 @@ fn records_used_feed_key_even_when_out_of_gas() {
     // sequencer keeps it and replay from the DA layer reaches the same outcome.
     let payload = vec![0xab; 64];
     let key = FeedKey::new(*PROVIDER_ID, feed_id(1));
-    let updates = updates_with(&[(key, &payload)]);
-    let ctx = context(Some(&updates));
+    let reports = reports_with(&[(key, &payload)]);
+    let ctx = context(Some(&reports));
 
     let one_word_short = expected_gas(payload.len()) - PRICE_ORACLE_PRECOMPILE_WORD_GAS;
     let err = run(

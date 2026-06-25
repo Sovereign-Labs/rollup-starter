@@ -12,14 +12,17 @@ version = "1.0.0"
 alloy-primitives = { workspace = true, features = ["borsh"] }
 borsh = { workspace = true }
 bytes = { workspace = true }
-sequencing-registry = { workspace = true }
 sov-evm = { workspace = true }
 sov-modules-api = { workspace = true }
+tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
+sov-address = { workspace = true, features = ["native"] }
+sov-evm = { workspace = true, features = ["native"] }
+sov-modules-api = { workspace = true, features = ["native"] }
 sov-rollup-interface = { workspace = true }
 sov-test-utils = { workspace = true }
 
 [features]
 default = []
-native = ["sov-evm/native", "sov-modules-api/native", "sequencing-registry/native"]
+native = ["sov-evm/native", "sov-modules-api/native", "dep:tracing"]
