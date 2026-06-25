@@ -8,7 +8,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Context};
 use price_oracle_ipc::{
-    connect, read_frame_with_timeout, Backoff, IpcError, OracleFrame, OracleStream,
+    connect, read_frame_with_timeout, Backoff, IpcError, OracleFrame, OracleStream, B256,
     PROTOCOL_VERSION,
 };
 use serde::Deserialize;
@@ -30,6 +30,7 @@ const STALENESS_WARN_SEC: u64 = 30;
 const REQUIRE_SOURCES_TIMEOUT: Duration = Duration::from_secs(5);
 const METRICS_REPORT_INTERVAL: Duration = Duration::from_secs(15);
 const PROVIDER_FEEDS_MAX: usize = 512;
+const HEARTBEAT_INTERVAL_MAX_SEC: u32 = 300;
 const THROTTLE_WARN_SEC: u64 = 60;
 
 static LAST_DROPPED_WARN_AT: AtomicU64 = AtomicU64::new(0);
@@ -499,6 +500,7 @@ async fn consume(
     let mut read_deadline = BOOTSTRAP_DEADLINE;
     let mut stale = false;
     let mut hello = false;
+    let mut session_provider: Option<B256> = None;
     loop {
         let frame = match read_frame_with_timeout(&mut stream, read_deadline).await {
             Ok(frame) => frame,
@@ -506,6 +508,16 @@ async fn consume(
         };
         metrics::inc_frames(&source.name);
         metrics::set_last_frame(&source.name, now_unix());
+        if !hello && !matches!(frame, OracleFrame::Hello { .. }) {
+            warn!(
+                source = %source.name,
+                "Oracle source sent a frame before Hello, dropping connection"
+            );
+            return SessionOutcome {
+                hello,
+                error: IpcError::Closed,
+            };
+        }
         match frame {
             OracleFrame::Hello {
                 protocol_version,
@@ -538,6 +550,18 @@ async fn consume(
                         error: IpcError::Closed,
                     };
                 }
+                if heartbeat_interval_sec > HEARTBEAT_INTERVAL_MAX_SEC {
+                    warn!(
+                        source = %source.name,
+                        heartbeat_interval_sec,
+                        max = HEARTBEAT_INTERVAL_MAX_SEC,
+                        "Oracle source advertised an excessive heartbeat interval, dropping connection"
+                    );
+                    return SessionOutcome {
+                        hello,
+                        error: IpcError::Closed,
+                    };
+                }
                 let registration = prices::register_feeds(&source.name, provider_id, feeds);
                 if registration.feeds_diverged {
                     metrics::inc_divergent_feeds(&source.name);
@@ -550,6 +574,7 @@ async fn consume(
                     }
                 }
                 hello = true;
+                session_provider = Some(provider_id);
                 read_deadline = heartbeat_deadline(heartbeat_interval_sec);
                 info!(
                     source = %source.name,
@@ -570,6 +595,17 @@ async fn consume(
                 ingested_at,
                 source_time,
             } => {
+                if Some(provider_id) != session_provider {
+                    metrics::inc_dropped_unexpected(&source.name);
+                    if warn_allowed(&LAST_DROPPED_WARN_AT) {
+                        warn!(
+                            source = %source.name,
+                            %provider_id,
+                            "Oracle source sent an update for an unadvertised provider, dropping"
+                        );
+                    }
+                    continue;
+                }
                 let age = now_unix().saturating_sub(ingested_at);
                 trace!(
                     target: "oracle::frames",
