@@ -81,7 +81,6 @@ where
         sov_modules_api::NodeEndpoints {
             axum_router,
             jsonrpsee_module: stf_starter_declaration::get_rpc_methods::<S>(api_state),
-            background_handles: Vec::new(),
         }
     }
 
