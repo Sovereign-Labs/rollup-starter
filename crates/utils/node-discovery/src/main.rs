@@ -10,7 +10,7 @@ use sov_metrics::{init_metrics_tracker, MonitoringConfig};
 use sov_proxy_utils::{
     write_to_file_atomically, ClusterInfo, ClusterInfoService, ClusterUpdateNotifier,
 };
-use sov_rollup_interface::node::SecondaryShutdownController;
+use sov_shutdown::SecondaryShutdownController;
 use tokio::process::Command;
 
 struct ReloadNginx {

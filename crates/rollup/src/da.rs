@@ -10,7 +10,7 @@ mod celestia {
     };
     use sov_modules_api::Spec;
     use sov_rollup_interface::da::DaVerifier;
-    use sov_rollup_interface::node::SecondaryShutdownController;
+    use sov_shutdown::SecondaryShutdownController;
     use sov_stf_runner::RollupConfig;
 
     pub const ROLLUP_BATCH_NAMESPACE: Namespace =
@@ -48,7 +48,7 @@ mod mock {
     pub use sov_mock_da::MockDaSpec as DaSpec;
     use sov_mock_da::MockDaVerifier;
     use sov_modules_api::Spec;
-    use sov_rollup_interface::node::SecondaryShutdownController;
+    use sov_shutdown::SecondaryShutdownController;
     use sov_stf_runner::RollupConfig;
 
     pub fn new_verifier() -> MockDaVerifier {
@@ -69,7 +69,7 @@ mod mock_external {
     pub use sov_mock_da::MockDaSpec as DaSpec;
     use sov_mock_da::MockDaVerifier;
     use sov_modules_api::Spec;
-    use sov_rollup_interface::node::SecondaryShutdownController;
+    use sov_shutdown::SecondaryShutdownController;
     use sov_stf_runner::RollupConfig;
 
     pub fn new_verifier() -> MockDaVerifier {

@@ -4,7 +4,7 @@ use tracing_subscriber::EnvFilter;
 use sov_mock_da::storable::rpc::start_server;
 use sov_mock_da::storable::StorableMockDaService;
 use sov_mock_da::{FailureBehavior, MockAddress, MockDaConfig};
-use sov_rollup_interface::node::SecondaryShutdownController;
+use sov_shutdown::SecondaryShutdownController;
 
 // Run with cargo run --bin mock-da-server --no-default-features --features="mock_da_external,mock_zkvm"
 #[derive(Parser, Debug)]
