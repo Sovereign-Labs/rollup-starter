@@ -6,6 +6,8 @@ use sov_evm::precompiles::{
     EvmPrecompile, EvmPrecompileEnv, PrecompileError, PrecompileOutput, PrecompileResult,
 };
 use sov_modules_api::{Spec, TxState};
+#[cfg(feature = "native")]
+use std::sync::OnceLock;
 
 use crate::types::{FeedKey, PriceReports};
 
@@ -18,7 +20,12 @@ pub const PRICE_ORACLE_PRECOMPILE_BASE_GAS: u64 = 3_000;
 pub const PRICE_ORACLE_PRECOMPILE_WORD_GAS: u64 = 16;
 
 #[derive(Clone, Default)]
-pub struct PriceOraclePrecompile<S>(PhantomData<S>);
+pub struct PriceOraclePrecompile<S> {
+    _marker: PhantomData<S>,
+    // Price data snapshot used during eth_call execution when sov_context is not available.
+    #[cfg(feature = "native")]
+    snapshot: OnceLock<PriceReports>,
+}
 
 impl<S: Spec> EvmPrecompile<S> for PriceOraclePrecompile<S> {
     const ADDRESS: Address = PRICE_ORACLE_PRECOMPILE_ADDRESS;
@@ -34,35 +41,58 @@ impl<S: Spec> EvmPrecompile<S> for PriceOraclePrecompile<S> {
         }
 
         let (provider_id, feed_id) = decode_feed_request(input)?;
+        let feed_key = FeedKey::new(provider_id, feed_id);
 
-        let context = env
-            .sov_context
-            .ok_or_else(|| PrecompileError::State("missing transaction context".to_string()))?;
-        let sequencing_data = context.sequencing_data().as_ref().ok_or_else(|| {
-            PrecompileError::State("no sequencing data attached to transaction".to_string())
-        })?;
-        let reports = PriceReports::try_from_slice(sequencing_data).map_err(|err| {
-            PrecompileError::State(format!("could not decode sequencing data: {err}"))
-        })?;
+        let report = match env.sov_context {
+            Some(context) => {
+                let sequencing_data = context.sequencing_data().as_ref().ok_or_else(|| {
+                    PrecompileError::State("no sequencing data attached to transaction".to_string())
+                })?;
+                let reports = PriceReports::try_from_slice(sequencing_data).map_err(|err| {
+                    PrecompileError::State(format!("could not decode sequencing data: {err}"))
+                })?;
+                let report = reports
+                    .get(&feed_key)
+                    .ok_or_else(|| {
+                        PrecompileError::InvalidInput(format!(
+                            "no price report for provider {provider_id} feed {feed_id}"
+                        ))
+                    })?
+                    .clone();
 
-        let payload = reports
-            .get(&FeedKey::new(provider_id, feed_id))
-            .ok_or_else(|| {
-                PrecompileError::InvalidInput(format!(
-                    "no price report for provider {provider_id} feed {feed_id}"
-                ))
-            })?;
+                // Record the feed before the gas check. The payload length affects gas,
+                // so a feed read here must be kept even if the call then runs out of gas,
+                // otherwise replay from the DA layer would diverge.
+                #[cfg(feature = "native")]
+                crate::sequencing::record_used_feed_key(context, feed_key).map_err(|err| {
+                    PrecompileError::State(format!("could not record used feed key: {err}"))
+                })?;
 
-        // Record the feed before the gas check. The payload length affects gas,
-        // so a feed read here must be kept even if the call then runs out of gas,
-        // otherwise replay from the DA layer would diverge.
-        #[cfg(feature = "native")]
-        crate::sequencing::record_used_feed_key(context, FeedKey::new(provider_id, feed_id))
-            .map_err(|err| {
-                PrecompileError::State(format!("could not record used feed key: {err}"))
-            })?;
+                report
+            }
+            None => {
+                #[cfg(feature = "native")]
+                {
+                    self.snapshot
+                        .get_or_init(crate::prices::snapshot_prices)
+                        .get(&feed_key)
+                        .ok_or_else(|| {
+                            PrecompileError::InvalidInput(format!(
+                                "no price report for provider {provider_id} feed {feed_id}"
+                            ))
+                        })?
+                        .clone()
+                }
+                #[cfg(not(feature = "native"))]
+                {
+                    return Err(PrecompileError::State(
+                        "missing transaction context".to_string(),
+                    ));
+                }
+            }
+        };
 
-        let words = payload.len().div_ceil(32) as u64;
+        let words = report.len().div_ceil(32) as u64;
         let gas_used = PRICE_ORACLE_PRECOMPILE_BASE_GAS + PRICE_ORACLE_PRECOMPILE_WORD_GAS * words;
         if gas_used > gas_limit {
             return Err(PrecompileError::OutOfGas);
@@ -70,7 +100,7 @@ impl<S: Spec> EvmPrecompile<S> for PriceOraclePrecompile<S> {
 
         Ok(PrecompileOutput {
             gas_used,
-            bytes: Bytes::from(payload.clone()),
+            bytes: Bytes::from(report),
         })
     }
 }

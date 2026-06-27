@@ -138,9 +138,27 @@ fn wrong_length_request_is_invalid_input() {
 }
 
 #[test]
-fn missing_context_is_state_error() {
-    let err = run(None, &request(*PROVIDER_ID, feed_id(1)), GAS_LIMIT).unwrap_err();
-    assert!(matches!(err, PrecompileError::State(_)));
+fn missing_context_serves_latest_prices() {
+    let provider = B256::repeat_byte(0xc1);
+    let feed = B256::repeat_byte(0xf1);
+    let payload = b"live-store-update".to_vec();
+    price_oracle::prices::register_feeds("test-fallback-source", provider, vec![feed]);
+    assert_eq!(
+        price_oracle::prices::insert_if_newer(provider, feed, payload.clone(), 1),
+        price_oracle::prices::InsertOutcome::Inserted
+    );
+
+    let output = run(None, &request(provider, feed), GAS_LIMIT).expect("store feed should resolve");
+
+    assert_eq!(output.bytes.as_ref(), payload.as_slice());
+    assert_eq!(output.gas_used, expected_gas(payload.len()));
+}
+
+#[test]
+fn missing_context_with_unknown_feed_is_invalid() {
+    let provider = B256::repeat_byte(0xee);
+    let err = run(None, &request(provider, feed_id(1)), GAS_LIMIT).unwrap_err();
+    assert!(matches!(err, PrecompileError::InvalidInput(_)));
 }
 
 #[test]

@@ -31,7 +31,6 @@ price-oracle = { workspace = true }
 
 anyhow = { workspace = true }
 borsh = { workspace = true }
-bytes = { workspace = true, optional = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -71,7 +70,6 @@ native = [
 	"sov-state/native",
 	"sov-chain-state/native",
 	"price-oracle/native",
-	"dep:bytes"
 ]
 
 bench = [
