@@ -71,24 +71,20 @@ impl<S: Spec> EvmPrecompile<S> for PriceOraclePrecompile<S> {
                 report
             }
             None => {
-                #[cfg(feature = "native")]
-                {
-                    self.snapshot
-                        .get_or_init(crate::prices::snapshot_prices)
-                        .get(&feed_key)
-                        .ok_or_else(|| {
-                            PrecompileError::InvalidInput(format!(
-                                "no price report for provider {provider_id} feed {feed_id}"
-                            ))
-                        })?
-                        .clone()
-                }
                 #[cfg(not(feature = "native"))]
-                {
-                    return Err(PrecompileError::State(
-                        "missing transaction context".to_string(),
-                    ));
-                }
+                return Err(PrecompileError::State(
+                    "missing transaction context".to_string(),
+                ));
+                #[cfg(feature = "native")]
+                self.snapshot
+                    .get_or_init(crate::prices::snapshot_prices)
+                    .get(&feed_key)
+                    .ok_or_else(|| {
+                        PrecompileError::InvalidInput(format!(
+                            "no price report for provider {provider_id} feed {feed_id}"
+                        ))
+                    })?
+                    .clone()
             }
         };
 
