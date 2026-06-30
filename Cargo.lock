@@ -218,6 +218,7 @@ checksum = "de3b431b4e72cd8bd0ec7a50b4be18e73dab74de0dba180eef171055e5d5926e"
 dependencies = [
  "alloy-rlp",
  "arbitrary",
+ "borsh",
  "bytes",
  "cfg-if",
  "const-hex",
@@ -827,12 +828,6 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 dependencies = [
  "serde",
 ]
-
-[[package]]
-name = "ascii"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d92bec98840b8f03a5ff5413de5293bfcd8bf96467cf5452609f939ec6f5de16"
 
 [[package]]
 name = "astral-tokio-tar"
@@ -1669,12 +1664,6 @@ dependencies = [
  "serde",
  "windows-link",
 ]
-
-[[package]]
-name = "chunked_transfer"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e4de3bc4ea267985becf712dc6d9eed8b04c953b3fcfb339ebc87acd9804901"
 
 [[package]]
 name = "cid"
@@ -5011,6 +5000,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "price-oracle"
+version = "1.0.0"
+dependencies = [
+ "alloy-primitives",
+ "borsh",
+ "bytes",
+ "sov-evm",
+ "sov-modules-api",
+ "sov-rollup-interface",
+ "sov-test-utils",
+ "tracing",
+]
+
+[[package]]
+name = "price-oracle-ipc"
+version = "0.3.0"
+dependencies = [
+ "alloy-primitives",
+ "borsh",
+ "socket2 0.5.10",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "primeorder"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5138,20 +5153,6 @@ dependencies = [
 
 [[package]]
 name = "prometheus"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d33c28a30771f7f96db69893f78b857f7450d7e0237e9c8fc6427a81bae7ed1"
-dependencies = [
- "cfg-if",
- "fnv",
- "lazy_static",
- "memchr",
- "parking_lot",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "prometheus"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ca5326d8d0b950a9acd87e6a3f94745394f62e4dae1b1ee22b2bc0c394af43a"
@@ -5162,20 +5163,6 @@ dependencies = [
  "memchr",
  "parking_lot",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "prometheus_exporter"
-version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caf17cbebe0bfdf4f279ef84eeefe0d50468b0b7116f078acf41d456e48fe81a"
-dependencies = [
- "ascii",
- "lazy_static",
- "log",
- "prometheus 0.13.4",
- "thiserror 1.0.69",
- "tiny_http",
 ]
 
 [[package]]
@@ -5995,7 +5982,7 @@ source = "git+https://github.com/sovereign-labs/rockbound?rev=d8b270d399d0d355a1
 dependencies = [
  "anyhow",
  "parking_lot",
- "prometheus 0.14.0",
+ "prometheus",
  "proptest",
  "proptest-derive 0.5.1",
  "quick_cache",
@@ -6019,6 +6006,7 @@ dependencies = [
 name = "rollup-starter"
 version = "0.3.0"
 dependencies = [
+ "alloy-primitives",
  "anyhow",
  "async-trait",
  "axum",
@@ -6026,7 +6014,9 @@ dependencies = [
  "bytes",
  "clap",
  "futures",
- "prometheus_exporter",
+ "hex",
+ "price-oracle",
+ "price-oracle-ipc",
  "rand 0.8.5",
  "rustls",
  "serde",
@@ -6044,6 +6034,7 @@ dependencies = [
  "sov-hyperlane-integration",
  "sov-kernels",
  "sov-ledger-apis",
+ "sov-metrics",
  "sov-mock-zkvm",
  "sov-modules-api",
  "sov-modules-rollup-blueprint",
@@ -6059,6 +6050,7 @@ dependencies = [
  "stf-starter",
  "tempfile",
  "tokio",
+ "toml",
  "tracing",
  "tracing-panic",
  "tracing-subscriber 0.3.23",
@@ -6113,6 +6105,7 @@ dependencies = [
  "ark-ff 0.3.0",
  "ark-ff 0.4.2",
  "ark-ff 0.5.0",
+ "borsh",
  "bytes",
  "fastrlp 0.3.1",
  "fastrlp 0.4.0",
@@ -8312,6 +8305,8 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "borsh",
+ "bytes",
+ "price-oracle",
  "serde_json",
  "sov-address",
  "sov-bank",
@@ -8323,6 +8318,7 @@ dependencies = [
  "sov-evm",
  "sov-hyperlane-integration",
  "sov-kernels",
+ "sov-mock-da",
  "sov-mock-zkvm",
  "sov-modules-api",
  "sov-modules-stf-blueprint",
@@ -8344,6 +8340,7 @@ dependencies = [
  "borsh",
  "clap",
  "jsonrpsee",
+ "price-oracle",
  "serde",
  "sov-accounts",
  "sov-address",
@@ -8707,19 +8704,6 @@ checksum = "2e70e4c5a0e0a8a4823ad65dfe1a6930e4f4d756dcd9dd7939022b5e8c501215"
 dependencies = [
  "num-conv",
  "time-core",
-]
-
-[[package]]
-name = "tiny_http"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5f8734c6d6943ad6df6b588d228a87b4af184998bcffa268ceddf05c2055a8c"
-dependencies = [
- "ascii",
- "chunked_transfer",
- "log",
- "time",
- "url",
 ]
 
 [[package]]

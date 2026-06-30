@@ -2,6 +2,8 @@
 
 pub mod authentication;
 mod delegation;
+#[cfg(feature = "native")]
+pub mod prices;
 pub mod runtime;
 
 pub use runtime::*;

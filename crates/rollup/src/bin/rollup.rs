@@ -3,6 +3,7 @@
 use anyhow::Context;
 use clap::Parser;
 use rollup_starter::da::DaService;
+use rollup_starter::oracle;
 use rollup_starter::rollup::StarterRollup;
 use sov_modules_rollup_blueprint::logging::initialize_logging;
 use sov_modules_rollup_blueprint::FullNodeBlueprint;
@@ -39,10 +40,6 @@ struct Args {
     #[arg(long, default_value = default_genesis_path().into_os_string())]
     genesis_path: PathBuf,
 
-    // UDP port on 127.0.0.1 where Telegraf service suppose to listen.
-    #[arg(long, default_value_t = 9845)]
-    metrics: u64,
-
     /// Start the rollup at a given height.
     #[arg(long, default_value = None)]
     start_at_rollup_height: Option<u64>,
@@ -55,6 +52,10 @@ struct Args {
     /// it issues a fresh outer proof that replaces any previous one.
     #[arg(long, default_value_t = false)]
     start_fresh_outer_proof_on_resync: bool,
+
+    /// The path to the price oracle config.
+    #[arg(long, default_value = None)]
+    oracle_config_path: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -68,13 +69,12 @@ async fn main() {
 
     let _guard = initialize_logging();
 
-    let metrics_port = args.metrics;
-    let address = format!("127.0.0.1:{metrics_port}");
-    prometheus_exporter::start(address.parse().unwrap())
-        .expect("Could not start prometheus server");
-
     let prover_config = parse_prover_config().expect("Malformed prover_config");
     tracing::info!(?prover_config, "Running demo rollup with prover config");
+
+    spawn_oracle_clients(&args)
+        .await
+        .expect("failed to start oracle price-feed clients");
 
     let rollup = new_rollup(
         args.genesis_path,
@@ -108,6 +108,13 @@ fn parse_prover_config() -> anyhow::Result<RollupProverConfig> {
     } else {
         Ok(RollupProverConfig::Disabled)
     }
+}
+
+async fn spawn_oracle_clients(args: &Args) -> anyhow::Result<()> {
+    let path =
+        oracle::resolve_config_path(args.oracle_config_path.clone(), &args.rollup_config_path);
+    let config = oracle::load_or_create_config(&path)?;
+    oracle::spawn_clients(config, path).await
 }
 
 async fn new_rollup(

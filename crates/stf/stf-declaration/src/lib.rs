@@ -16,6 +16,12 @@ use sov_modules_api::{DispatchCall, Event, Genesis, Hooks, MessageCodec, Spec};
 
 pub type Mailbox<S> = RawMailbox<S, Warp<S>>;
 
+sov_evm::generate_precompile_set! {
+    pub struct RelayEvmPrecompiles<S> {
+        price_oracle: price_oracle::PriceOraclePrecompile<S>,
+    }
+}
+
 /// The runtime defines the logic of the rollup.
 ///
 /// At a high level, the rollup node receives serialized "call messages" from the DA layer and executes them as atomic transactions.
@@ -34,14 +40,14 @@ pub type Mailbox<S> = RawMailbox<S, Warp<S>>;
 /// Runtime lifecycle:
 ///
 /// 1. Initialization:
-///     When a rollup is deployed for the first time, it needs to set its genesis state.
-///     The `#[derive(Genesis)]` macro will generate a `Runtime::genesis(config)` method which returns
-///     `Storage` with the initialized state.
+///    When a rollup is deployed for the first time, it needs to set its genesis state.
+///    The `#[derive(Genesis)]` macro will generate a `Runtime::genesis(config)` method which returns
+///    `Storage` with the initialized state.
 ///
 /// 2. Calls:
-///     The `Module` interface defines a `call` method which accepts a module-defined type and triggers the specific `module logic.`
-///     In general, the point of a call is to change the module state, but if the call throws an error,
-///     no state is updated (the transaction is reverted).
+///    The `Module` interface defines a `call` method which accepts a module-defined type and triggers the specific `module logic.`
+///    In general, the point of a call is to change the module state, but if the call throws an error,
+///    no state is updated (the transaction is reverted).
 ///
 /// `#[derive(MessageCodec)]` adds deserialization capabilities to the `Runtime` (by implementing the `decode_call` method).
 /// `Runtime::decode_call` accepts a serialized call message and returns a type that implements the `DispatchCall` trait.
@@ -89,5 +95,5 @@ where
     pub state_consistency: sov_test_state_consistency::StateConsistency<S>,
     #[cfg_attr(feature = "native", cli_skip)]
     /// The EVM module.
-    pub evm: sov_evm::Evm<S>,
+    pub evm: sov_evm::Evm<S, RelayEvmPrecompiles<S>>,
 }

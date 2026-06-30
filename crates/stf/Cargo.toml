@@ -27,9 +27,11 @@ sov-test-state-consistency = { workspace = true }
 sov-address = { workspace = true }
 sov-evm = { workspace = true }
 sov-eip712-auth = { workspace = true }
+price-oracle = { workspace = true }
 
 anyhow = { workspace = true }
 borsh = { workspace = true }
+bytes = { workspace = true, optional = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -37,6 +39,7 @@ stf-starter-declaration = { workspace = true }
 sov-address = { workspace = true, features = ["evm"] }
 sov-modules-api = { workspace = true }
 sov-mock-zkvm = { workspace = true }
+sov-mock-da = { workspace = true }
 sov-celestia-adapter = { workspace = true, optional = true }
 serde_json = { workspace = true }
 sov-universal-wallet = { workspace = true, features = ["serde"] }
@@ -60,12 +63,15 @@ native = [
 	"sov-bank/native",
 	"sov-address/native",
 	"sov-celestia-adapter?/native",
+	"sov-mock-da/native",
 	"sov-mock-zkvm/native",
 	"sov-evm/native",
 	"sov-test-state-consistency/native",
 	"sov-eip712-auth/native",
 	"sov-state/native",
-	"sov-chain-state/native"
+	"sov-chain-state/native",
+	"price-oracle/native",
+	"dep:bytes"
 ]
 
 bench = [

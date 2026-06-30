@@ -1,0 +1,18 @@
+[oracle]
+enabled = true
+require_sources = false
+
+[[oracle.source]]
+name = "chainlink-1"
+socket_address = "127.0.0.1:9801"
+transport = "tcp"
+
+[[oracle.source]]
+name = "chainlink-2"
+socket_address = "127.0.0.1:9802"
+transport = "tcp"
+
+[[oracle.source]]
+name = "chainlink-3"
+socket_address = "127.0.0.1:9803"
+transport = "tcp"
