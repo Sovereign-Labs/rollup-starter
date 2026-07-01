@@ -18,16 +18,18 @@ block_time_ms = 6_000
 path = "./rollup-state/rollup-starter-data-mock"
 user_commit_concurrency = 6
 kernel_commit_concurrency = 2
-# Disable pruning for now
-# pruner_block_interval = 100_000
-pruner_versions_to_keep = 100
 # The number of 4kb buckets to allocate for the state DB
 # The state DB will not exceed this size, and you'll get a warning when it fills up to 90% capacity.
 #user_hashtable_buckets = 64_000_000 # 256 GB. You will need much more for production deployments
 user_hashtable_buckets = 1_000_000
 # This paramater introduces performance penalty and should be changed in production.
 # It allows avoiding allocating 256GB at the start
-user_preallocate_ht = false 
+user_preallocate_ht = false
+
+# [storage.pruner.once_at_startup]
+# versions_to_keep = 20
+# max_batch_size = 300000
+# compact_after = false # If true, compact the pruned column families afterward to reclaim disk (heavy)
 
 [runner]
 da_polling_interval_ms = 2_000
