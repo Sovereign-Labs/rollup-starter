@@ -1,5 +1,7 @@
 pub mod precompile;
 #[cfg(feature = "native")]
+pub mod prices;
+#[cfg(feature = "native")]
 pub mod sequencing;
 pub mod types;
 

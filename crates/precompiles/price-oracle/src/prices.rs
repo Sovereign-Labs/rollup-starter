@@ -1,11 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{LazyLock, Mutex};
+use std::sync::LazyLock;
 
 use bytes::Bytes;
-use price_oracle::{FeedKey, PriceReports, B256};
+use parking_lot::RwLock;
 
-static ORACLE_STORE: LazyLock<Mutex<OracleStore>> =
-    LazyLock::new(|| Mutex::new(OracleStore::default()));
+use crate::{FeedKey, PriceReports, B256};
+
+static ORACLE_STORE: LazyLock<RwLock<OracleStore>> =
+    LazyLock::new(|| RwLock::new(OracleStore::default()));
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InsertOutcome {
@@ -137,14 +139,8 @@ impl OracleStore {
     }
 }
 
-fn store() -> std::sync::MutexGuard<'static, OracleStore> {
-    ORACLE_STORE
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
 pub fn snapshot_prices() -> PriceReports {
-    store().snapshot()
+    ORACLE_STORE.read().snapshot()
 }
 
 pub fn insert_if_newer(
@@ -153,15 +149,19 @@ pub fn insert_if_newer(
     payload: Vec<u8>,
     order_time: u64,
 ) -> InsertOutcome {
-    store().insert_if_newer(provider_id, feed_id, payload, order_time)
+    ORACLE_STORE
+        .write()
+        .insert_if_newer(provider_id, feed_id, payload, order_time)
 }
 
 pub fn register_feeds(source_name: &str, provider_id: B256, feeds: Vec<B256>) -> RegisterOutcome {
-    store().register(source_name, provider_id, feeds)
+    ORACLE_STORE
+        .write()
+        .register(source_name, provider_id, feeds)
 }
 
 pub fn remove_source(source_name: &str) -> usize {
-    store().remove_source(source_name)
+    ORACLE_STORE.write().remove_source(source_name)
 }
 
 #[cfg(test)]

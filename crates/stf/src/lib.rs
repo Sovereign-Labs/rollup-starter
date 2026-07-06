@@ -2,10 +2,10 @@
 
 pub mod authentication;
 mod delegation;
-#[cfg(feature = "native")]
-pub mod prices;
 pub mod runtime;
 
+#[cfg(feature = "native")]
+pub use price_oracle::prices;
 pub use runtime::*;
 use sov_modules_stf_blueprint::StfBlueprint;
 use sov_rollup_interface::stf::StateTransitionVerifier;

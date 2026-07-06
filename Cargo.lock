@@ -5006,6 +5006,7 @@ dependencies = [
  "alloy-primitives",
  "borsh",
  "bytes",
+ "parking_lot",
  "sov-evm",
  "sov-modules-api",
  "sov-rollup-interface",
@@ -8305,7 +8306,6 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "borsh",
- "bytes",
  "price-oracle",
  "serde_json",
  "sov-address",
