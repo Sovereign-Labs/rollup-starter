@@ -7,8 +7,9 @@ mod celestia {
         types::Namespace,
         verifier::{CelestiaVerifier, RollupParams},
     };
-    use sov_modules_api::{prelude::tokio::sync::watch::Receiver, Spec};
+    use sov_modules_api::Spec;
     use sov_rollup_interface::da::DaVerifier;
+    use sov_shutdown::SecondaryShutdownController;
     use sov_stf_runner::RollupConfig;
 
     pub const ROLLUP_BATCH_NAMESPACE: Namespace =
@@ -26,7 +27,7 @@ mod celestia {
 
     pub async fn new_da_service<S: Spec>(
         rollup_config: &RollupConfig<S::Address, DaService>,
-        shutdown_receiver: Receiver<()>,
+        secondary_shutdown_controller: &SecondaryShutdownController,
     ) -> DaService {
         DaService::new(
             rollup_config.da.clone(),
@@ -34,7 +35,7 @@ mod celestia {
                 rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,
                 rollup_proof_namespace: ROLLUP_PROOF_NAMESPACE,
             },
-            shutdown_receiver,
+            secondary_shutdown_controller,
         )
         .await
     }

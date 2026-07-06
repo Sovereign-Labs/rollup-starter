@@ -36,6 +36,7 @@ use sov_rollup_interface::zk::aggregated_proof::{
 };
 use sov_rollup_interface::zk::ZkVerifier;
 use sov_sequencer::{ProofBlobSender, SeqConfigExtension, Sequencer, TxStatus};
+use sov_shutdown::{PrimaryShutdownController, SecondaryShutdownController};
 use sov_state::nomt::prover_storage::NomtProverStorage;
 use sov_state::DefaultStorageSpec;
 use sov_state::Storage;
@@ -102,7 +103,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         &self,
         state_update_receiver: StateUpdateReceiver<<Self::Spec as Spec>::Storage>,
         sync_status_receiver: watch::Receiver<SyncStatus>,
-        shutdown_receiver: watch::Receiver<()>,
+        primary_shutdown: PrimaryShutdownController,
         ledger_db: &LedgerDb,
         sequencer: &SequencerCreationReceipt<Self::Spec>,
         _da_service: &Self::DaService,
@@ -111,7 +112,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         sov_modules_rollup_blueprint::register_endpoints::<Self, _>(
             state_update_receiver.clone(),
             sync_status_receiver,
-            shutdown_receiver,
+            primary_shutdown,
             ledger_db,
             sequencer,
             rollup_config,
@@ -122,9 +123,9 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
     async fn create_da_service(
         &self,
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
-        shutdown_receiver: tokio::sync::watch::Receiver<()>,
+        secondary_shutdown_controller: &SecondaryShutdownController,
     ) -> Self::DaService {
-        new_da_service::<Self::Spec>(rollup_config, shutdown_receiver).await
+        new_da_service::<Self::Spec>(rollup_config, secondary_shutdown_controller).await
     }
 
     async fn create_prover_service(
@@ -204,7 +205,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
         &self,
         sequencer: Seq,
         rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
-        shutdown_receiver: tokio::sync::watch::Receiver<()>,
+        primary_shutdown: PrimaryShutdownController,
         sequencer_da_address: <<Self::Spec as Spec>::Da as sov_rollup_interface::da::DaSpec>::Address,
     ) -> anyhow::Result<sov_modules_api::NodeEndpoints>
     where
@@ -219,7 +220,7 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
             sequencer_rollup_address: rollup_config.sequencer.rollup_address,
             sequencer_da_address,
             sequencer_type: SequencerType::Preferred,
-            shutdown_receiver,
+            primary_shutdown,
         };
 
         let axum_router = axum::Router::new()
@@ -230,7 +231,6 @@ impl FullNodeBlueprint<Native> for StarterRollup<Native> {
             axum_router,
             jsonrpsee_module: sov_ethereum::get_ethereum_rpc(eth_rpc_config, sequencer)
                 .remove_context(),
-            ..Default::default()
         })
     }
 }

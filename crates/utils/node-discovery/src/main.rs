@@ -10,6 +10,7 @@ use sov_metrics::{init_metrics_tracker, MonitoringConfig};
 use sov_proxy_utils::{
     write_to_file_atomically, ClusterInfo, ClusterInfoService, ClusterUpdateNotifier,
 };
+use sov_shutdown::SecondaryShutdownController;
 use tokio::process::Command;
 
 struct ReloadNginx {
@@ -99,11 +100,10 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     tracing::info!("Starting node discovery.");
 
-    let (metrics_shutdown_sender, mut metrics_shutdown_receiver) = tokio::sync::watch::channel(());
-    metrics_shutdown_receiver.mark_unchanged();
+    let secondary_shutdown_controller = SecondaryShutdownController::new();
 
     let monitoring_config = MonitoringConfig::default_on_port(args.metrics_port);
-    init_metrics_tracker(&monitoring_config, metrics_shutdown_receiver.clone());
+    init_metrics_tracker(&monitoring_config, &secondary_shutdown_controller);
 
     let max_age = std::time::Duration::from_millis(args.max_age_millis);
 
@@ -124,10 +124,10 @@ async fn main() -> anyhow::Result<()> {
 
     if let Err(err) = cluster_info_service.join().await {
         tracing::error!(?err, "Failed to join cluster info service");
-        let _ = metrics_shutdown_sender.send(());
+        secondary_shutdown_controller.shutdown();
         exit(1);
     } else {
-        let _ = metrics_shutdown_sender.send(());
+        secondary_shutdown_controller.shutdown();
     }
 
     Ok(())
