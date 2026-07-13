@@ -33,7 +33,7 @@ const PROVIDER_FEEDS_MAX: usize = 512;
 const HEARTBEAT_INTERVAL_MAX_SEC: u32 = 300;
 const THROTTLE_WARN_SEC: u64 = 60;
 
-static LAST_DROPPED_WARN_AT: AtomicU64 = AtomicU64::new(0);
+static LAST_UNADVERTISED_WARN_AT: AtomicU64 = AtomicU64::new(0);
 static LAST_DIVERGENCE_WARN_AT: AtomicU64 = AtomicU64::new(0);
 
 fn warn_allowed(last: &AtomicU64) -> bool {
@@ -592,12 +592,12 @@ async fn consume(
                 provider_id,
                 feed_id,
                 payload,
-                ingested_at,
-                source_time,
+                delivery_time_ms,
+                source_time_ms,
             } => {
                 if Some(provider_id) != session_provider {
-                    metrics::inc_dropped_unexpected(&source.name);
-                    if warn_allowed(&LAST_DROPPED_WARN_AT) {
+                    metrics::inc_unadvertised(&source.name);
+                    if warn_allowed(&LAST_UNADVERTISED_WARN_AT) {
                         warn!(
                             source = %source.name,
                             %provider_id,
@@ -606,22 +606,22 @@ async fn consume(
                     }
                     continue;
                 }
-                let age = now_unix().saturating_sub(ingested_at);
+                let age_ms = now_unix_ms().saturating_sub(delivery_time_ms);
                 trace!(
                     target: "oracle::frames",
                     source = %source.name,
                     %feed_id,
-                    age_secs = age,
+                    age_ms,
                     bytes = payload.len(),
                     "Received price update"
                 );
-                if age > STALENESS_WARN_SEC {
+                if age_ms > STALENESS_WARN_SEC * 1000 {
                     if !stale {
                         stale = true;
                         warn!(
                             source = %source.name,
                             %feed_id,
-                            age_secs = age,
+                            age_ms,
                             "Oracle source data is stale (payload older than threshold)"
                         );
                     }
@@ -629,16 +629,17 @@ async fn consume(
                     stale = false;
                     info!(source = %source.name, "Oracle source data freshness recovered");
                 }
-                let order_time = if source_time != 0 {
-                    source_time
+                let payload_time_ms = if source_time_ms != 0 {
+                    source_time_ms
                 } else {
-                    ingested_at
+                    delivery_time_ms
                 };
-                match prices::insert_if_newer(provider_id, feed_id, payload, order_time) {
-                    prices::InsertOutcome::Inserted | prices::InsertOutcome::Stale => {}
+                match prices::insert_if_newer(provider_id, feed_id, payload, payload_time_ms) {
+                    prices::InsertOutcome::Inserted => metrics::inc_inserted(&source.name),
+                    prices::InsertOutcome::Stale => metrics::inc_stale(&source.name),
                     prices::InsertOutcome::Unexpected => {
-                        metrics::inc_dropped_unexpected(&source.name);
-                        if warn_allowed(&LAST_DROPPED_WARN_AT) {
+                        metrics::inc_unadvertised(&source.name);
+                        if warn_allowed(&LAST_UNADVERTISED_WARN_AT) {
                             warn!(
                                 source = %source.name,
                                 %feed_id,
@@ -648,11 +649,11 @@ async fn consume(
                     }
                 }
             }
-            OracleFrame::Heartbeat { sent_at_unix } => {
+            OracleFrame::Heartbeat { send_time_ms } => {
                 trace!(
                     target: "oracle::frames",
                     source = %source.name,
-                    sent_at_unix,
+                    send_time_ms,
                     "Received heartbeat"
                 );
             }
@@ -665,6 +666,13 @@ fn now_unix() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
+}
+
+fn now_unix_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }
 
 mod metrics {
@@ -683,7 +691,9 @@ mod metrics {
         reconnects: AtomicU64,
         frames: AtomicU64,
         last_frame_unix: AtomicU64,
-        dropped_unexpected: AtomicU64,
+        inserted: AtomicU64,
+        stale: AtomicU64,
+        unadvertised: AtomicU64,
         divergent_feeds: AtomicU64,
     }
 
@@ -717,10 +727,16 @@ mod metrics {
             .store(unix_secs, Ordering::Relaxed);
     }
 
-    pub fn inc_dropped_unexpected(name: &str) {
-        source(name)
-            .dropped_unexpected
-            .fetch_add(1, Ordering::Relaxed);
+    pub fn inc_inserted(name: &str) {
+        source(name).inserted.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn inc_stale(name: &str) {
+        source(name).stale.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn inc_unadvertised(name: &str) {
+        source(name).unadvertised.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn inc_divergent_feeds(name: &str) {
@@ -735,7 +751,9 @@ mod metrics {
         reconnects: u64,
         frames: u64,
         last_frame_unix: u64,
-        dropped_unexpected: u64,
+        inserted: u64,
+        stale: u64,
+        unadvertised: u64,
         divergent_feeds: u64,
     }
 
@@ -747,14 +765,16 @@ mod metrics {
         fn serialize_for_telegraf(&self, buffer: &mut Vec<u8>) -> io::Result<()> {
             write!(
                 buffer,
-                "{},source={} connected={},reconnects={},frames={},last_frame={},dropped_unexpected={},divergent_feeds={}",
+                "{},source={} connected={},reconnects={},frames={},last_frame={},inserted={},stale={},unadvertised={},divergent_feeds={}",
                 self.measurement_name(),
                 sov_metrics::safe_telegraf_string(&self.source),
                 self.connected as u8,
                 self.reconnects,
                 self.frames,
                 self.last_frame_unix,
-                self.dropped_unexpected,
+                self.inserted,
+                self.stale,
+                self.unadvertised,
                 self.divergent_feeds,
             )
         }
@@ -781,7 +801,9 @@ mod metrics {
                     reconnects: metrics.reconnects.load(Ordering::Relaxed),
                     frames: metrics.frames.load(Ordering::Relaxed),
                     last_frame_unix: metrics.last_frame_unix.load(Ordering::Relaxed),
-                    dropped_unexpected: metrics.dropped_unexpected.load(Ordering::Relaxed),
+                    inserted: metrics.inserted.load(Ordering::Relaxed),
+                    stale: metrics.stale.load(Ordering::Relaxed),
+                    unadvertised: metrics.unadvertised.load(Ordering::Relaxed),
                     divergent_feeds: metrics.divergent_feeds.load(Ordering::Relaxed),
                 })
                 .collect()
@@ -794,7 +816,9 @@ mod metrics {
                 reconnects = metric.reconnects,
                 frames = metric.frames,
                 last_frame = metric.last_frame_unix,
-                dropped_unexpected = metric.dropped_unexpected,
+                inserted = metric.inserted,
+                stale = metric.stale,
+                unadvertised = metric.unadvertised,
                 divergent_feeds = metric.divergent_feeds,
                 "oracle source metrics"
             );

@@ -49,7 +49,7 @@ impl OracleStore {
         provider_id: B256,
         feed_id: B256,
         payload: Vec<u8>,
-        order_time: u64,
+        payload_time_ms: u64,
     ) -> InsertOutcome {
         let allowed = self
             .allowed_feeds
@@ -60,11 +60,11 @@ impl OracleStore {
         }
         let key = FeedKey::new(provider_id, feed_id);
         if let Some((_, existing_time)) = self.reports.get(&key) {
-            if *existing_time >= order_time {
+            if *existing_time >= payload_time_ms {
                 return InsertOutcome::Stale;
             }
         }
-        self.reports.insert(key, (Bytes::from(payload), order_time));
+        self.reports.insert(key, (Bytes::from(payload), payload_time_ms));
         InsertOutcome::Inserted
     }
 
@@ -147,11 +147,11 @@ pub fn insert_if_newer(
     provider_id: B256,
     feed_id: B256,
     payload: Vec<u8>,
-    order_time: u64,
+    payload_time_ms: u64,
 ) -> InsertOutcome {
     ORACLE_STORE
         .write()
-        .insert_if_newer(provider_id, feed_id, payload, order_time)
+        .insert_if_newer(provider_id, feed_id, payload, payload_time_ms)
 }
 
 pub fn register_feeds(source_name: &str, provider_id: B256, feeds: Vec<B256>) -> RegisterOutcome {

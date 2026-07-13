@@ -1,7 +1,7 @@
 use alloy_primitives::B256;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;
 
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, BorshSerialize, BorshDeserialize,
@@ -32,10 +32,10 @@ pub enum OracleFrame {
         provider_id: B256,
         feed_id: B256,
         payload: Vec<u8>,
-        ingested_at: u64,
-        source_time: u64,
+        delivery_time_ms: u64,
+        source_time_ms: u64,
     },
     Heartbeat {
-        sent_at_unix: u64,
+        send_time_ms: u64,
     },
 }

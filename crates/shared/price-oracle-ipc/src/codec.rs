@@ -75,8 +75,8 @@ mod tests {
             provider_id: B256::repeat_byte(0xab),
             feed_id: B256::repeat_byte(0xcd),
             payload: vec![0x12, 0x34, 0x56, 0x78],
-            ingested_at: 0x1234_5678,
-            source_time: 0x1234_5670,
+            delivery_time_ms: 0x1234_5678,
+            source_time_ms: 0x1234_5670,
         }
     }
 
