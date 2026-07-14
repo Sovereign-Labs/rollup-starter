@@ -12,7 +12,7 @@ CHAIN_ID = 537713
 CHAIN_NAME = "Relay"
 # Chain hash overrides by rollup block height range.
 # TODO: This is set to i64::MAX for resync tests to work after dev changed the chain_hash. Set to proper heights when doing a deployment with the new chain hash.
-CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 9_223_372_036_854_775_807, chain_hash = "0x30b30bc6849c4ae1429d117ddb4cd101aa32daa692889d14a630b9d25986fde0", grace_period = 20_000 }]
+CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 2887000, chain_hash = "0x30b30bc6849c4ae1429d117ddb4cd101aa32daa692889d14a630b9d25986fde0", grace_period = 50_000 }]
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert to ASCII bytes
