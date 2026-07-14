@@ -8,7 +8,7 @@ use tokio::net::{TcpListener, TcpStream};
 use crate::error::IpcError;
 
 pub const DEFAULT_BACKOFF_MIN: Duration = Duration::from_secs(1);
-pub const DEFAULT_BACKOFF_MAX: Duration = Duration::from_secs(30);
+pub const DEFAULT_BACKOFF_MAX: Duration = Duration::from_secs(15);
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_KEEPALIVE_IDLE: Duration = Duration::from_secs(15);
 pub const DEFAULT_KEEPALIVE_INTERVAL: Duration = Duration::from_secs(5);

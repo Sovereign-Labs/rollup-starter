@@ -43,7 +43,7 @@ Helpers wrap a local TCP connection (no TLS).
 - `OracleStream` - A connected TCP stream, implementing `AsyncRead` and `AsyncWrite`.
 - `OracleListener` - A bound listener, with `accept` and `local_addr`. Accepted connections get `TCP_NODELAY` and `SO_KEEPALIVE`.
 - `BoundListener` - Owns a bound listener and its resolved address, exposing it through `address()` (resolving an ephemeral `:0` port).
-- `Backoff` - A reusable exponential backoff helper, doubling from a minimum up to a maximum, defaulting to 1s through 30s.
+- `Backoff` - A reusable exponential backoff helper, doubling from a minimum up to a maximum, defaulting to 1s through 15s.
 
 ## Errors
 
