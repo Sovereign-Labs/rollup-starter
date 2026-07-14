@@ -65,38 +65,17 @@ pub struct OracleConfig {
     pub sources: Vec<SourceConfig>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Transport {
-    #[default]
-    Tcp,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceConfig {
     pub name: String,
-    pub provider_id: String,
-    #[serde(default)]
-    pub transport: Transport,
-    #[serde(default)]
-    pub socket_address: Option<String>,
+    pub provider: String,
+    pub address: String,
 }
 
 impl SourceConfig {
     fn provider_hash(&self) -> B256 {
-        alloy_primitives::keccak256(self.provider_id.as_bytes())
-    }
-
-    fn address(&self) -> anyhow::Result<String> {
-        match self.transport {
-            Transport::Tcp => self.socket_address.clone().ok_or_else(|| {
-                anyhow!(
-                    "oracle source '{}': transport = \"tcp\" requires socket_address",
-                    self.name
-                )
-            }),
-        }
+        alloy_primitives::keccak256(self.provider.as_bytes())
     }
 }
 
@@ -118,7 +97,6 @@ fn validate(config: &OracleConfig) -> anyhow::Result<()> {
         if !seen.insert(source.name.as_str()) {
             return Err(anyhow!("duplicate oracle source name '{}'", source.name));
         }
-        source.address()?;
     }
     Ok(())
 }
@@ -191,9 +169,7 @@ pub async fn spawn_clients(config: OracleConfig, path: PathBuf) -> anyhow::Resul
     let mut registry: HashMap<String, SourceHandle> = HashMap::new();
     for source in config.sources {
         let name = source.name.clone();
-        if let Some(handle) = spawn_source(source, ready_tx.clone()) {
-            registry.insert(name, handle);
-        }
+        registry.insert(name, spawn_source(source, ready_tx.clone()));
     }
     drop(ready_tx);
 
@@ -256,22 +232,16 @@ async fn await_sources_ready(
 fn spawn_source(
     source: SourceConfig,
     ready: Option<mpsc::UnboundedSender<String>>,
-) -> Option<SourceHandle> {
-    let address = match source.address() {
-        Ok(address) => address,
-        Err(e) => {
-            error!(source = %source.name, error = %e, "Skipping oracle source with invalid address");
-            return None;
-        }
-    };
+) -> SourceHandle {
+    let address = source.address.clone();
     info!(source = %source.name, address = %address, "Starting oracle source client");
     let (cancel_tx, cancel_rx) = watch::channel(());
     let join = tokio::spawn(supervise_source(source.clone(), address, ready, cancel_rx));
-    Some(SourceHandle {
+    SourceHandle {
         config: source,
         cancel: cancel_tx,
         join,
-    })
+    }
 }
 
 async fn ignore_sighup() {
@@ -392,16 +362,12 @@ async fn apply_source_diff(
             info!(source = %name, "Restarting oracle source (config changed)");
             handle.shutdown().await;
         }
-        if let Some(handle) = spawn_source(source, None) {
-            registry.insert(name, handle);
-        }
+        registry.insert(name, spawn_source(source, None));
     }
     for source in diff.to_add {
         let name = source.name.clone();
         info!(source = %name, "Adding oracle source (config reload)");
-        if let Some(handle) = spawn_source(source, None) {
-            registry.insert(name, handle);
-        }
+        registry.insert(name, spawn_source(source, None));
     }
 
     debug!(added, restarted, removed, "Applied oracle config reload");
@@ -563,7 +529,7 @@ async fn consume(
                 if provider_id != source.provider_hash() {
                     warn!(
                         source = %source.name,
-                        expected = %source.provider_id,
+                        expected = %source.provider,
                         advertised = %provider_id,
                         "Oracle source advertised an unexpected provider id, dropping connection"
                     );
@@ -875,7 +841,7 @@ mod metrics {
 mod tests {
     use super::*;
 
-    const PROVIDER_ID: &str = "chainlink";
+    const PROVIDER: &str = "chainlink";
 
     #[test]
     fn require_sources_defaults_to_false() {
@@ -885,24 +851,9 @@ mod tests {
         assert!(!config.require_sources);
     }
 
-    #[test]
-    fn transport_defaults_to_tcp() {
-        let toml = format!(
-            r#"
-            [oracle]
-            [[oracle.source]]
-            name = "chainlink"
-            provider_id = "{PROVIDER_ID}"
-            socket_address = "127.0.0.1:9801"
-        "#
-        );
-        let config = toml::from_str::<OracleConfigFile>(&toml).unwrap().oracle;
-        assert_eq!(config.sources[0].transport, Transport::Tcp);
-    }
-
     fn source(toml: &str) -> SourceConfig {
         toml::from_str::<OracleConfigFile>(&format!(
-            "[oracle]\n[[oracle.source]]\nprovider_id = \"{PROVIDER_ID}\"\n{toml}"
+            "[oracle]\n[[oracle.source]]\nprovider = \"{PROVIDER}\"\n{toml}"
         ))
         .unwrap()
         .oracle
@@ -919,13 +870,12 @@ mod tests {
             require_sources = true
             [[oracle.source]]
             name = "chainlink-1"
-            provider_id = "{PROVIDER_ID}"
-            transport = "tcp"
-            socket_address = "127.0.0.1:9801"
+            provider = "{PROVIDER}"
+            address = "127.0.0.1:9801"
             [[oracle.source]]
             name = "chainlink-2"
-            provider_id = "{PROVIDER_ID}"
-            socket_address = "127.0.0.1:9802"
+            provider = "{PROVIDER}"
+            address = "127.0.0.1:9802"
         "#
         );
         let config = toml::from_str::<OracleConfigFile>(&toml).unwrap().oracle;
@@ -933,48 +883,36 @@ mod tests {
         assert!(config.require_sources);
         assert_eq!(config.sources.len(), 2);
         assert_eq!(config.sources[0].name, "chainlink-1");
-        assert_eq!(config.sources[0].provider_id, PROVIDER_ID);
+        assert_eq!(config.sources[0].provider, PROVIDER);
         assert_eq!(
             config.sources[0].provider_hash(),
-            alloy_primitives::keccak256(PROVIDER_ID)
+            alloy_primitives::keccak256(PROVIDER)
         );
-        assert_eq!(config.sources[0].transport, Transport::Tcp);
-        assert_eq!(config.sources[1].transport, Transport::Tcp);
+        assert_eq!(config.sources[1].address, "127.0.0.1:9802");
     }
 
     #[test]
-    fn missing_provider_id_is_an_error() {
+    fn missing_provider_is_an_error() {
         let toml = r#"
             [oracle]
             [[oracle.source]]
             name = "chainlink"
-            socket_address = "127.0.0.1:9801"
+            address = "127.0.0.1:9801"
         "#;
         assert!(toml::from_str::<OracleConfigFile>(toml).is_err());
     }
 
     #[test]
-    fn tcp_source_resolves_to_address() {
-        let s = source("name = \"a\"\ntransport = \"tcp\"\nsocket_address = \"127.0.0.1:9802\"");
-        assert_eq!(s.address().unwrap(), "127.0.0.1:9802");
+    fn source_parses_address() {
+        let s = source("name = \"a\"\naddress = \"127.0.0.1:9802\"");
+        assert_eq!(s.address, "127.0.0.1:9802");
     }
 
     #[test]
-    fn default_transport_resolves_to_address() {
-        let s = source("name = \"a\"\nsocket_address = \"127.0.0.1:9802\"");
-        assert_eq!(s.address().unwrap(), "127.0.0.1:9802");
-    }
-
-    #[test]
-    fn tcp_without_socket_address_is_an_error() {
-        let s = source("name = \"a\"\ntransport = \"tcp\"");
-        assert!(s.address().is_err());
-    }
-
-    #[test]
-    fn default_transport_without_address_is_an_error() {
-        let s = source("name = \"a\"");
-        assert!(s.address().is_err());
+    fn missing_address_is_an_error() {
+        let toml =
+            format!("[oracle]\n[[oracle.source]]\nname = \"a\"\nprovider = \"{PROVIDER}\"");
+        assert!(toml::from_str::<OracleConfigFile>(&toml).is_err());
     }
 
     #[test]
@@ -1029,19 +967,18 @@ mod tests {
         assert!(load_config(&path).is_err());
     }
 
-    fn tcp_src(name: &str, address: &str) -> SourceConfig {
+    fn src(name: &str, address: &str) -> SourceConfig {
         SourceConfig {
             name: name.to_string(),
-            provider_id: PROVIDER_ID.to_string(),
-            transport: Transport::Tcp,
-            socket_address: Some(address.to_string()),
+            provider: PROVIDER.to_string(),
+            address: address.to_string(),
         }
     }
 
     #[test]
     fn duplicate_source_names_are_rejected() {
         let config = OracleConfig {
-            sources: vec![tcp_src("dup", "127.0.0.1:1"), tcp_src("dup", "127.0.0.1:2")],
+            sources: vec![src("dup", "127.0.0.1:1"), src("dup", "127.0.0.1:2")],
             ..Default::default()
         };
         assert!(validate(&config).is_err());
@@ -1050,7 +987,7 @@ mod tests {
     #[test]
     fn unique_source_names_pass_validation() {
         let config = OracleConfig {
-            sources: vec![tcp_src("a", "127.0.0.1:1"), tcp_src("b", "127.0.0.1:2")],
+            sources: vec![src("a", "127.0.0.1:1"), src("b", "127.0.0.1:2")],
             ..Default::default()
         };
         assert!(validate(&config).is_ok());
@@ -1059,14 +996,14 @@ mod tests {
     #[test]
     fn diff_add_remove_restart() {
         let mut current = HashMap::new();
-        current.insert("keep".to_string(), tcp_src("keep", "127.0.0.1:1"));
-        current.insert("change".to_string(), tcp_src("change", "127.0.0.1:2"));
-        current.insert("drop".to_string(), tcp_src("drop", "127.0.0.1:3"));
+        current.insert("keep".to_string(), src("keep", "127.0.0.1:1"));
+        current.insert("change".to_string(), src("change", "127.0.0.1:2"));
+        current.insert("drop".to_string(), src("drop", "127.0.0.1:3"));
 
         let new_sources = vec![
-            tcp_src("keep", "127.0.0.1:1"),
-            tcp_src("change", "127.0.0.1:9"),
-            tcp_src("add", "127.0.0.1:4"),
+            src("keep", "127.0.0.1:1"),
+            src("change", "127.0.0.1:9"),
+            src("add", "127.0.0.1:4"),
         ];
         let diff = diff_sources(&current, new_sources);
 
