@@ -1,7 +1,12 @@
+use std::time::Duration;
+
 use alloy_primitives::B256;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const PROTOCOL_VERSION: u16 = 2;
+pub const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
+pub const READ_DEADLINE: Duration = Duration::from_secs(15);
+pub const FEEDS_MAX: usize = 512;
 
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, BorshSerialize, BorshDeserialize,
@@ -26,16 +31,11 @@ pub enum OracleFrame {
         protocol_version: u16,
         provider_id: B256,
         feeds: Vec<B256>,
-        heartbeat_interval_sec: u32,
     },
     PriceUpdate {
-        provider_id: B256,
         feed_id: B256,
         payload: Vec<u8>,
-        delivery_time_ms: u64,
         source_time_ms: u64,
     },
-    Heartbeat {
-        send_time_ms: u64,
-    },
+    Heartbeat,
 }
