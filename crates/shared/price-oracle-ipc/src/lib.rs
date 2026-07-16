@@ -10,6 +10,8 @@ pub use error::IpcError;
 pub use transport::{
     bind, connect, Backoff, BoundListener, OracleListener, OracleStream, DEFAULT_CONNECT_TIMEOUT,
 };
-pub use types::{FeedKey, OracleFrame, PROTOCOL_VERSION};
+pub use types::{
+    FeedKey, OracleFrame, FEEDS_MAX, HEARTBEAT_INTERVAL, PROTOCOL_VERSION, READ_DEADLINE,
+};
 
 pub use alloy_primitives::B256;

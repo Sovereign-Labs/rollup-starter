@@ -5,7 +5,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::error::IpcError;
 use crate::types::OracleFrame;
 
-pub const MAX_FRAME_LEN: u32 = 16 * 1024 * 1024;
+pub const MAX_FRAME_LEN: u32 = 256 * 1024;
 
 pub async fn write_frame<W>(writer: &mut W, frame: &OracleFrame) -> Result<(), IpcError>
 where
@@ -72,11 +72,9 @@ mod tests {
 
     fn sample_update() -> OracleFrame {
         OracleFrame::PriceUpdate {
-            provider_id: B256::repeat_byte(0xab),
             feed_id: B256::repeat_byte(0xcd),
             payload: vec![0x12, 0x34, 0x56, 0x78],
-            ingested_at: 0x1234_5678,
-            source_time: 0x1234_5670,
+            source_time_ms: 0x1234_5670,
         }
     }
 
@@ -96,7 +94,6 @@ mod tests {
             protocol_version: crate::PROTOCOL_VERSION,
             provider_id: B256::repeat_byte(0x01),
             feeds: vec![B256::repeat_byte(0x02), B256::repeat_byte(0x03)],
-            heartbeat_interval_sec: 10,
         };
         write_frame(&mut a, &hello).await.unwrap();
         write_frame(&mut a, &sample_update()).await.unwrap();

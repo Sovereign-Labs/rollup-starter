@@ -15,7 +15,7 @@ async fn session_round_trip() {
         common::hello(),
         common::update(0x01, b"snap-1"),
         common::update(0x02, b"snap-2"),
-        common::heartbeat(7),
+        common::heartbeat(),
         common::update(0x01, b"live-1"),
     ];
     let server = common::serve_once(listener, expected.clone());
@@ -81,7 +81,7 @@ async fn write_trips_deadline_when_peer_never_reads() {
     let address = listener.address().to_string();
     let server = tokio::spawn(async move {
         let mut stream = listener.accept().await.unwrap();
-        let big = common::update(0x01, &vec![0u8; 1024 * 1024]);
+        let big = common::update(0x01, &vec![0u8; 200 * 1024]);
         for _ in 0..1000 {
             match write_frame_with_timeout(&mut stream, &big, Duration::from_millis(100)).await {
                 Ok(()) => continue,

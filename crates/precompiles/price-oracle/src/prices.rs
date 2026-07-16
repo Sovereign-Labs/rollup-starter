@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::LazyLock;
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use parking_lot::RwLock;
@@ -12,6 +13,8 @@ static ORACLE_STORE: LazyLock<RwLock<OracleStore>> =
 #[derive(Debug, PartialEq, Eq)]
 pub enum InsertOutcome {
     Inserted,
+    Duplicate,
+    Conflict,
     Stale,
     Unexpected,
 }
@@ -19,7 +22,7 @@ pub enum InsertOutcome {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct RegisterOutcome {
     pub evicted: usize,
-    pub feeds_diverged: bool,
+    pub feed_set_conflicts: Vec<B256>,
 }
 
 struct SourceFeeds {
@@ -27,9 +30,15 @@ struct SourceFeeds {
     feeds: BTreeSet<B256>,
 }
 
+struct Report {
+    payload: Bytes,
+    source_time_ms: u64,
+    updated: Instant,
+}
+
 #[derive(Default)]
 struct OracleStore {
-    reports: BTreeMap<FeedKey, (Bytes, u64)>,
+    reports: BTreeMap<FeedKey, Report>,
     source_feeds: BTreeMap<String, SourceFeeds>,
     allowed_feeds: BTreeMap<B256, BTreeSet<B256>>,
 }
@@ -39,7 +48,7 @@ impl OracleStore {
         PriceReports(
             self.reports
                 .iter()
-                .map(|(key, (payload, _))| (*key, payload.clone()))
+                .map(|(key, report)| (*key, report.payload.clone()))
                 .collect(),
         )
     }
@@ -49,7 +58,7 @@ impl OracleStore {
         provider_id: B256,
         feed_id: B256,
         payload: Vec<u8>,
-        order_time: u64,
+        source_time_ms: u64,
     ) -> InsertOutcome {
         let allowed = self
             .allowed_feeds
@@ -59,13 +68,49 @@ impl OracleStore {
             return InsertOutcome::Unexpected;
         }
         let key = FeedKey::new(provider_id, feed_id);
-        if let Some((_, existing_time)) = self.reports.get(&key) {
-            if *existing_time >= order_time {
+        let now = Instant::now();
+        if let Some(existing) = self.reports.get_mut(&key) {
+            if existing.source_time_ms > source_time_ms {
                 return InsertOutcome::Stale;
             }
+            let tied = existing.source_time_ms == source_time_ms;
+            if tied && existing.payload.as_ref() == payload.as_slice() {
+                existing.updated = now;
+                return InsertOutcome::Duplicate;
+            }
+            *existing = Report {
+                payload: Bytes::from(payload),
+                source_time_ms,
+                updated: now,
+            };
+            return if tied {
+                InsertOutcome::Conflict
+            } else {
+                InsertOutcome::Inserted
+            };
         }
-        self.reports.insert(key, (Bytes::from(payload), order_time));
+        self.reports.insert(
+            key,
+            Report {
+                payload: Bytes::from(payload),
+                source_time_ms,
+                updated: now,
+            },
+        );
         InsertOutcome::Inserted
+    }
+
+    fn evict_expired(&mut self, now: Instant, ttl: Duration) -> Vec<FeedKey> {
+        let expired: Vec<FeedKey> = self
+            .reports
+            .iter()
+            .filter(|(_, report)| now.duration_since(report.updated) >= ttl)
+            .map(|(key, _)| *key)
+            .collect();
+        for key in &expired {
+            self.reports.remove(key);
+        }
+        expired
     }
 
     fn register(
@@ -85,7 +130,7 @@ impl OracleStore {
         let evicted = self.retain_allowed_feeds();
         RegisterOutcome {
             evicted,
-            feeds_diverged: self.feeds_diverged(provider_id),
+            feed_set_conflicts: self.feed_set_conflicts(provider_id),
         }
     }
 
@@ -126,16 +171,22 @@ impl OracleStore {
         before - self.reports.len()
     }
 
-    fn feeds_diverged(&self, provider_id: B256) -> bool {
+    fn feed_set_conflicts(&self, provider_id: B256) -> Vec<B256> {
         let mut sets = self
             .source_feeds
             .values()
             .filter(|entry| entry.provider_id == provider_id)
             .map(|entry| &entry.feeds);
         let Some(first) = sets.next() else {
-            return false;
+            return Vec::new();
         };
-        sets.any(|set| set != first)
+        let mut union = first.clone();
+        let mut intersection = first.clone();
+        for set in sets {
+            union.extend(set.iter().copied());
+            intersection.retain(|feed| set.contains(feed));
+        }
+        union.difference(&intersection).copied().collect()
     }
 }
 
@@ -147,11 +198,11 @@ pub fn insert_if_newer(
     provider_id: B256,
     feed_id: B256,
     payload: Vec<u8>,
-    order_time: u64,
+    source_time_ms: u64,
 ) -> InsertOutcome {
     ORACLE_STORE
         .write()
-        .insert_if_newer(provider_id, feed_id, payload, order_time)
+        .insert_if_newer(provider_id, feed_id, payload, source_time_ms)
 }
 
 pub fn register_feeds(source_name: &str, provider_id: B256, feeds: Vec<B256>) -> RegisterOutcome {
@@ -162,6 +213,10 @@ pub fn register_feeds(source_name: &str, provider_id: B256, feeds: Vec<B256>) ->
 
 pub fn remove_source(source_name: &str) -> usize {
     ORACLE_STORE.write().remove_source(source_name)
+}
+
+pub fn evict_expired(ttl: Duration) -> Vec<FeedKey> {
+    ORACLE_STORE.write().evict_expired(Instant::now(), ttl)
 }
 
 #[cfg(test)]
@@ -200,10 +255,6 @@ mod tests {
             InsertOutcome::Stale
         );
         assert_eq!(
-            store.insert_if_newer(provider(0x01), feed(0xaa), vec![3], 100),
-            InsertOutcome::Stale
-        );
-        assert_eq!(
             store.insert_if_newer(provider(0x01), feed(0xaa), vec![4], 110),
             InsertOutcome::Inserted
         );
@@ -217,12 +268,67 @@ mod tests {
     }
 
     #[test]
+    fn equal_timestamp_conflict_overwrites() {
+        let mut store = OracleStore::default();
+        store.register("chainlink-1", provider(0x01), vec![feed(0xaa)]);
+        store.insert_if_newer(provider(0x01), feed(0xaa), vec![1], 100);
+        assert_eq!(
+            store.insert_if_newer(provider(0x01), feed(0xaa), vec![2], 100),
+            InsertOutcome::Conflict
+        );
+        let snapshot = store.snapshot();
+        assert_eq!(
+            snapshot
+                .get(&FeedKey::new(provider(0x01), feed(0xaa)))
+                .unwrap(),
+            &Bytes::from(vec![2])
+        );
+    }
+
+    #[test]
+    fn equal_timestamp_duplicate_is_skipped() {
+        let mut store = OracleStore::default();
+        store.register("chainlink-1", provider(0x01), vec![feed(0xaa)]);
+        store.insert_if_newer(provider(0x01), feed(0xaa), vec![1], 100);
+        assert_eq!(
+            store.insert_if_newer(provider(0x01), feed(0xaa), vec![1], 100),
+            InsertOutcome::Duplicate
+        );
+    }
+
+    #[test]
+    fn evicts_expired_reports() {
+        let mut store = OracleStore::default();
+        store.register("chainlink-1", provider(0x01), vec![feed(0xaa)]);
+        store.insert_if_newer(provider(0x01), feed(0xaa), vec![1], 100);
+        let now = Instant::now();
+        let ttl = Duration::from_secs(300);
+        assert!(store.evict_expired(now, ttl).is_empty());
+        let evicted = store.evict_expired(now + Duration::from_secs(600), ttl);
+        assert_eq!(evicted, vec![FeedKey::new(provider(0x01), feed(0xaa))]);
+        assert!(store.reports.is_empty());
+    }
+
+    #[test]
+    fn duplicate_refreshes_expiry() {
+        let mut store = OracleStore::default();
+        store.register("chainlink-1", provider(0x01), vec![feed(0xaa)]);
+        store.insert_if_newer(provider(0x01), feed(0xaa), vec![1], 100);
+        let key = FeedKey::new(provider(0x01), feed(0xaa));
+        store.reports.get_mut(&key).unwrap().updated -= Duration::from_secs(600);
+        store.insert_if_newer(provider(0x01), feed(0xaa), vec![1], 100);
+        assert!(store
+            .evict_expired(Instant::now(), Duration::from_secs(300))
+            .is_empty());
+    }
+
+    #[test]
     fn unions_replica_feeds() {
         let mut store = OracleStore::default();
         let out = store.register("chainlink-1", provider(0x01), vec![feed(0xaa), feed(0xbb)]);
-        assert!(!out.feeds_diverged);
+        assert!(out.feed_set_conflicts.is_empty());
         let out = store.register("chainlink-2", provider(0x01), vec![feed(0xaa)]);
-        assert!(out.feeds_diverged);
+        assert_eq!(out.feed_set_conflicts, vec![feed(0xbb)]);
         assert_eq!(
             store.insert_if_newer(provider(0x01), feed(0xbb), vec![1], 100),
             InsertOutcome::Inserted

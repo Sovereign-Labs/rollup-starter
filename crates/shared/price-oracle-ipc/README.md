@@ -11,11 +11,15 @@ payload is carried as an opaque byte blob and this library does not decode or va
 Messages are `OracleFrame` values, serialized with Borsh.
 There are three variants.
 
-- `Hello` - Sent first by the server, carries the protocol version, provider id, the list of subscribed feeds, and the server's heartbeat interval in seconds.
-- `PriceUpdate` - A price report for one feed, with provider id, feed id, opaque payload, an ingested-at timestamp, and a source timestamp taken from the upstream report.
-- `Heartbeat` - A liveness ping carrying a Unix timestamp in seconds.
+- `Hello` - Sent first by the server, carries the protocol version, provider id, and the list of subscribed feeds.
+- `PriceUpdate` - A price report for one feed, with feed id, opaque payload, and a source timestamp in Unix milliseconds taken from the upstream report.
+- `Heartbeat` - A periodic liveness message.
 
 A feed is identified by a `FeedKey`, the pair of provider id and feed id, both 32-byte values.
+
+The heartbeat cadence is fixed by the protocol. A server must send some frame at
+least every `HEARTBEAT_INTERVAL` (5s), and a subscriber should treat a stream
+with no frame for `READ_DEADLINE` (15s) as dead.
 
 Each frame is length-prefixed.
 The wire layout is a 4-byte little-endian length followed by the Borsh-encoded frame body.
@@ -25,7 +29,7 @@ The wire layout is a 4-byte little-endian length followed by the Borsh-encoded f
 - `write_frame_with_timeout` - `write_frame` bounded by a deadline, returning `IpcError::WriteTimeout` on expiry.
 - `read_frame_with_timeout` - `read_frame` bounded by a deadline, returning `IpcError::ReadTimeout` on expiry.
 
-Frames larger than `MAX_FRAME_LEN` (16 MiB) are rejected on both read and write.
+Frames larger than `MAX_FRAME_LEN` (256 KiB) are rejected on both read and write.
 A clean end of stream while reading the length prefix is reported as `IpcError::Closed`
 rather than an I/O error. The codec works over any `AsyncRead` or `AsyncWrite`
 the socket type is not assumed.
@@ -39,7 +43,7 @@ Helpers wrap a local TCP connection (no TLS).
 - `OracleStream` - A connected TCP stream, implementing `AsyncRead` and `AsyncWrite`.
 - `OracleListener` - A bound listener, with `accept` and `local_addr`. Accepted connections get `TCP_NODELAY` and `SO_KEEPALIVE`.
 - `BoundListener` - Owns a bound listener and its resolved address, exposing it through `address()` (resolving an ephemeral `:0` port).
-- `Backoff` - A reusable exponential backoff helper, doubling from a minimum up to a maximum, defaulting to 1s through 30s.
+- `Backoff` - A reusable exponential backoff helper, doubling from a minimum up to a maximum, defaulting to 1s through 15s.
 
 ## Errors
 
