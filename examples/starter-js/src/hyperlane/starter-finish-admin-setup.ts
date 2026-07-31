@@ -29,6 +29,7 @@ const evmAdminCall: RuntimeCall = {
                         // "0x6c942525544eAaE2e3361704B2f596122b718D8E",
                         // "0xf8ffaA5c3812659D832Ea866526F76A3B7F3b298"
                         // "0x71d8bE89D9f2339F0FE9cBA39496C6C9cbFF9da6",
+                        // "0xbE595DaD4d75cf04314e6e217F379926aFD38244",
                       ],
                     remove: [],
                 },
