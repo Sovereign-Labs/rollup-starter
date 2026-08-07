@@ -1,0 +1,15 @@
+{
+  "name": "enable-oracle-precompile",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-wasm-modules index.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.5.0",
+    "@noble/secp256k1": "^2.3.0",
+    "@sovereign-sdk/signers": "^0.5.2",
+    "@sovereign-sdk/utils": "^0.0.4",
+    "@sovereign-sdk/web3": "^0.14.0"
+  }
+}
