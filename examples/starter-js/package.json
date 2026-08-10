@@ -9,7 +9,8 @@
     "hyperlane-finish-admin-setup": "npm run schema && node --no-warnings --experimental-wasm-modules --loader ts-node/esm src/hyperlane/starter-finish-admin-setup.ts",
     "hyperlane-enroll-router-on-ethtest": "npm run schema && node --no-warnings --loader ts-node/esm src/hyperlane/starter-enroll-rollup-route-on-ethtest.ts",
     "hyperlane-inbound": "npm run schema && node --no-warnings --loader ts-node/esm src/hyperlane/starter-inbound-transfer.ts",
-    "hyperlane-outbound": "npm run schema && node --no-warnings --experimental-wasm-modules --loader ts-node/esm src/hyperlane/starter-outbound-transfer.ts"
+    "hyperlane-outbound": "npm run schema && node --no-warnings --experimental-wasm-modules --loader ts-node/esm src/hyperlane/starter-outbound-transfer.ts",
+    "enable-oracle-precompile": "npm run schema && node --no-warnings --experimental-wasm-modules --loader ts-node/esm src/hyperlane/starter-enable-oracle-precompile.ts"
   },
   "author": "",
   "license": "ISC",
