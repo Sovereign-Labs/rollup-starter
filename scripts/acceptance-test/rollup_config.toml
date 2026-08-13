@@ -23,12 +23,16 @@ path = "{rollup_data_path}"
 user_commit_concurrency = 6
 kernel_commit_concurrency = 2
 # Run pruning once every 1000 blocks. Prune any keys more than 100 versions old
-pruner_block_interval = 1000_000
-pruner_versions_to_keep = 100
+
 state_cache_size = 10000000000 # 10GB
 # The number of 4kb buckets to allocate for the state DB
 # The state DB will not exceed this size, and you'll get a warning when it fills up to 90% capacity.
 user_hashtable_buckets = 2_000_000 # 8 GB. You will need much more for production deployments
+
+[storage.pruner.periodic]
+block_interval = 1_000_000
+versions_to_keep = 100
+
 
 [runner]
 da_polling_interval_ms = 200
