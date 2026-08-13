@@ -910,8 +910,7 @@ mod tests {
 
     #[test]
     fn missing_address_is_an_error() {
-        let toml =
-            format!("[oracle]\n[[oracle.source]]\nname = \"a\"\nprovider = \"{PROVIDER}\"");
+        let toml = format!("[oracle]\n[[oracle.source]]\nname = \"a\"\nprovider = \"{PROVIDER}\"");
         assert!(toml::from_str::<OracleConfigFile>(&toml).is_err());
     }
 
