@@ -20,7 +20,6 @@ use sov_api_spec::ResponseValue;
 use sov_bank::{get_token_id, Amount, CallMessage as BankCallMessage, Coins, TokenId};
 use sov_modules_api::Spec as SpecT;
 use stf_starter::sov_modules_api::capabilities::UniquenessData;
-use stf_starter::sov_modules_api::macros::config_value;
 use stf_starter::sov_modules_api::transaction::{
     PriorityFeeBips, Transaction, UnsignedTransaction,
 };
@@ -462,10 +461,11 @@ fn save_mock_data(directories: Directories) -> Result<(), anyhow::Error> {
 fn encode_and_sign_tx(msg: RuntimeCall<Spec>) -> Result<RawTx, anyhow::Error> {
     let utx = UnsignedTransaction::<Runtime, Spec>::new(
         msg,
-        config_value!("CHAIN_ID"),
+        <Runtime as sov_modules_stf_blueprint::Runtime<Spec>>::CHAIN_HASH,
         PriorityFeeBips(0),
         Amount::new(100_000_000),
         UniquenessData::Generation(0),
+        None,
         None,
     );
     let priv_key: <<Spec as SpecT>::CryptoSpec as CryptoSpec>::PrivateKey = serde_json::from_str(

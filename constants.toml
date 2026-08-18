@@ -20,6 +20,11 @@ CHAIN_NAME = "TestChain"
 # the old hash will still be accepted alongside the new hash, allowing for smooth transitions.
 # Example: CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 1000, chain_hash = "0xabc...32_bytes_hex", grace_period = 100 }]
 CHAIN_HASH_OVERRIDES = []
+# The global on-chain Sovereign state version expected by this binary.
+# This must match the `sov_chain_state::state_version` value in the current on-disk state. The compiled
+# rollup will refuse to run if there is a mismatch.
+# Increment this whenever an SDK upgrade requires an out-of-band state migration.
+STATE_VERSION = 1
 
 # The namespace used by the rollup to store its data.
 # Using byte_string to convert to ASCII bytes
@@ -159,22 +164,14 @@ PROCESS_TX_PRE_EXEC_GAS_PER_TX_BYTE = [1, 1]
 # The cost of deserializing a message using Borsh
 DEFAULT_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 BIAS_BORSH_DESERIALIZATION = [1, 1]
-
-# The cost of deserializing a tx using Borsh
-TX_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
-TX_BIAS_BORSH_DESERIALIZATION = [1, 1]
+# Per-byte cost charged inside `MeteredReader` and upfront against opaque payloads.
+BORSH_PER_BYTE_READ = [1, 1]
+# Per-read fixed cost charged inside `MeteredReader`.
+BORSH_PER_READ_BIAS = [0, 0]
 
 # The cost of deserializing a tx using JSON
 TX_GAS_TO_CHARGE_PER_BYTE_JSON_DESERIALIZATION = [1, 1]
 TX_BIAS_JSON_DESERIALIZATION = [1, 1]
-
-# The cost of deserializing a proof using Borsh
-PROOF_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
-PROOF_BIAS_BORSH_DESERIALIZATION = [1, 1]
-
-# The cost of deserializing a string using Borsh
-STRING_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
-STRING_BIAS_BORSH_DESERIALIZATION = [1, 1]
 
 # The percentage of the "base fee" that is burned when a transaction is processed.
 # The portion that is not burned is awarded to provers and/or attesters on the network.
@@ -187,9 +184,7 @@ FIXED_GAS_TO_CHARGE_PER_PROOF = [100, 100]
 
 # --- Gas fee adjustment parameters: See https://eips.ethereum.org/EIPS/eip-1559 for a detailed description ---
 # The initial gas limit of the rollup.
-INITIAL_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
-UPDATED_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
-CHANGE_GAS_LIMIT_AFTER_HEIGHT = 9223372036854775807
+BLOCK_GAS_LIMIT = [10_000_000_000_000_000, 10_000_000_000_000_000]
 # The initial "base fee" that every transaction emits when executed.
 INITIAL_BASE_FEE_PER_GAS = [10, 10]
 # The maximum change denominator of the base fee.
