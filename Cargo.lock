@@ -9231,6 +9231,7 @@ dependencies = [
  "sov-hyperlane-integration",
  "sov-kernels",
  "sov-ledger-apis",
+ "sov-migrations",
  "sov-mock-da",
  "sov-mock-zkvm",
  "sov-modules-api",
@@ -11336,6 +11337,24 @@ dependencies = [
  "tokio",
  "tokio-metrics",
  "tracing",
+]
+
+[[package]]
+name = "sov-migrations"
+version = "0.3.0"
+source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3208eb5c54243a1854f44a453787335dc9f87642#3208eb5c54243a1854f44a453787335dc9f87642"
+dependencies = [
+ "anyhow",
+ "rockbound",
+ "serde",
+ "serde_json",
+ "sov-accounts",
+ "sov-chain-state",
+ "sov-db",
+ "sov-full-node-configs",
+ "sov-modules-api",
+ "sov-rollup-interface",
+ "sov-state",
 ]
 
 [[package]]

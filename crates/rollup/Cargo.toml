@@ -35,6 +35,7 @@ sov-eip712-auth = { workspace = true }
 sov-rollup-interface = { workspace = true }
 sov-shutdown = { workspace = true }
 sov-rollup-full-node-interface = { workspace = true }
+sov-migrations = { workspace = true, optional = true }
 sov-mock-da = { workspace = true, features = ["native"], optional = true }
 sov-celestia-adapter = { workspace = true, features = ["native"], optional = true }
 
@@ -92,3 +93,8 @@ path = "src/bin/starter_cli_wallet.rs"
 name = "mock-da-server"
 path = "src/bin/mock_da.rs"
 required-features = ["mock_da_external"]
+
+[[bin]]
+name = "rollup-db-migration"
+path = "src/bin/rollup_db_migration.rs"
+required-features = ["sov-migrations"]
