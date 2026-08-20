@@ -23,6 +23,7 @@ pub const SOAK_NUM_WORKERS: u32 = 20;
 pub const SOAK_SALT: u32 = 3; // existing acceptance-test-data started from 3 for some reason
 pub const SOAK_SAFETY_STOP_BLOCKS: u64 = 5;
 const ACCEPTANCE_TEST_FEATURES: [&str; 3] = ["acceptance-testing", "mock_da", "mock_zkvm"];
+const DB_MIGRATION_FEATURE: &str = "sov-migrations";
 const ACCEPTANCE_CONSTANTS_FILENAME: &str = "constants.testing.toml";
 /// Repo-relative directory whose `constants.testing.toml` all versioned builds must use.
 const ACCEPTANCE_CONSTANTS_REPO_DIR: &str = "scripts/acceptance-test";
@@ -44,6 +45,19 @@ fn acceptance_test_feature_list() -> String {
     ACCEPTANCE_TEST_FEATURES.join(",")
 }
 
+/// Features for the `rollup-db-migration` binary: the migration must be built with the same
+/// runtime-shaping features and constants as the rollup binary it migrates for, plus the
+/// `sov-migrations` feature that gates the binary itself.
+fn db_migration_features() -> Vec<String> {
+    let mut features = acceptance_test_features();
+    features.push(DB_MIGRATION_FEATURE.to_string());
+    features
+}
+
+fn db_migration_feature_list() -> String {
+    db_migration_features().join(",")
+}
+
 #[derive(Debug, Clone)]
 enum VersionSource {
     RemoteCommit(String),
@@ -54,6 +68,9 @@ enum VersionSource {
 struct ResolvedVersion {
     source: VersionSource,
     migration_path: Option<PathBuf>,
+    /// Build this version's `rollup-db-migration` binary and have the manager run it (with
+    /// `--rollup-config-path` of this version) before the version starts.
+    build_db_migration: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -67,6 +84,8 @@ struct VersionSpecEntry {
     version_id: String,
     vars_file: PathBuf,
     migration_path: Option<PathBuf>,
+    #[serde(default)]
+    build_db_migration: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -154,7 +173,12 @@ fn default_build_targets() -> BuildTargets {
     if let Some(soak) = targets.soak.as_mut() {
         soak.no_default_features = true;
         soak.features = acceptance_test_features();
-        soak.test_constants_manifest_dir = constants_dir;
+        soak.test_constants_manifest_dir = constants_dir.clone();
+    }
+    if let Some(db_migration) = targets.db_migration.as_mut() {
+        db_migration.no_default_features = true;
+        db_migration.features = db_migration_features();
+        db_migration.test_constants_manifest_dir = constants_dir;
     }
     targets.mock_da = None;
     targets
@@ -184,6 +208,7 @@ fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<Resolve
         return Ok(vec![ResolvedVersion {
             source: VersionSource::LocalHead,
             migration_path: None,
+            build_db_migration: false,
         }]);
     }
 
@@ -226,9 +251,19 @@ fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<Resolve
             ));
         }
 
+        if entry.build_db_migration && entry.migration_path.is_some() {
+            return Err(anyhow!(
+                "version {} sets both migration_path and build_db_migration; \
+                 use migration_path for a prebuilt binary or build_db_migration \
+                 to build the version's own rollup-db-migration target",
+                entry.version_id
+            ));
+        }
+
         versions.push(ResolvedVersion {
             source: VersionSource::RemoteCommit(vars.rollup_commit_hash),
             migration_path: entry.migration_path.clone(),
+            build_db_migration: entry.build_db_migration,
         });
     }
 
@@ -236,6 +271,7 @@ fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<Resolve
         versions.push(ResolvedVersion {
             source: VersionSource::LocalHead,
             migration_path: None,
+            build_db_migration: false,
         });
     } else if let Some(last) = versions.last_mut() {
         last.source = VersionSource::LocalHead;
@@ -247,7 +283,8 @@ fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<Resolve
 fn build_local_head_binaries(
     directories: &Directories,
     constants_manifest: LocalConstantsManifest,
-) -> Result<(PathBuf, PathBuf), anyhow::Error> {
+    build_db_migration: bool,
+) -> Result<(PathBuf, PathBuf, Option<PathBuf>), anyhow::Error> {
     let feature_list = acceptance_test_feature_list();
     let rollup_root = &directories.rollup_root;
     let target_dir = match constants_manifest {
@@ -308,6 +345,25 @@ fn build_local_head_binaries(
     configure_constants_manifest(&mut soak_build);
     run_checked(&mut soak_build, "build local head soak binary")?;
 
+    if build_db_migration {
+        tracing::info!("Building rollup-db-migration at local HEAD...");
+        let migration_feature_list = db_migration_feature_list();
+        let mut migration_build = StdCommand::new("cargo");
+        migration_build.current_dir(rollup_root).args([
+            "build",
+            "--release",
+            "--package",
+            "rollup-starter",
+            "--bin",
+            "rollup-db-migration",
+            "--no-default-features",
+            "--features",
+            &migration_feature_list,
+        ]);
+        configure_constants_manifest(&mut migration_build);
+        run_checked(&mut migration_build, "build local head db migration binary")?;
+    }
+
     let release_dir = target_dir.join("release");
     let rollup_bin = release_dir.join("rollup");
     if !rollup_bin.exists() {
@@ -333,6 +389,24 @@ fn build_local_head_binaries(
         }
     };
 
+    let migration_bin = if build_db_migration {
+        let migration_bin = release_dir.join("rollup-db-migration");
+        if !migration_bin.exists() {
+            return Err(anyhow!(
+                "local db migration binary not found at {}",
+                migration_bin.display()
+            ));
+        }
+        Some(migration_bin.canonicalize().with_context(|| {
+            format!(
+                "failed to canonicalize db migration binary {}",
+                migration_bin.display()
+            )
+        })?)
+    } else {
+        None
+    };
+
     Ok((
         rollup_bin.canonicalize().with_context(|| {
             format!(
@@ -343,6 +417,7 @@ fn build_local_head_binaries(
         soak_bin.canonicalize().with_context(|| {
             format!("failed to canonicalize soak binary {}", soak_bin.display())
         })?,
+        migration_bin,
     ))
 }
 
@@ -451,10 +526,12 @@ pub fn prepare_acceptance_run_plan_with_constants(
     })?;
 
     let resolved_versions = load_version_sources(directories)?;
-    let remote_commits: Vec<String> = resolved_versions
+    let remote_commits: Vec<(String, bool)> = resolved_versions
         .iter()
         .filter_map(|version| match &version.source {
-            VersionSource::RemoteCommit(commit) => Some(commit.clone()),
+            VersionSource::RemoteCommit(commit) => {
+                Some((commit.clone(), version.build_db_migration))
+            }
             VersionSource::LocalHead => None,
         })
         .collect();
@@ -467,9 +544,10 @@ pub fn prepare_acceptance_run_plan_with_constants(
             targets: default_build_targets(),
             versions: remote_commits
                 .iter()
-                .map(|commit| VersionBuildSpec {
+                .map(|(commit, build_db_migration)| VersionBuildSpec {
                     commit: commit.clone(),
                     build_soak: true,
+                    build_db_migration: *build_db_migration,
                 })
                 .collect(),
         };
@@ -488,8 +566,14 @@ pub fn prepare_acceptance_run_plan_with_constants(
         )
     };
 
-    let (local_rollup_bin, local_soak_bin) =
-        build_local_head_binaries(directories, local_constants_manifest)?;
+    let local_head_builds_db_migration = resolved_versions.iter().any(|version| {
+        matches!(version.source, VersionSource::LocalHead) && version.build_db_migration
+    });
+    let (local_rollup_bin, local_soak_bin, local_migration_bin) = build_local_head_binaries(
+        directories,
+        local_constants_manifest,
+        local_head_builds_db_migration,
+    )?;
 
     let versioned_configs_dir = directories.output_dir.join("versioned-configs");
     fs::create_dir_all(&versioned_configs_dir).with_context(|| {
@@ -553,7 +637,22 @@ pub fn prepare_acceptance_run_plan_with_constants(
                         Path::new(VERSION_CONFIG_TEMPLATE_PATH),
                     )?;
 
-                    let migration_path = if let Some(path) = &resolved_version.migration_path {
+                    let migration_path = if resolved_version.build_db_migration {
+                        let db_migration_binary =
+                            artifacts.db_migration_binary.ok_or_else(|| {
+                                anyhow!(
+                                    "missing db migration binary artifact for remote commit {}",
+                                    commit
+                                )
+                            })?;
+                        Some(db_migration_binary.canonicalize().with_context(|| {
+                            format!(
+                                "failed to canonicalize db migration binary artifact {} for remote commit {}",
+                                db_migration_binary.display(),
+                                commit
+                            )
+                        })?)
+                    } else if let Some(path) = &resolved_version.migration_path {
                         let migration_path = if path.is_absolute() {
                             path.clone()
                         } else {
@@ -590,7 +689,11 @@ pub fn prepare_acceptance_run_plan_with_constants(
                     )
                 }
                 VersionSource::LocalHead => {
-                    let migration_path = if let Some(path) = &resolved_version.migration_path {
+                    let migration_path = if resolved_version.build_db_migration {
+                        Some(local_migration_bin.clone().ok_or_else(|| {
+                            anyhow!("local head db migration binary was requested but not built")
+                        })?)
+                    } else if let Some(path) = &resolved_version.migration_path {
                         let migration_path = if path.is_absolute() {
                             path.clone()
                         } else {

@@ -31,6 +31,25 @@ pub struct Runtime<S: Spec>(pub(crate) RuntimeInner<S>)
 where
     <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>;
 
+impl<S: Spec> std::ops::Deref for Runtime<S>
+where
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    type Target = RuntimeInner<S>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<S: Spec> std::ops::DerefMut for Runtime<S>
+where
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl<S: Spec> SchemaProvider for Runtime<S>
 where
     S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,

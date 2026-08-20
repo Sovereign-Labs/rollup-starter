@@ -1,9 +1,9 @@
-//! Offline migration tool that upgrades demo-rollup state from version 0 to version 1.
+//! Offline migration tool that upgrades rollup-starter state from version 0 to version 1.
 
 use std::path::PathBuf;
 
 use clap::Parser;
-use sov_demo_rollup::MockDemoRollup;
+use rollup_starter::rollup::StarterRollup;
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::{CryptoSpec, Spec};
 use sov_modules_rollup_blueprint::RollupBlueprint;
@@ -13,7 +13,7 @@ use stf_starter::Runtime;
 #[command(
     author,
     version,
-    about = "Offline migration tool for demo-rollup state version 0 to version 1."
+    about = "Offline migration tool for rollup-starter state version 0 to version 1."
 )]
 struct Args {
     /// Path to the rollup config file used by the running node.
@@ -29,7 +29,7 @@ struct Args {
     dry_run: bool,
 }
 
-type RollupSpec = <MockDemoRollup<Native> as RollupBlueprint<Native>>::Spec;
+type RollupSpec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
 type Hasher = <<RollupSpec as Spec>::CryptoSpec as CryptoSpec>::Hasher;
 
 fn main() {
