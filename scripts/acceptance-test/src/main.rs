@@ -1,13 +1,10 @@
-use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
-    cleanup_rollup_state_dir, extend_last_stop_height,
-    fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
-    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan_with_constants,
-    prepare_rollup_state_dir, recorded_data_bounds, run_soak, run_until_shutdown_signal,
-    shutdown_error, sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown,
-    write_manager_config, AcceptanceRunPlan, CommonArgs, Directories, LocalConstantsManifest,
-    PostgresContainerGuard, ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions,
-    API_URL,
+    cleanup_rollup_state_dir, copy_persistent_mock_data, extend_last_stop_height,
+    generate_postgres_password, prepare_acceptance_run_plan_with_constants,
+    prepare_rollup_state_dir, recorded_data_bounds, resync_and_verify_slots, run_soak,
+    run_until_shutdown_signal, spawn_rollup_manager, write_manager_config, AcceptanceRunPlan,
+    CommonArgs, Directories, LocalConstantsManifest, PostgresContainerGuard, ResolvedRunSettings,
+    RunProfile, ShutdownReceiver, SoakRunOptions,
 };
 use acceptance_test::{
     wait_for_sequencer_ready, ThroughputReport, SEQUENCER_READY_HANDOVER_TIMEOUT,
@@ -16,15 +13,7 @@ use acceptance_test::{
 use anyhow::Context;
 use chrono::Utc;
 use clap::Parser;
-use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
-use std::time::Duration;
 use tracing::info;
-
-/// While the first rollup version shuts down at the end of the recorded data, the slot
-/// subscription and ledger API can fail before the harness has finished comparing the last
-/// few slots. Errors within this many slots of the recorded data's end are treated as
-/// handover flakiness rather than test failures.
-const HANDOVER_FLAKINESS_SLOT_WINDOW: u64 = 15;
 
 struct PreparedTestRun {
     directories: Directories,
@@ -57,69 +46,6 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     result
-}
-
-fn ignore_file_not_found<OK: Default>(e: std::io::Error) -> std::io::Result<OK> {
-    if e.kind() == std::io::ErrorKind::NotFound {
-        Ok(OK::default())
-    } else {
-        Err(e)
-    }
-}
-
-fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Error> {
-    tracing::info!("Copying persistent mock data back to mock_da.sqlite");
-    // Clean up any files from any previous runs. This is needed particularly for the shm and wal
-    // files since they may not get overwritten by a copy, but we do all three for consistency.
-    for stale_file in [
-        directories.output_dir.join("mock_da.sqlite"),
-        directories.output_dir.join("mock_da.sqlite-shm"),
-        directories.output_dir.join("mock_da.sqlite-wal"),
-    ] {
-        std::fs::remove_file(&stale_file)
-            .or_else(ignore_file_not_found)
-            .with_context(|| {
-                format!(
-                    "failed to remove stale mock DA file {}",
-                    stale_file.display()
-                )
-            })?;
-    }
-
-    // Then copy the base file, always
-    let persistent_mock_da = directories.output_dir.join("persistent_mock_da.sqlite");
-    let mock_da = directories.output_dir.join("mock_da.sqlite");
-    std::fs::copy(&persistent_mock_da, &mock_da).with_context(|| {
-        format!(
-            "failed to copy persistent mock DA database from {} to {}",
-            persistent_mock_da.display(),
-            mock_da.display()
-        )
-    })?;
-    // And the dangling wal and shm only if they exist
-    for (persistent_sidecar, mock_da_sidecar) in [
-        (
-            directories.output_dir.join("persistent_mock_da.sqlite-shm"),
-            directories.output_dir.join("mock_da.sqlite-shm"),
-        ),
-        (
-            directories.output_dir.join("persistent_mock_da.sqlite-wal"),
-            directories.output_dir.join("mock_da.sqlite-wal"),
-        ),
-    ] {
-        std::fs::copy(&persistent_sidecar, &mock_da_sidecar)
-            .or_else(ignore_file_not_found)
-            .with_context(|| {
-                format!(
-                    "failed to copy persistent mock DA sidecar from {} to {}",
-                    persistent_sidecar.display(),
-                    mock_da_sidecar.display()
-                )
-            })?;
-    }
-
-    tracing::info!("Persistent mock data copied back to mock_da.sqlite");
-    Ok(())
 }
 
 fn prepare_test_run(args: Args) -> Result<PreparedTestRun, anyhow::Error> {
@@ -199,129 +125,13 @@ async fn run_test(
         None,
     )?;
 
-    // Wait up to 60s for the rollup to be ready
-    for _ in 0..120 {
-        if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
-            .await
-            .is_ok_and(|response| response.status().is_success())
-        {
-            break;
-        }
-        sleep_or_shutdown(Duration::from_millis(500), &mut shutdown_rx).await?;
-    }
-
-    let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
-    slot_fetcher.subscribe_slots(false).await?;
-
-    let mut checked = 0;
-    let client = get_rollup_client()?;
-    let mut latest_batch_num = 0;
-    let handover_tail_start = last_recorded_slot
-        .map(|last_slot| last_slot.saturating_sub(HANDOVER_FLAKINESS_SLOT_WINDOW));
-    let in_handover_tail =
-        |slot_number: u64| handover_tail_start.is_some_and(|start| slot_number >= start);
-    'outer: loop {
-        let next = tokio::select! {
-            slot = slot_fetcher.next_slot() => slot,
-            reason = wait_for_shutdown(&mut shutdown_rx) => return Err(shutdown_error(reason)),
-        };
-        let slot = match next {
-            Ok(Some(slot)) => slot,
-            Ok(None) => {
-                if in_handover_tail(checked) {
-                    tracing::warn!(
-                        last_compared_slot = checked,
-                        "Slot subscription ended during the version handover; treating the \
-                         remaining recorded slots as shutdown flakiness"
-                    );
-                    break 'outer;
-                }
-                anyhow::bail!("Slot subscription ended unexpectedly at slot {checked}");
-            }
-            Err(error) => {
-                if in_handover_tail(checked) {
-                    tracing::warn!(
-                        last_compared_slot = checked,
-                        %error,
-                        "Slot subscription failed during the version handover; treating the \
-                         remaining recorded slots as shutdown flakiness"
-                    );
-                    break 'outer;
-                }
-                return Err(error);
-            }
-        };
-        for slot_number in checked..=slot.number {
-            let Ok(snapshot) = load_snapshot_json(slot_number, &directories.snapshots_dir) else {
-                // We might be missing a few slots at the beginning.
-                // If the slot number is less than 10, just ignore the missing snapshot.
-                if slot_number < 10 {
-                    continue;
-                } else if latest_batch_num < expected_setup_batches {
-                    panic!("Missing snapshot for slot {}", slot_number);
-                } else {
-                    // Once we've passed the setup batch count and we find the first missing snapshot, we're done.
-                    tracing::info!(
-                        "Missing snapshot found at slot {}. Finished resyncing.",
-                        slot_number
-                    );
-                    break 'outer;
-                }
-            };
-            let slot_snapshot: Slot = serde_json::from_value(snapshot.clone()).unwrap();
-            latest_batch_num = slot_snapshot.batch_range.end.saturating_sub(1);
-            let include_children = if slot_snapshot.batches.is_empty() {
-                None
-            } else {
-                Some(GetSlotByIdChildren::X1)
-            };
-            let slot = match client
-                .get_slot_by_id(&types::IntOrHash::Integer(slot_number), include_children)
-                .await
-            {
-                Ok(slot) => slot,
-                Err(error) if in_handover_tail(slot_number) => {
-                    tracing::warn!(
-                        slot_number,
-                        %error,
-                        "Slot API unavailable during the version handover; skipping \
-                         comparison of the remaining recorded slots as shutdown flakiness"
-                    );
-                    break 'outer;
-                }
-                Err(error) => return Err(error.into()),
-            };
-            compare_against_snapshot(
-                &slot.into_inner(),
-                snapshot,
-                &format!("slot_{}", slot_number),
-                false,
-            )?;
-
-            // Once the final recorded snapshot has been verified we're done: the first
-            // rollup version stops exactly at the end of the recorded data, so no slot
-            // beyond it will arrive until the next version takes over.
-            if Some(slot_number) == last_recorded_slot {
-                if latest_batch_num < expected_setup_batches {
-                    panic!(
-                        "Verified the final recorded snapshot at slot {} but only found {} batches, expected {}",
-                        slot_number, latest_batch_num, expected_setup_batches
-                    );
-                }
-                tracing::info!(
-                    "Verified the final recorded snapshot at slot {}. Finished resyncing.",
-                    slot_number
-                );
-                break 'outer;
-            }
-        }
-        checked = slot.number;
-    }
-
-    tracing::info!(
-        "Rollup resync complete. All slots match their snapshots. Found {} batches.",
-        latest_batch_num
-    );
+    let (latest_batch_num, _first_new_slot) = resync_and_verify_slots(
+        &directories,
+        expected_setup_batches,
+        last_recorded_slot,
+        &mut shutdown_rx,
+    )
+    .await?;
 
     // Wait for the sequencer to resync to the empty DA slots. This wait spans the version
     // handover, which may include running the new version's db migration, so use the
@@ -342,6 +152,7 @@ async fn run_test(
             rollup_stop_height: stop_at_height,
             full_slot_save_interval: settings.full_slot_save_interval,
             save_slot_snapshots: false,
+            snapshot_backfill_start: None,
         },
         shutdown_rx.clone(),
     )

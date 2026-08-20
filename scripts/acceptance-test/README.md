@@ -48,6 +48,35 @@ Useful examples:
 - `cargo run --bin acceptance-test -- --short --no-throughput-check`
 - `cargo run --bin acceptance-test -- --acceptance-data-dir /tmp/acceptance-data`
 
+### Rollup versioning (hard forks)
+
+If a multi-version spec (`versions.yaml` at the repo root) is present, the test builds a binary per
+version (each compiled against its own commit's acceptance-test constants), replays the recorded
+data across the historical versions, and puts the latest version (local `HEAD`, with the SDK commit
+under test) through the post-resync soak. Versions with `build_db_migration: true` also get their
+`rollup-db-migration` binary built; the rollup manager runs it at that version's start boundary.
+
+Version boundaries are exact `blocks_per_version` multiples in rollup-height space (generation
+stops each version precisely at its stop height). DA *slot* numbers run ahead of rollup heights by
+a data-dependent amount (warmup and handover-gap slots carry no batches), so anything slot-based is
+derived from the saved snapshots rather than height arithmetic.
+
+`setup` is version-aware and auto-detects how to run:
+
+- **From-genesis (default):** with no persistent MockDA yet, or a single-version spec, it
+  regenerates everything from genesis (the original behavior).
+- **Append (auto):** when a persistent MockDA already exists *and* the spec has more than one
+  version, `setup` restores that MockDA, resyncs the historical versions (verifying them against
+  the existing snapshots), then generates only the new last version's data — appending one
+  version's worth of blocks and snapshots and re-persisting the extended MockDA. This is the
+  one-shot run to perform right after a hard fork adds a version.
+
+Append requires the existing data to end exactly at the fork boundary — the previous version's
+stop height, in batch-number space. `setup` validates this and refuses to run if the data already
+contains the new version's range (regenerating an existing version would require pruning the
+MockDA, which is not supported) or if it covers fewer versions than the spec. In those cases,
+clear the acceptance data and regenerate from genesis.
+
 ### Resetting the Test
 
 If you need to generate a new test, simply run

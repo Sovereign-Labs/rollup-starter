@@ -104,11 +104,13 @@ pub struct AcceptanceRunPlan {
 
 /// Bounds of the pre-existing recorded acceptance data, derived from the saved snapshots.
 ///
-/// The version boundaries must be derived from the data rather than computed from
-/// `blocks_per_version`, because the recorded DA stream contains slots that don't carry
-/// batches (e.g. the current data holds 1000 batches spanning DA slots 3..=1002, executing
-/// at rollup heights 1..=1000). The first rollup version must replay all of the recorded
-/// data — and only the recorded data — before handing over to the next version.
+/// Rollup heights are exact at generation (each version stops precisely at its stop height, a
+/// `blocks_per_version` multiple), but DA *slot* numbers run ahead of rollup heights by a
+/// data-dependent amount (slots that carry no batches: genesis warmup slots, and the empty gap
+/// slots a version handover leaves behind). E.g. the original data holds 1000 batches spanning
+/// DA slots 3..=1002, executing at rollup heights 1..=1000. Anything slot-based (when a resync
+/// has replayed all recorded data; where fresh generation begins) must therefore come from
+/// these data-derived bounds, never from height arithmetic.
 #[derive(Debug, Clone, Copy)]
 pub struct RecordedDataBounds {
     /// The highest recorded DA slot number (the last slot with a saved snapshot).
@@ -586,34 +588,42 @@ pub fn prepare_acceptance_run_plan_with_constants(
     let mut manager_versions = Vec::with_capacity(resolved_versions.len());
     let mut soak_versions = Vec::with_capacity(resolved_versions.len());
 
-    // The first version must replay all of the pre-existing recorded data — and only
-    // that data — so its stop height is derived from the saved snapshots instead of
-    // being assumed equal to `blocks_per_version`. Later versions each generate
-    // `blocks_per_version` fresh blocks on top.
-    let first_version_stop_height = match recorded_data {
-        Some(bounds) => {
-            info!(
-                last_slot_number = bounds.last_slot_number,
-                end_rollup_height = bounds.end_rollup_height,
-                "Derived recorded data bounds from saved snapshots"
-            );
-            bounds.end_rollup_height
+    // Version boundaries are exact `blocks_per_version` multiples in rollup-height space:
+    // generation stops each version precisely at its stop height (only DA *slot* numbers are
+    // fuzzy, e.g. due to warmup slots that carry no batches). When pre-existing recorded data
+    // is present, validate that it ends exactly on a version boundary and covers all non-last
+    // versions: it may extend into the last version's range (the state right after appending
+    // that version's data), but never beyond it.
+    if let Some(bounds) = recorded_data {
+        info!(
+            last_slot_number = bounds.last_slot_number,
+            end_rollup_height = bounds.end_rollup_height,
+            "Derived recorded data bounds from saved snapshots"
+        );
+        let num_versions = resolved_versions.len() as u64;
+        let end = bounds.end_rollup_height;
+        let is_version_boundary = end % blocks_per_version == 0;
+        let covered_versions = end / blocks_per_version;
+        if !is_version_boundary
+            || covered_versions < num_versions.saturating_sub(1)
+            || covered_versions > num_versions
+        {
+            return Err(anyhow!(
+                "recorded data ends at rollup height {end}, which does not match the version \
+                 spec ({num_versions} version(s) at {blocks_per_version} blocks each): the data \
+                 must end exactly on a version boundary and cover all non-last versions. The \
+                 acceptance data and versions.yaml are out of sync; regenerate the data or fix \
+                 the spec."
+            ));
         }
-        None => {
-            info!(
-                blocks_per_version,
-                "No recorded snapshots found; using blocks_per_version for the first version"
-            );
-            blocks_per_version
-        }
-    };
+    }
 
     for (idx, resolved_version) in resolved_versions.iter().enumerate() {
-        let stop_height = first_version_stop_height + (idx as u64) * blocks_per_version;
+        let stop_height = ((idx as u64) + 1) * blocks_per_version;
         let start_height = if idx == 0 {
             None
         } else {
-            Some(first_version_stop_height + ((idx as u64) - 1) * blocks_per_version + 1)
+            Some((idx as u64) * blocks_per_version + 1)
         };
 
         let (rollup_binary, soak_binary, config_template_content, migration_path) =
@@ -761,6 +771,29 @@ pub fn prepare_acceptance_run_plan_with_constants(
     })
 }
 
+/// Build a soak config that runs ONLY the last version, at its configured stop height, using the
+/// salt that a full from-genesis run would have assigned to that version
+/// (`base_salt + num_workers * (num_versions - 1)`).
+///
+/// Used by `setup` in append mode: the historical versions are resynced from the existing DA and
+/// only the last (new) version is generated, so its soak worker accounts must use the next salt
+/// segment to avoid colliding with the resynced historical accounts. This mirrors the external
+/// [`SoakManagerConfig::for_resync`], except it keeps the last version's configured stop height
+/// (no extension) and targets the last version itself rather than the segment after it.
+///
+/// Returns `None` if the config has no versions.
+pub fn last_version_soak_config(soak_config: &SoakManagerConfig) -> Option<SoakManagerConfig> {
+    let (last_binary, last_stop_height) = soak_config.versions.last()?;
+    let num_versions = soak_config.versions.len() as u32;
+    let mut config = soak_config.config.clone();
+    config.salt += config.num_workers * num_versions.saturating_sub(1);
+    Some(SoakManagerConfig::new(
+        config,
+        vec![(last_binary.clone(), *last_stop_height)],
+        soak_config.safety_stop_blocks,
+    ))
+}
+
 pub fn extend_last_stop_height(
     versions: &[RollupVersion],
     extra_blocks: u64,
@@ -870,4 +903,73 @@ pub fn spawn_rollup_manager(
         )
     })?;
     Ok(ManagedRollupProcess::new(child))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn last_version_soak_config_uses_last_version_and_offsets_salt() {
+        let config = SoakManagerConfig::new(
+            SoakWorkerConfig {
+                num_workers: 20,
+                salt: 3,
+            },
+            vec![
+                (PathBuf::from("/bin/soak-v0"), 1000),
+                (PathBuf::from("/bin/soak-v1"), 2000),
+                (PathBuf::from("/bin/soak-v2"), 3000),
+            ],
+            5,
+        );
+
+        let appended = last_version_soak_config(&config).expect("config has versions");
+
+        assert_eq!(appended.versions.len(), 1);
+        assert_eq!(appended.versions[0].0, PathBuf::from("/bin/soak-v2"));
+        // Last version keeps its configured stop height (no extension, unlike `for_resync`).
+        assert_eq!(appended.versions[0].1, 3000);
+        // base salt 3 + num_workers 20 * (3 versions - 1) = 43, matching the salt a from-genesis
+        // run would assign to the third version (index 2), so worker accounts don't collide with
+        // the resynced historical accounts.
+        assert_eq!(appended.config.salt, 43);
+        assert_eq!(appended.config.num_workers, 20);
+        assert_eq!(appended.safety_stop_blocks, 5);
+    }
+
+    #[test]
+    fn last_version_soak_config_two_versions_offsets_by_one_segment() {
+        let config = SoakManagerConfig::new(
+            SoakWorkerConfig {
+                num_workers: 20,
+                salt: 3,
+            },
+            vec![
+                (PathBuf::from("/bin/soak-v0"), 1000),
+                (PathBuf::from("/bin/soak-v1"), 2000),
+            ],
+            5,
+        );
+
+        let appended = last_version_soak_config(&config).expect("config has versions");
+
+        assert_eq!(appended.versions[0].0, PathBuf::from("/bin/soak-v1"));
+        // base salt 3 + 20 * (2 - 1) = 23.
+        assert_eq!(appended.config.salt, 23);
+    }
+
+    #[test]
+    fn last_version_soak_config_empty_is_none() {
+        let config = SoakManagerConfig::new(
+            SoakWorkerConfig {
+                num_workers: 1,
+                salt: 0,
+            },
+            vec![],
+            0,
+        );
+
+        assert!(last_version_soak_config(&config).is_none());
+    }
 }

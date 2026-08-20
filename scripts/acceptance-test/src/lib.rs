@@ -25,7 +25,9 @@ use tokio::sync::{oneshot, watch};
 use tokio::task::JoinSet;
 use tracing::{debug, info};
 
-use crate::fetch_and_compare::{save_slot_snapshot, SlotFetcher};
+use crate::fetch_and_compare::{
+    compare_against_snapshot, load_snapshot_json, save_slot_snapshot, SlotFetcher,
+};
 mod config;
 mod evm_contracts;
 pub mod evm_soak;
@@ -38,7 +40,7 @@ pub use config::{
     DEFAULT_POSTGRES_CONTAINER_NAME,
 };
 pub use versioned_setup::{
-    extend_last_stop_height, prepare_acceptance_run_plan,
+    extend_last_stop_height, last_version_soak_config, prepare_acceptance_run_plan,
     prepare_acceptance_run_plan_with_constants, recorded_data_bounds, spawn_rollup_manager,
     write_manager_config, AcceptanceRunPlan, LocalConstantsManifest, RecordedDataBounds,
 };
@@ -440,6 +442,262 @@ fn save_slot_snapshot_if_needed(
     Ok(())
 }
 
+/// Fetch and save snapshots for any slots in `[from_slot, up_to_exclusive)` that don't already
+/// have one on disk. Used by `run_soak` in append mode to keep snapshot coverage contiguous
+/// across the resync→generation handoff, where the live-tail slot subscription may only start a
+/// few slots after the new version began producing. Slots are fetched with children so the
+/// snapshot is fully populated.
+async fn backfill_missing_snapshots(
+    client: &sov_api_spec::Client,
+    directories: &Directories,
+    from_slot: u64,
+    up_to_exclusive: u64,
+) -> Result<(), anyhow::Error> {
+    for slot_number in from_slot..up_to_exclusive {
+        let snapshot_path = directories
+            .snapshots_dir
+            .join(format!("slot_{:04}_with_children.json", slot_number));
+        if snapshot_path.exists() {
+            continue;
+        }
+        let slot = client
+            .get_slot_by_id(
+                &types::IntOrHash::Integer(slot_number),
+                Some(GetSlotByIdChildren::X1),
+            )
+            .await
+            .map_err(|e| anyhow!("failed to backfill snapshot for slot {slot_number}: {e}"))?;
+        save_slot_snapshot(&slot.into_inner(), &directories.snapshots_dir)?;
+        tracing::info!("Backfilled missing snapshot for slot {slot_number}");
+    }
+    Ok(())
+}
+
+fn ignore_file_not_found<OK: Default>(e: std::io::Error) -> std::io::Result<OK> {
+    if e.kind() == std::io::ErrorKind::NotFound {
+        Ok(OK::default())
+    } else {
+        Err(e)
+    }
+}
+
+/// Copy the durable `persistent_mock_da.sqlite*` files back to `mock_da.sqlite*` so a run can
+/// resync against the saved MockDA without growing the persisted database on every run. Stale
+/// `mock_da` files from a previous run are removed first (the `-shm`/`-wal` sidecars in
+/// particular may not get overwritten by a copy).
+pub fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Error> {
+    tracing::info!("Copying persistent mock data back to mock_da.sqlite");
+    for stale_file in [
+        directories.output_dir.join("mock_da.sqlite"),
+        directories.output_dir.join("mock_da.sqlite-shm"),
+        directories.output_dir.join("mock_da.sqlite-wal"),
+    ] {
+        std::fs::remove_file(&stale_file)
+            .or_else(ignore_file_not_found)
+            .with_context(|| {
+                format!(
+                    "failed to remove stale mock DA file {}",
+                    stale_file.display()
+                )
+            })?;
+    }
+
+    // Then copy the base file, always.
+    let persistent_mock_da = directories.output_dir.join("persistent_mock_da.sqlite");
+    let mock_da = directories.output_dir.join("mock_da.sqlite");
+    std::fs::copy(&persistent_mock_da, &mock_da).with_context(|| {
+        format!(
+            "failed to copy persistent mock DA database from {} to {}",
+            persistent_mock_da.display(),
+            mock_da.display()
+        )
+    })?;
+    // And the dangling wal and shm only if they exist.
+    for (persistent_sidecar, mock_da_sidecar) in [
+        (
+            directories.output_dir.join("persistent_mock_da.sqlite-shm"),
+            directories.output_dir.join("mock_da.sqlite-shm"),
+        ),
+        (
+            directories.output_dir.join("persistent_mock_da.sqlite-wal"),
+            directories.output_dir.join("mock_da.sqlite-wal"),
+        ),
+    ] {
+        std::fs::copy(&persistent_sidecar, &mock_da_sidecar)
+            .or_else(ignore_file_not_found)
+            .with_context(|| {
+                format!(
+                    "failed to copy persistent mock DA sidecar from {} to {}",
+                    persistent_sidecar.display(),
+                    mock_da_sidecar.display()
+                )
+            })?;
+    }
+
+    tracing::info!("Persistent mock data copied back to mock_da.sqlite");
+    Ok(())
+}
+
+/// While the last recorded version shuts down at the end of the recorded data, the slot
+/// subscription and ledger API can fail before the harness has finished comparing the last few
+/// slots. Errors within this many slots of the recorded data's end are treated as handover
+/// flakiness rather than test failures.
+pub const HANDOVER_FLAKINESS_SLOT_WINDOW: u64 = 15;
+
+/// Resync the rollup against the existing saved snapshots, verifying that each replayed slot
+/// matches its snapshot. Finishes when the final recorded snapshot (`last_recorded_slot`) has
+/// been verified — the last recorded version stops exactly at the end of the recorded data, so
+/// no slot beyond it arrives until the next version takes over. Availability errors within
+/// [`HANDOVER_FLAKINESS_SLOT_WINDOW`] slots of that boundary are tolerated as handover
+/// flakiness; snapshot content mismatches are always fatal.
+///
+/// `expected_setup_batches` is a *batch* number (rollup height minus one), not a slot number:
+/// slot numbers run ahead of batch numbers because of empty DA slots.
+///
+/// Returns `(latest_batch_num, first_new_slot)`, where `first_new_slot` is the first slot after
+/// the recorded data — the slot where a not-yet-generated next version would begin.
+pub async fn resync_and_verify_slots(
+    directories: &Directories,
+    expected_setup_batches: u64,
+    last_recorded_slot: Option<u64>,
+    shutdown_rx: &mut ShutdownReceiver,
+) -> Result<(u64, u64), anyhow::Error> {
+    // Wait up to 60s for the freshly spawned rollup's API to come up before subscribing.
+    for _ in 0..120 {
+        if reqwest::get(format!("{}/ledger/slots/0", API_URL))
+            .await
+            .is_ok_and(|response| response.status().is_success())
+        {
+            break;
+        }
+        sleep_or_shutdown(Duration::from_millis(500), shutdown_rx).await?;
+    }
+
+    let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, directories);
+    slot_fetcher.subscribe_slots(false).await?;
+
+    let mut checked = 0;
+    let client = get_rollup_client()?;
+    let mut latest_batch_num = 0;
+    let handover_tail_start = last_recorded_slot
+        .map(|last_slot| last_slot.saturating_sub(HANDOVER_FLAKINESS_SLOT_WINDOW));
+    let in_handover_tail =
+        |slot_number: u64| handover_tail_start.is_some_and(|start| slot_number >= start);
+    let first_new_slot = 'outer: loop {
+        let next = tokio::select! {
+            slot = slot_fetcher.next_slot() => slot,
+            reason = wait_for_shutdown(shutdown_rx) => return Err(shutdown_error(reason)),
+        };
+        let slot = match next {
+            Ok(Some(slot)) => slot,
+            Ok(None) => {
+                if in_handover_tail(checked) {
+                    tracing::warn!(
+                        last_compared_slot = checked,
+                        "Slot subscription ended during the version handover; treating the \
+                         remaining recorded slots as shutdown flakiness"
+                    );
+                    break 'outer boundary_slot(last_recorded_slot);
+                }
+                anyhow::bail!("Slot subscription ended unexpectedly at slot {checked}");
+            }
+            Err(error) => {
+                if in_handover_tail(checked) {
+                    tracing::warn!(
+                        last_compared_slot = checked,
+                        %error,
+                        "Slot subscription failed during the version handover; treating the \
+                         remaining recorded slots as shutdown flakiness"
+                    );
+                    break 'outer boundary_slot(last_recorded_slot);
+                }
+                return Err(error);
+            }
+        };
+        for slot_number in checked..=slot.number {
+            let Ok(snapshot) = load_snapshot_json(slot_number, &directories.snapshots_dir) else {
+                // We might be missing a few slots at the beginning.
+                // If the slot number is less than 10, just ignore the missing snapshot.
+                if slot_number < 10 {
+                    continue;
+                } else if latest_batch_num < expected_setup_batches {
+                    panic!("Missing snapshot for slot {}", slot_number);
+                } else {
+                    // Once we've passed the setup batch count and we find the first missing
+                    // snapshot, we're done.
+                    tracing::info!(
+                        "Missing snapshot found at slot {}. Finished resyncing.",
+                        slot_number
+                    );
+                    break 'outer slot_number;
+                }
+            };
+            let slot_snapshot: Slot = serde_json::from_value(snapshot.clone()).unwrap();
+            latest_batch_num = slot_snapshot.batch_range.end.saturating_sub(1);
+            let include_children = if slot_snapshot.batches.is_empty() {
+                None
+            } else {
+                Some(GetSlotByIdChildren::X1)
+            };
+            let slot = match client
+                .get_slot_by_id(&types::IntOrHash::Integer(slot_number), include_children)
+                .await
+            {
+                Ok(slot) => slot,
+                Err(error) if in_handover_tail(slot_number) => {
+                    tracing::warn!(
+                        slot_number,
+                        %error,
+                        "Slot API unavailable during the version handover; skipping \
+                         comparison of the remaining recorded slots as shutdown flakiness"
+                    );
+                    break 'outer boundary_slot(last_recorded_slot);
+                }
+                Err(error) => return Err(error.into()),
+            };
+            compare_against_snapshot(
+                &slot.into_inner(),
+                snapshot,
+                &format!("slot_{}", slot_number),
+                false,
+            )?;
+
+            // Once the final recorded snapshot has been verified we're done.
+            if Some(slot_number) == last_recorded_slot {
+                if latest_batch_num < expected_setup_batches {
+                    panic!(
+                        "Verified the final recorded snapshot at slot {} but only found {} batches, expected {}",
+                        slot_number, latest_batch_num, expected_setup_batches
+                    );
+                }
+                tracing::info!(
+                    "Verified the final recorded snapshot at slot {}. Finished resyncing.",
+                    slot_number
+                );
+                break 'outer slot_number + 1;
+            }
+        }
+        checked = slot.number;
+    };
+
+    tracing::info!(
+        "Rollup resync complete. Found {} batches; the recorded data ends before slot {}.",
+        latest_batch_num,
+        first_new_slot
+    );
+
+    Ok((latest_batch_num, first_new_slot))
+}
+
+/// The first slot after the recorded data, used when the resync loop finishes via handover
+/// flakiness. Only reachable when `last_recorded_slot` is known (the tail window is derived
+/// from it).
+fn boundary_slot(last_recorded_slot: Option<u64>) -> u64 {
+    last_recorded_slot
+        .expect("handover tail tolerance requires known recorded data bounds")
+        .saturating_add(1)
+}
+
 #[derive(Debug)]
 pub struct ManagedRollupProcess {
     child: Child,
@@ -561,6 +819,13 @@ pub struct SoakRunOptions {
     pub rollup_stop_height: u64,
     pub full_slot_save_interval: u64,
     pub save_slot_snapshots: bool,
+    /// When `Some(first_slot)` (and `save_slot_snapshots` is set), guarantee contiguous snapshot
+    /// coverage starting at `first_slot`. On the first slot this run observes, the gap
+    /// `[first_slot, observed_slot)` is backfilled once by fetching those slots directly; the
+    /// live-tail subscription is contiguous afterwards. This closes the gap between the end of
+    /// resync and the first slot this soak run observes — used by append mode. `None` preserves
+    /// the default behavior (save only observed slots).
+    pub snapshot_backfill_start: Option<u64>,
 }
 
 fn is_very_close_to_soak_test_end(num_soak_batches: u64, target_soak_batches: u64) -> bool {
@@ -650,8 +915,17 @@ pub async fn run_soak(
         rollup_stop_height,
         full_slot_save_interval,
         save_slot_snapshots,
+        snapshot_backfill_start,
     } = options;
     let target_soak_batches = rollup_stop_height.saturating_sub(throughput_start_batch);
+    // The first slot of the appended version. On the first slot this run observes, we backfill
+    // any gap between it and here, exactly once (see `SoakRunOptions::snapshot_backfill_start`).
+    // Only active when snapshot saving was also requested (append mode).
+    let mut snapshot_backfill_from = if save_slot_snapshots {
+        snapshot_backfill_start
+    } else {
+        None
+    };
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
     slot_fetcher.subscribe_slots(false).await?;
@@ -801,6 +1075,16 @@ pub async fn run_soak(
                         }
                     }
                 }
+                // In append mode the live-tail subscription may only start a few slots after the
+                // new version began producing. On the first slot we observe, backfill any gap
+                // between the resync boundary and here so the new version's snapshots are
+                // contiguous; the subscription is contiguous from this point on, so this runs
+                // exactly once (`take`).
+                if let Some(backfill_from) = snapshot_backfill_from.take() {
+                    backfill_missing_snapshots(&client, &directories, backfill_from, slot.number)
+                        .await?;
+                }
+
                 // If we haven't started processing any txs yet skip the rest of the loop. Don't forget to save the slot snapshot before we do though!
                 if num_soak_batches == 0 {
                     save_slot_snapshot_if_needed(&slot, &directories, save_slot_snapshots)?;
