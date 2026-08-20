@@ -46,9 +46,9 @@ thiserror = "2.0.14"
 serde.workspace = true
 serde_yaml = "0.9"
 libc = "0.2"
-sov-rollup-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "dd0e4ac1586ee5e852078209afcb295bb888a44f" }
-sov-soak-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "dd0e4ac1586ee5e852078209afcb295bb888a44f" }
-sov-versioned-artifact-builder = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "dd0e4ac1586ee5e852078209afcb295bb888a44f" }
+sov-rollup-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "c4d1ccff5e3d28436e2a2b012128c75268e74a5f" }
+sov-soak-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "c4d1ccff5e3d28436e2a2b012128c75268e74a5f" }
+sov-versioned-artifact-builder = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "c4d1ccff5e3d28436e2a2b012128c75268e74a5f" }
 
 [dev-dependencies]
 tempfile.workspace = true

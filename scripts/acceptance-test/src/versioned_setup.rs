@@ -24,6 +24,8 @@ pub const SOAK_SALT: u32 = 3; // existing acceptance-test-data started from 3 fo
 pub const SOAK_SAFETY_STOP_BLOCKS: u64 = 5;
 const ACCEPTANCE_TEST_FEATURES: [&str; 3] = ["acceptance-testing", "mock_da", "mock_zkvm"];
 const ACCEPTANCE_CONSTANTS_FILENAME: &str = "constants.testing.toml";
+/// Repo-relative directory whose `constants.testing.toml` all versioned builds must use.
+const ACCEPTANCE_CONSTANTS_REPO_DIR: &str = "scripts/acceptance-test";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LocalConstantsManifest {
@@ -82,11 +84,17 @@ pub struct AcceptanceRunPlan {
 fn default_build_targets() -> BuildTargets {
     let mut targets = BuildTargets::upgrade_simulator_defaults();
     // The soak binary signs transactions using Runtime::CHAIN_HASH, so it must be built with the
-    // exact same runtime-shaping features as the rollup binary.
+    // exact same runtime-shaping features as the rollup binary. Both must also be compiled
+    // against the acceptance-test constants manifest (like the local-HEAD builds are): among
+    // other things it carries the CHAIN_HASH_OVERRIDES without which the historical DA
+    // transactions fail signature verification on replay.
+    let constants_dir = Some(PathBuf::from(ACCEPTANCE_CONSTANTS_REPO_DIR));
     targets.rollup.features = acceptance_test_features();
+    targets.rollup.test_constants_manifest_dir = constants_dir.clone();
     if let Some(soak) = targets.soak.as_mut() {
         soak.no_default_features = true;
         soak.features = acceptance_test_features();
+        soak.test_constants_manifest_dir = constants_dir;
     }
     targets.mock_da = None;
     targets
