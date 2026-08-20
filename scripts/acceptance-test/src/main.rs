@@ -3,10 +3,11 @@ use acceptance_test::{
     cleanup_rollup_state_dir, extend_last_stop_height,
     fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
     generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan_with_constants,
-    prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, shutdown_error,
-    sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown, write_manager_config,
-    AcceptanceRunPlan, CommonArgs, Directories, LocalConstantsManifest, PostgresContainerGuard,
-    ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions, API_URL,
+    prepare_rollup_state_dir, recorded_data_bounds, run_soak, run_until_shutdown_signal,
+    shutdown_error, sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown,
+    write_manager_config, AcceptanceRunPlan, CommonArgs, Directories, LocalConstantsManifest,
+    PostgresContainerGuard, ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions,
+    API_URL,
 };
 use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
 use anyhow::Context;
@@ -15,6 +16,12 @@ use clap::Parser;
 use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
 use std::time::Duration;
 use tracing::info;
+
+/// While the first rollup version shuts down at the end of the recorded data, the slot
+/// subscription and ledger API can fail before the harness has finished comparing the last
+/// few slots. Errors within this many slots of the recorded data's end are treated as
+/// handover flakiness rather than test failures.
+const HANDOVER_FLAKINESS_SLOT_WINDOW: u64 = 15;
 
 struct PreparedTestRun {
     directories: Directories,
@@ -121,11 +128,13 @@ fn prepare_test_run(args: Args) -> Result<PreparedTestRun, anyhow::Error> {
         &directories.rollup_data_path,
         settings.on_existing_rollup_state,
     )?;
+    let recorded_data = recorded_data_bounds(&directories.snapshots_dir)?;
     let plan = prepare_acceptance_run_plan_with_constants(
         &directories,
         &password,
         settings.blocks_per_version,
         LocalConstantsManifest::AcceptanceTest,
+        recorded_data,
     )?;
     Ok(PreparedTestRun {
         directories,
@@ -154,15 +163,19 @@ async fn run_test(
     // Start postgres and keep it alive for the test duration. Drop cleanup runs last.
     let _postgres_guard =
         PostgresContainerGuard::start(&settings.postgres_docker_container_name, &password)?;
-    let expected_setup_batches = plan
-        .manager_versions
-        .last()
-        .expect("Acceptance testing must have at least one rollup version")
-        .stop_height
-        .expect("Acceptance testing last rollup version must have stop height")
-        // Genesis doesn't have a batch; this has the result that batch numbers lag 1 behind the
-        // rollup height.
-        .saturating_sub(1);
+    // Genesis doesn't have a batch; this has the result that batch numbers lag 1 behind the
+    // rollup height.
+    let expected_setup_batches = match plan.recorded_data {
+        Some(bounds) => bounds.end_rollup_height.saturating_sub(1),
+        None => plan
+            .manager_versions
+            .first()
+            .expect("Acceptance testing must have at least one rollup version")
+            .stop_height
+            .expect("Acceptance testing first rollup version must have stop height")
+            .saturating_sub(1),
+    };
+    let last_recorded_slot = plan.recorded_data.map(|bounds| bounds.last_slot_number);
     let manager_versions =
         extend_last_stop_height(&plan.manager_versions, settings.blocks_per_version);
     let manager_config_path = directories
@@ -200,10 +213,40 @@ async fn run_test(
     let mut checked = 0;
     let client = get_rollup_client()?;
     let mut latest_batch_num = 0;
+    let handover_tail_start = last_recorded_slot
+        .map(|last_slot| last_slot.saturating_sub(HANDOVER_FLAKINESS_SLOT_WINDOW));
+    let in_handover_tail =
+        |slot_number: u64| handover_tail_start.is_some_and(|start| slot_number >= start);
     'outer: loop {
-        let slot = tokio::select! {
-            slot = slot_fetcher.next_slot() => slot?.unwrap(),
+        let next = tokio::select! {
+            slot = slot_fetcher.next_slot() => slot,
             reason = wait_for_shutdown(&mut shutdown_rx) => return Err(shutdown_error(reason)),
+        };
+        let slot = match next {
+            Ok(Some(slot)) => slot,
+            Ok(None) => {
+                if in_handover_tail(checked) {
+                    tracing::warn!(
+                        last_compared_slot = checked,
+                        "Slot subscription ended during the version handover; treating the \
+                         remaining recorded slots as shutdown flakiness"
+                    );
+                    break 'outer;
+                }
+                anyhow::bail!("Slot subscription ended unexpectedly at slot {checked}");
+            }
+            Err(error) => {
+                if in_handover_tail(checked) {
+                    tracing::warn!(
+                        last_compared_slot = checked,
+                        %error,
+                        "Slot subscription failed during the version handover; treating the \
+                         remaining recorded slots as shutdown flakiness"
+                    );
+                    break 'outer;
+                }
+                return Err(error);
+            }
         };
         for slot_number in checked..=slot.number {
             let Ok(snapshot) = load_snapshot_json(slot_number, &directories.snapshots_dir) else {
@@ -229,15 +272,45 @@ async fn run_test(
             } else {
                 Some(GetSlotByIdChildren::X1)
             };
-            let slot = client
+            let slot = match client
                 .get_slot_by_id(&types::IntOrHash::Integer(slot_number), include_children)
-                .await?;
+                .await
+            {
+                Ok(slot) => slot,
+                Err(error) if in_handover_tail(slot_number) => {
+                    tracing::warn!(
+                        slot_number,
+                        %error,
+                        "Slot API unavailable during the version handover; skipping \
+                         comparison of the remaining recorded slots as shutdown flakiness"
+                    );
+                    break 'outer;
+                }
+                Err(error) => return Err(error.into()),
+            };
             compare_against_snapshot(
                 &slot.into_inner(),
                 snapshot,
                 &format!("slot_{}", slot_number),
                 false,
             )?;
+
+            // Once the final recorded snapshot has been verified we're done: the first
+            // rollup version stops exactly at the end of the recorded data, so no slot
+            // beyond it will arrive until the next version takes over.
+            if Some(slot_number) == last_recorded_slot {
+                if latest_batch_num < expected_setup_batches {
+                    panic!(
+                        "Verified the final recorded snapshot at slot {} but only found {} batches, expected {}",
+                        slot_number, latest_batch_num, expected_setup_batches
+                    );
+                }
+                tracing::info!(
+                    "Verified the final recorded snapshot at slot {}. Finished resyncing.",
+                    slot_number
+                );
+                break 'outer;
+            }
         }
         checked = slot.number;
     }

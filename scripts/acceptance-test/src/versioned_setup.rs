@@ -79,6 +79,66 @@ pub struct AcceptanceRunPlan {
     pub manager_binary: PathBuf,
     pub manager_versions: Vec<RollupVersion>,
     pub soak_config: SoakManagerConfig,
+    /// Where the recorded acceptance data ends, if pre-existing snapshots were found.
+    pub recorded_data: Option<RecordedDataBounds>,
+}
+
+/// Bounds of the pre-existing recorded acceptance data, derived from the saved snapshots.
+///
+/// The version boundaries must be derived from the data rather than computed from
+/// `blocks_per_version`, because the recorded DA stream contains slots that don't carry
+/// batches (e.g. the current data holds 1000 batches spanning DA slots 3..=1002, executing
+/// at rollup heights 1..=1000). The first rollup version must replay all of the recorded
+/// data — and only the recorded data — before handing over to the next version.
+#[derive(Debug, Clone, Copy)]
+pub struct RecordedDataBounds {
+    /// The highest recorded DA slot number (the last slot with a saved snapshot).
+    pub last_slot_number: u64,
+    /// The rollup height at which the recorded data ends. Rollup height N applies ledger
+    /// batch N-1, so this equals the last snapshot's `batch_range.end`.
+    pub end_rollup_height: u64,
+}
+
+/// Scans `snapshots_dir` for saved slot snapshots and derives [`RecordedDataBounds`] from
+/// the highest-numbered one. Returns `Ok(None)` when no snapshots exist (e.g. during data
+/// generation from scratch).
+pub fn recorded_data_bounds(snapshots_dir: &Path) -> anyhow::Result<Option<RecordedDataBounds>> {
+    if !snapshots_dir.is_dir() {
+        return Ok(None);
+    }
+    let mut last_slot_number: Option<u64> = None;
+    for entry in fs::read_dir(snapshots_dir)
+        .with_context(|| format!("failed to read snapshots dir {}", snapshots_dir.display()))?
+    {
+        let name = entry?.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let Some(number) = name
+            .strip_prefix("slot_")
+            .and_then(|rest| rest.strip_suffix("_with_children.json"))
+            .and_then(|digits| digits.parse::<u64>().ok())
+        else {
+            continue;
+        };
+        last_slot_number = Some(last_slot_number.map_or(number, |max| max.max(number)));
+    }
+    let Some(last_slot_number) = last_slot_number else {
+        return Ok(None);
+    };
+
+    let snapshot = crate::fetch_and_compare::load_snapshot_json(last_slot_number, snapshots_dir)
+        .with_context(|| format!("failed to load final snapshot for slot {last_slot_number}"))?;
+    let end_rollup_height = snapshot
+        .get("batch_range")
+        .and_then(|range| range.get("end"))
+        .and_then(|end| end.as_u64())
+        .ok_or_else(|| {
+            anyhow!("final snapshot for slot {last_slot_number} has no numeric batch_range.end")
+        })?;
+
+    Ok(Some(RecordedDataBounds {
+        last_slot_number,
+        end_rollup_height,
+    }))
 }
 
 fn default_build_targets() -> BuildTargets {
@@ -359,6 +419,8 @@ fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, any
     })
 }
 
+/// Prepares a run plan for generating acceptance data from scratch: version heights are
+/// derived purely from `blocks_per_version`, ignoring any pre-existing snapshots.
 pub fn prepare_acceptance_run_plan(
     directories: &Directories,
     password: &str,
@@ -369,6 +431,7 @@ pub fn prepare_acceptance_run_plan(
         password,
         blocks_per_version,
         LocalConstantsManifest::Default,
+        None,
     )
 }
 
@@ -377,6 +440,7 @@ pub fn prepare_acceptance_run_plan_with_constants(
     password: &str,
     blocks_per_version: u64,
     local_constants_manifest: LocalConstantsManifest,
+    recorded_data: Option<RecordedDataBounds>,
 ) -> Result<AcceptanceRunPlan, anyhow::Error> {
     let binary_cache_dir = &directories.rollup_build_cache_dir;
     fs::create_dir_all(binary_cache_dir).with_context(|| {
@@ -438,12 +502,34 @@ pub fn prepare_acceptance_run_plan_with_constants(
     let mut manager_versions = Vec::with_capacity(resolved_versions.len());
     let mut soak_versions = Vec::with_capacity(resolved_versions.len());
 
+    // The first version must replay all of the pre-existing recorded data — and only
+    // that data — so its stop height is derived from the saved snapshots instead of
+    // being assumed equal to `blocks_per_version`. Later versions each generate
+    // `blocks_per_version` fresh blocks on top.
+    let first_version_stop_height = match recorded_data {
+        Some(bounds) => {
+            info!(
+                last_slot_number = bounds.last_slot_number,
+                end_rollup_height = bounds.end_rollup_height,
+                "Derived recorded data bounds from saved snapshots"
+            );
+            bounds.end_rollup_height
+        }
+        None => {
+            info!(
+                blocks_per_version,
+                "No recorded snapshots found; using blocks_per_version for the first version"
+            );
+            blocks_per_version
+        }
+    };
+
     for (idx, resolved_version) in resolved_versions.iter().enumerate() {
-        let stop_height = ((idx as u64) + 1) * blocks_per_version;
+        let stop_height = first_version_stop_height + (idx as u64) * blocks_per_version;
         let start_height = if idx == 0 {
             None
         } else {
-            Some((idx as u64 * blocks_per_version) + 1)
+            Some(first_version_stop_height + ((idx as u64) - 1) * blocks_per_version + 1)
         };
 
         let (rollup_binary, soak_binary, config_template_content, migration_path) =
@@ -568,6 +654,7 @@ pub fn prepare_acceptance_run_plan_with_constants(
             soak_versions,
             SOAK_SAFETY_STOP_BLOCKS,
         ),
+        recorded_data,
     })
 }
 

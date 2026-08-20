@@ -39,8 +39,8 @@ pub use config::{
 };
 pub use versioned_setup::{
     extend_last_stop_height, prepare_acceptance_run_plan,
-    prepare_acceptance_run_plan_with_constants, spawn_rollup_manager, write_manager_config,
-    AcceptanceRunPlan, LocalConstantsManifest,
+    prepare_acceptance_run_plan_with_constants, recorded_data_bounds, spawn_rollup_manager,
+    write_manager_config, AcceptanceRunPlan, LocalConstantsManifest, RecordedDataBounds,
 };
 
 pub const API_URL: &str = "http://127.0.0.1:12348";

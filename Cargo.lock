@@ -11759,7 +11759,7 @@ dependencies = [
 [[package]]
 name = "sov-rollup-manager"
 version = "0.0.1"
-source = "git+https://github.com/Sovereign-Labs/sov-rollup-manager?rev=dd0e4ac1586ee5e852078209afcb295bb888a44f#dd0e4ac1586ee5e852078209afcb295bb888a44f"
+source = "git+https://github.com/Sovereign-Labs/sov-rollup-manager?rev=c4d1ccff5e3d28436e2a2b012128c75268e74a5f#c4d1ccff5e3d28436e2a2b012128c75268e74a5f"
 dependencies = [
  "clap",
  "nix",
@@ -11873,7 +11873,7 @@ dependencies = [
 [[package]]
 name = "sov-soak-manager"
 version = "0.0.1"
-source = "git+https://github.com/Sovereign-Labs/sov-rollup-manager?rev=dd0e4ac1586ee5e852078209afcb295bb888a44f#dd0e4ac1586ee5e852078209afcb295bb888a44f"
+source = "git+https://github.com/Sovereign-Labs/sov-rollup-manager?rev=c4d1ccff5e3d28436e2a2b012128c75268e74a5f#c4d1ccff5e3d28436e2a2b012128c75268e74a5f"
 dependencies = [
  "nix",
  "reqwest 0.12.28",
@@ -12213,7 +12213,7 @@ dependencies = [
 [[package]]
 name = "sov-versioned-artifact-builder"
 version = "0.0.1"
-source = "git+https://github.com/Sovereign-Labs/sov-rollup-manager?rev=dd0e4ac1586ee5e852078209afcb295bb888a44f#dd0e4ac1586ee5e852078209afcb295bb888a44f"
+source = "git+https://github.com/Sovereign-Labs/sov-rollup-manager?rev=c4d1ccff5e3d28436e2a2b012128c75268e74a5f#c4d1ccff5e3d28436e2a2b012128c75268e74a5f"
 dependencies = [
  "serde",
  "thiserror 2.0.18",
