@@ -401,19 +401,32 @@ pub fn get_rollup_client() -> Result<sov_api_spec::Client, anyhow::Error> {
     Ok(client)
 }
 
+/// How long to wait for the sequencer to come up on a plain rollup start.
+pub const SEQUENCER_READY_STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
+/// How long to wait for the sequencer when crossing a version boundary: the rollup manager
+/// may first run the new version's db migration, which can take a while on a full data set.
+pub const SEQUENCER_READY_HANDOVER_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+
 pub async fn wait_for_sequencer_ready(
     shutdown_rx: &mut ShutdownReceiver,
+    timeout: Duration,
 ) -> Result<(), anyhow::Error> {
-    // Wait up to a minute for the sequencer to be ready
-    for _ in 0..600 {
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
         if let Ok(response) = reqwest::get(format!("{}/sequencer/ready", API_URL)).await {
             if response.status().is_success() {
-                break;
+                return Ok(());
             }
+        }
+        if tokio::time::Instant::now() >= deadline {
+            anyhow::bail!(
+                "sequencer did not become ready within {timeout:?}; if this run crossed a \
+                 version boundary, the db migration may still be running or have failed — \
+                 check the rollup manager output for migration logs"
+            );
         }
         sleep_or_shutdown(Duration::from_millis(100), shutdown_rx).await?;
     }
-    Ok(())
 }
 
 fn save_slot_snapshot_if_needed(

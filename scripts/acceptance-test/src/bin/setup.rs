@@ -7,7 +7,8 @@ use acceptance_test::{
     prepare_acceptance_run_plan, prepare_rollup_state_dir, run_soak, run_until_shutdown_signal,
     spawn_rollup_manager, wait_for_sequencer_ready, write_manager_config, AcceptanceRunPlan,
     CommonArgs, Directories, PostgresContainerGuard, ResolvedRunSettings, Runtime,
-    ShutdownReceiver, SoakRunOptions, Spec, ThroughputReport, API_URL, SETUP_THROUGHPUT_FILE,
+    ShutdownReceiver, SoakRunOptions, Spec, ThroughputReport, API_URL,
+    SEQUENCER_READY_STARTUP_TIMEOUT, SETUP_THROUGHPUT_FILE,
 };
 use anyhow::Context;
 use base64::prelude::BASE64_STANDARD;
@@ -254,7 +255,7 @@ async fn do_manual_setup(
     shutdown_rx: &mut ShutdownReceiver,
 ) -> Result<(), anyhow::Error> {
     info!("Rollup started, waiting for sequencer to be ready");
-    wait_for_sequencer_ready(shutdown_rx).await?;
+    wait_for_sequencer_ready(shutdown_rx, SEQUENCER_READY_STARTUP_TIMEOUT).await?;
     info!("Sequencer is ready, sending txs");
 
     // Send the known good txs: Create token, mint token, transfer token

@@ -6,6 +6,7 @@ use clap::Parser;
 use rollup_starter::rollup::StarterRollup;
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::{CryptoSpec, Spec};
+use sov_modules_rollup_blueprint::logging::initialize_logging;
 use sov_modules_rollup_blueprint::RollupBlueprint;
 use stf_starter::Runtime;
 
@@ -33,14 +34,23 @@ type RollupSpec = <StarterRollup<Native> as RollupBlueprint<Native>>::Spec;
 type Hasher = <<RollupSpec as Spec>::CryptoSpec as CryptoSpec>::Hasher;
 
 fn main() {
+    let _guard = initialize_logging();
     if let Err(err) = run() {
-        eprintln!("migrate_to_v1 failed: {err:#}");
+        tracing::error!(error = format!("{err:#}"), "rollup-db-migration failed");
+        eprintln!("rollup-db-migration failed: {err:#}");
         std::process::exit(1);
     }
 }
 
 fn run() -> anyhow::Result<()> {
     let args = Args::parse();
+    tracing::info!(
+        rollup_config_path = %args.rollup_config_path.display(),
+        db_path = ?args.db_path,
+        dry_run = args.dry_run,
+        "Starting rollup-db-migration (state version 0 -> 1)"
+    );
+    let start = std::time::Instant::now();
     let mut runtime = Runtime::<RollupSpec>::default();
     let runtime_inner = &mut *runtime;
     sov_migrations::v1::run::<RollupSpec, Hasher>(
@@ -52,5 +62,9 @@ fn run() -> anyhow::Result<()> {
         &mut runtime_inner.accounts,
         &mut runtime_inner.chain_state,
     )?;
+    tracing::info!(
+        elapsed = ?start.elapsed(),
+        "rollup-db-migration completed successfully"
+    );
     Ok(())
 }

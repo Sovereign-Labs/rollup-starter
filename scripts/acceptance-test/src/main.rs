@@ -9,7 +9,10 @@ use acceptance_test::{
     PostgresContainerGuard, ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions,
     API_URL,
 };
-use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
+use acceptance_test::{
+    wait_for_sequencer_ready, ThroughputReport, SEQUENCER_READY_HANDOVER_TIMEOUT,
+    SETUP_THROUGHPUT_FILE,
+};
 use anyhow::Context;
 use chrono::Utc;
 use clap::Parser;
@@ -38,7 +41,7 @@ async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,hyper=info,sov_sequencer::rest_api=off,tower_http::trace=off,alloy_transport_http=warn,alloy_rpc_client=warn")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,hyper=info,sov_sequencer::rest_api=off,tower_http::trace=off,alloy_transport_http=warn,alloy_rpc_client=warn,rustls=info,reqwest=info")),
         )
         .init();
 
@@ -320,8 +323,10 @@ async fn run_test(
         latest_batch_num
     );
 
-    // Wait for the sequencer to resync to the empty DA slots
-    wait_for_sequencer_ready(&mut shutdown_rx).await?;
+    // Wait for the sequencer to resync to the empty DA slots. This wait spans the version
+    // handover, which may include running the new version's db migration, so use the
+    // generous timeout.
+    wait_for_sequencer_ready(&mut shutdown_rx, SEQUENCER_READY_HANDOVER_TIMEOUT).await?;
 
     let resync_soak_config = plan
         .soak_config
