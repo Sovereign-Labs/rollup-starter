@@ -409,6 +409,32 @@ pub const SEQUENCER_READY_STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
 /// may first run the new version's db migration, which can take a while on a full data set.
 pub const SEQUENCER_READY_HANDOVER_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
+/// Wait until the rollup node's ledger API responds. Unlike sequencer readiness (which
+/// requires the node to have caught up to the DA head), this only requires the node process to
+/// be up: the ledger API serves — and slot subscriptions work — while the node is still
+/// resyncing.
+pub async fn wait_for_rollup_api(
+    shutdown_rx: &mut ShutdownReceiver,
+    timeout: Duration,
+) -> Result<(), anyhow::Error> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        if let Ok(response) = reqwest::get(format!("{}/ledger/slots/0", API_URL)).await {
+            if response.status().is_success() {
+                return Ok(());
+            }
+        }
+        if tokio::time::Instant::now() >= deadline {
+            anyhow::bail!(
+                "rollup API did not come up within {timeout:?}; if this run crossed a version \
+                 boundary, the db migration may still be running or have failed — check the \
+                 rollup manager output for migration logs"
+            );
+        }
+        sleep_or_shutdown(Duration::from_millis(100), shutdown_rx).await?;
+    }
+}
+
 pub async fn wait_for_sequencer_ready(
     shutdown_rx: &mut ShutdownReceiver,
     timeout: Duration,
@@ -562,16 +588,8 @@ pub async fn resync_and_verify_slots(
     last_recorded_slot: Option<u64>,
     shutdown_rx: &mut ShutdownReceiver,
 ) -> Result<(u64, u64), anyhow::Error> {
-    // Wait up to 60s for the freshly spawned rollup's API to come up before subscribing.
-    for _ in 0..120 {
-        if reqwest::get(format!("{}/ledger/slots/0", API_URL))
-            .await
-            .is_ok_and(|response| response.status().is_success())
-        {
-            break;
-        }
-        sleep_or_shutdown(Duration::from_millis(500), shutdown_rx).await?;
-    }
+    // Wait for the freshly spawned rollup's API to come up before subscribing.
+    wait_for_rollup_api(shutdown_rx, SEQUENCER_READY_STARTUP_TIMEOUT).await?;
 
     let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, directories);
     slot_fetcher.subscribe_slots(false).await?;
@@ -583,6 +601,37 @@ pub async fn resync_and_verify_slots(
         .map(|last_slot| last_slot.saturating_sub(HANDOVER_FLAKINESS_SLOT_WINDOW));
     let in_handover_tail =
         |slot_number: u64| handover_tail_start.is_some_and(|start| slot_number >= start);
+    // Recorded data can span multiple rollup versions, and each mid-data version boundary is a
+    // legitimate interruption: the outgoing version stops exactly at its boundary and the next
+    // one takes over (possibly after running its db migration first). When the subscription or
+    // the ledger API drops mid-resync, wait for the incoming version and resume from where we
+    // stopped. The no-progress guard turns a repeated drop at the same slot (e.g. a crash-looping
+    // rollup) into a hard error instead of an infinite reconnect cycle.
+    let mut last_reconnect_at: Option<u64> = None;
+    macro_rules! reconnect_or_bail {
+        ($reason:expr) => {{
+            let reason: String = $reason;
+            if last_reconnect_at == Some(checked) {
+                anyhow::bail!(
+                    "slot subscription dropped again at slot {checked} without progress since \
+                     the previous version-handover reconnect ({reason})"
+                );
+            }
+            last_reconnect_at = Some(checked);
+            tracing::info!(
+                last_compared_slot = checked,
+                reason,
+                "Slot stream interrupted mid-resync; assuming a version handover and \
+                 reconnecting (the incoming version may need to run a db migration first)"
+            );
+            // Wait for the node API only, NOT sequencer readiness: the incoming version's
+            // sequencer won't be ready until it has resynced all the way to the DA head,
+            // whereas the slot subscription can (and must) follow that resync live.
+            wait_for_rollup_api(shutdown_rx, SEQUENCER_READY_HANDOVER_TIMEOUT).await?;
+            slot_fetcher = SlotFetcher::new(get_rollup_client()?, directories);
+            slot_fetcher.subscribe_slots(false).await?;
+        }};
+    }
     let first_new_slot = 'outer: loop {
         let next = tokio::select! {
             slot = slot_fetcher.next_slot() => slot,
@@ -590,28 +639,23 @@ pub async fn resync_and_verify_slots(
         };
         let slot = match next {
             Ok(Some(slot)) => slot,
-            Ok(None) => {
+            other => {
+                let reason = match other {
+                    Ok(None) => "subscription ended".to_string(),
+                    Err(error) => format!("subscription failed: {error:#}"),
+                    Ok(Some(_)) => unreachable!("handled above"),
+                };
                 if in_handover_tail(checked) {
                     tracing::warn!(
                         last_compared_slot = checked,
-                        "Slot subscription ended during the version handover; treating the \
+                        reason,
+                        "Slot stream dropped at the end of the recorded data; treating the \
                          remaining recorded slots as shutdown flakiness"
                     );
                     break 'outer boundary_slot(last_recorded_slot);
                 }
-                anyhow::bail!("Slot subscription ended unexpectedly at slot {checked}");
-            }
-            Err(error) => {
-                if in_handover_tail(checked) {
-                    tracing::warn!(
-                        last_compared_slot = checked,
-                        %error,
-                        "Slot subscription failed during the version handover; treating the \
-                         remaining recorded slots as shutdown flakiness"
-                    );
-                    break 'outer boundary_slot(last_recorded_slot);
-                }
-                return Err(error);
+                reconnect_or_bail!(reason);
+                continue 'outer;
             }
         };
         for slot_number in checked..=slot.number {
@@ -648,12 +692,17 @@ pub async fn resync_and_verify_slots(
                     tracing::warn!(
                         slot_number,
                         %error,
-                        "Slot API unavailable during the version handover; skipping \
+                        "Slot API unavailable at the end of the recorded data; skipping \
                          comparison of the remaining recorded slots as shutdown flakiness"
                     );
                     break 'outer boundary_slot(last_recorded_slot);
                 }
-                Err(error) => return Err(error.into()),
+                Err(error) => {
+                    // `checked` has not advanced yet, so the slots compared in this batch of
+                    // the loop are re-verified after the reconnect (comparison is idempotent).
+                    reconnect_or_bail!(format!("ledger API error at slot {slot_number}: {error}"));
+                    continue 'outer;
+                }
             };
             compare_against_snapshot(
                 &slot.into_inner(),
