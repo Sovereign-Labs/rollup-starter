@@ -33,6 +33,7 @@ dependencies = [
  "sov-modules-stf-blueprint",
  "sov-rollup-interface",
  "sov-rollup-manager",
+ "sov-rollup-versioned-setup",
  "sov-soak-manager",
  "sov-soak-testing-lib",
  "sov-test-state-consistency",
@@ -3515,7 +3516,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ab67060fc6b8ef687992d439ca0fa36e7ed17e9a0b16b25b601e8757df720de"
 dependencies = [
  "data-encoding",
- "syn 2.0.117",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -5129,7 +5130,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -8003,7 +8004,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -8041,7 +8042,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.59.0",
 ]
@@ -11774,6 +11775,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sov-rollup-versioned-setup"
+version = "0.0.1"
+source = "git+https://github.com/Sovereign-Labs/sov-rollup-manager?rev=47d40a34b6a26e03d303f472f0c676860534f4da#47d40a34b6a26e03d303f472f0c676860534f4da"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_yaml",
+ "sov-versioned-artifact-builder",
+ "tracing",
+]
+
+[[package]]
 name = "sov-rpc-eth-types"
 version = "0.3.0"
 source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=3208eb5c54243a1854f44a453787335dc9f87642#3208eb5c54243a1854f44a453787335dc9f87642"
@@ -15063,7 +15076,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

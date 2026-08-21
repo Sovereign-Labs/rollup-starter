@@ -47,6 +47,7 @@ serde.workspace = true
 serde_yaml = "0.9"
 libc = "0.2"
 sov-rollup-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "47d40a34b6a26e03d303f472f0c676860534f4da" }
+sov-rollup-versioned-setup = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "47d40a34b6a26e03d303f472f0c676860534f4da" }
 sov-soak-manager = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "47d40a34b6a26e03d303f472f0c676860534f4da" }
 sov-versioned-artifact-builder = { git = "https://github.com/Sovereign-Labs/sov-rollup-manager", rev = "47d40a34b6a26e03d303f472f0c676860534f4da" }
 

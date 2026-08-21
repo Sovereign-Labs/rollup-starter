@@ -1,10 +1,9 @@
 use acceptance_test::{
     cleanup_rollup_state_dir, copy_persistent_mock_data, extend_last_stop_height,
-    generate_postgres_password, prepare_acceptance_run_plan_with_constants,
-    prepare_rollup_state_dir, recorded_data_bounds, resync_and_verify_slots, run_soak,
-    run_until_shutdown_signal, spawn_rollup_manager, write_manager_config, AcceptanceRunPlan,
-    CommonArgs, Directories, LocalConstantsManifest, PostgresContainerGuard, ResolvedRunSettings,
-    RunProfile, ShutdownReceiver, SoakRunOptions,
+    generate_postgres_password, prepare_acceptance_run_plan, prepare_rollup_state_dir,
+    recorded_data_bounds, resync_and_verify_slots, run_soak, run_until_shutdown_signal,
+    spawn_rollup_manager, write_manager_config, AcceptanceRunPlan, CommonArgs, Directories,
+    PostgresContainerGuard, ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions,
 };
 use acceptance_test::{
     wait_for_sequencer_ready, ThroughputReport, SEQUENCER_READY_HANDOVER_TIMEOUT,
@@ -58,11 +57,10 @@ fn prepare_test_run(args: Args) -> Result<PreparedTestRun, anyhow::Error> {
         settings.on_existing_rollup_state,
     )?;
     let recorded_data = recorded_data_bounds(&directories.snapshots_dir)?;
-    let plan = prepare_acceptance_run_plan_with_constants(
+    let plan = prepare_acceptance_run_plan(
         &directories,
         &password,
         settings.blocks_per_version,
-        LocalConstantsManifest::AcceptanceTest,
         recorded_data,
     )?;
     Ok(PreparedTestRun {
@@ -92,19 +90,6 @@ async fn run_test(
     // Start postgres and keep it alive for the test duration. Drop cleanup runs last.
     let _postgres_guard =
         PostgresContainerGuard::start(&settings.postgres_docker_container_name, &password)?;
-    // Genesis doesn't have a batch; this has the result that batch numbers lag 1 behind the
-    // rollup height.
-    let expected_setup_batches = match plan.recorded_data {
-        Some(bounds) => bounds.end_rollup_height.saturating_sub(1),
-        None => plan
-            .manager_versions
-            .first()
-            .expect("Acceptance testing must have at least one rollup version")
-            .stop_height
-            .expect("Acceptance testing first rollup version must have stop height")
-            .saturating_sub(1),
-    };
-    let last_recorded_slot = plan.recorded_data.map(|bounds| bounds.last_slot_number);
     let manager_versions =
         extend_last_stop_height(&plan.manager_versions, settings.blocks_per_version);
     let manager_config_path = directories
@@ -125,18 +110,8 @@ async fn run_test(
         None,
     )?;
 
-    // Cumulative batch counts at which a version handover (and its db migration) occurs.
-    let migration_boundaries: Vec<u64> = (1..plan.manager_versions.len() as u64)
-        .map(|k| k * settings.blocks_per_version)
-        .collect();
-    let (latest_batch_num, _first_new_slot) = resync_and_verify_slots(
-        &directories,
-        expected_setup_batches,
-        last_recorded_slot,
-        &migration_boundaries,
-        &mut shutdown_rx,
-    )
-    .await?;
+    let (latest_batch_num, _first_new_slot) =
+        resync_and_verify_slots(&directories, &plan, &mut shutdown_rx).await?;
 
     // Wait for the sequencer to resync to the empty DA slots. This wait spans the version
     // handover, which may include running the new version's db migration, so use the

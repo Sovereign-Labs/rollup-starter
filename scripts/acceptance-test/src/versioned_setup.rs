@@ -6,7 +6,8 @@ use anyhow::{anyhow, Context};
 use sov_rollup_manager::{ManagerConfig, RollupVersion};
 use sov_soak_manager::{SoakManagerConfig, SoakWorkerConfig};
 use sov_versioned_artifact_builder::{
-    prepare_artifacts, BuildRequest, BuildSpec, BuildTargets, RollupBuilder, VersionBuildSpec,
+    prepare_artifacts, BuildRequest, BuildSpec, BuildTarget, BuildTargets, RollupBuilder,
+    VersionBuildSpec,
 };
 use tokio::process::Command as TokioCommand;
 use tracing::info;
@@ -14,8 +15,6 @@ use tracing::info;
 use crate::{Directories, ManagedRollupProcess};
 
 pub const ROLLUP_REPO_URL: &str = "https://github.com/Sovereign-Labs/rollup-starter.git";
-pub const ROLLUP_MANAGER_REPO_URL: &str = "https://github.com/Sovereign-Labs/sov-rollup-manager";
-pub const ROLLUP_MANAGER_BRANCH: &str = "master";
 pub const VERSION_SPEC_FILE: &str = "versions.yaml";
 pub const VERSION_VARS_COMMIT_KEY: &str = "rollup_commit_hash";
 pub const VERSION_CONFIG_TEMPLATE_PATH: &str = "scripts/acceptance-test/rollup_config.toml";
@@ -28,21 +27,11 @@ const ACCEPTANCE_CONSTANTS_FILENAME: &str = "constants.testing.toml";
 /// Repo-relative directory whose `constants.testing.toml` all versioned builds must use.
 const ACCEPTANCE_CONSTANTS_REPO_DIR: &str = "scripts/acceptance-test";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LocalConstantsManifest {
-    Default,
-    AcceptanceTest,
-}
-
 fn acceptance_test_features() -> Vec<String> {
     ACCEPTANCE_TEST_FEATURES
         .iter()
         .map(|feature| feature.to_string())
         .collect()
-}
-
-fn acceptance_test_feature_list() -> String {
-    ACCEPTANCE_TEST_FEATURES.join(",")
 }
 
 /// Features for the `rollup-db-migration` binary: the migration must be built with the same
@@ -52,10 +41,6 @@ fn db_migration_features() -> Vec<String> {
     let mut features = acceptance_test_features();
     features.push(DB_MIGRATION_FEATURE.to_string());
     features
-}
-
-fn db_migration_feature_list() -> String {
-    db_migration_features().join(",")
 }
 
 #[derive(Debug, Clone)]
@@ -100,6 +85,34 @@ pub struct AcceptanceRunPlan {
     pub soak_config: SoakManagerConfig,
     /// Where the recorded acceptance data ends, if pre-existing snapshots were found.
     pub recorded_data: Option<RecordedDataBounds>,
+    /// The per-version block span the plan was built with.
+    pub blocks_per_version: u64,
+}
+
+impl AcceptanceRunPlan {
+    /// The highest batch *number* the recorded data is expected to contain (batch numbers lag
+    /// the rollup height by one, since genesis carries no batch). Falls back to the first
+    /// version's span when no recorded data exists.
+    pub fn expected_setup_batches(&self) -> u64 {
+        match self.recorded_data {
+            Some(bounds) => bounds.end_rollup_height,
+            None => self.blocks_per_version,
+        }
+        .saturating_sub(1)
+    }
+
+    /// The highest recorded DA slot number, when pre-existing recorded data is present.
+    pub fn last_recorded_slot(&self) -> Option<u64> {
+        self.recorded_data.map(|bounds| bounds.last_slot_number)
+    }
+
+    /// Cumulative batch counts at which a version handover (and its db migration) occurs:
+    /// `k * blocks_per_version` for each non-last version `k`.
+    pub fn migration_boundary_batch_counts(&self) -> Vec<u64> {
+        (1..self.manager_versions.len() as u64)
+            .map(|k| k * self.blocks_per_version)
+            .collect()
+    }
 }
 
 /// Bounds of the pre-existing recorded acceptance data, derived from the saved snapshots.
@@ -282,145 +295,80 @@ fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<Resolve
     Ok(versions)
 }
 
+/// Build one cargo target at the local HEAD. The target's constants manifest and dedicated
+/// cargo target dir are honored via [`BuildTarget::apply_build_env`] — the exact same
+/// environment the versioned artifact builder applies to remote-commit builds, so local and
+/// historical binaries are always built identically.
+fn build_local_target(rollup_root: &Path, target: &BuildTarget) -> Result<PathBuf, anyhow::Error> {
+    tracing::info!(bin = %target.bin, "Building binary at local HEAD...");
+    let mut cmd = StdCommand::new("cargo");
+    cmd.current_dir(rollup_root);
+    cmd.args(["build", "--release"]);
+    if let Some(package) = &target.package {
+        cmd.args(["--package", package]);
+    }
+    cmd.args(["--bin", &target.bin]);
+    if target.no_default_features {
+        cmd.arg("--no-default-features");
+    }
+    if !target.features.is_empty() {
+        cmd.args(["--features", &target.features.join(",")]);
+    }
+    target.apply_build_env(&mut cmd, rollup_root);
+    run_checked(&mut cmd, &format!("build local head {} binary", target.bin))?;
+
+    let binary = target
+        .cargo_target_dir(rollup_root)
+        .join("release")
+        .join(&target.bin);
+    if !binary.exists() {
+        return Err(anyhow!(
+            "local {} binary not found at {}",
+            target.bin,
+            binary.display()
+        ));
+    }
+    binary.canonicalize().with_context(|| {
+        format!(
+            "failed to canonicalize local {} binary {}",
+            target.bin,
+            binary.display()
+        )
+    })
+}
+
 fn build_local_head_binaries(
     directories: &Directories,
-    constants_manifest: LocalConstantsManifest,
+    targets: &BuildTargets,
     build_db_migration: bool,
 ) -> Result<(PathBuf, PathBuf, Option<PathBuf>), anyhow::Error> {
-    let feature_list = acceptance_test_feature_list();
-    let rollup_root = &directories.rollup_root;
-    let target_dir = match constants_manifest {
-        LocalConstantsManifest::Default => rollup_root.join("target"),
-        LocalConstantsManifest::AcceptanceTest => {
-            let constants_path = directories
-                .acceptance_test_dir
-                .join(ACCEPTANCE_CONSTANTS_FILENAME);
-            if !constants_path.is_file() {
-                return Err(anyhow!(
-                    "acceptance-test constants manifest not found at {}",
-                    constants_path.display()
-                ));
-            }
-            // Keep this build in a dedicated target dir so the proc-macro crate is compiled
-            // with the acceptance-test constants manifest instead of reusing the default one.
-            rollup_root.join("target").join("acceptance-test")
-        }
-    };
-
-    let configure_constants_manifest = |cmd: &mut StdCommand| {
-        if constants_manifest == LocalConstantsManifest::AcceptanceTest {
-            cmd.env("SOV_TEST_MODE_CONST_MANIFEST", "1")
-                .env("CONSTANTS_MANIFEST", &directories.acceptance_test_dir)
-                .env("CARGO_TARGET_DIR", &target_dir);
-        }
-    };
-
-    tracing::info!("Building rollup at local HEAD...");
-    let mut rollup_build = StdCommand::new("cargo");
-    rollup_build.current_dir(rollup_root).args([
-        "build",
-        "--release",
-        "--package",
-        "rollup-starter",
-        "--bin",
-        "rollup",
-        "--no-default-features",
-        "--features",
-        &feature_list,
-    ]);
-    configure_constants_manifest(&mut rollup_build);
-    run_checked(&mut rollup_build, "build local head rollup binary")?;
-
-    tracing::info!("Building soak test at local HEAD...");
-    let mut soak_build = StdCommand::new("cargo");
-    soak_build.current_dir(rollup_root).args([
-        "build",
-        "--release",
-        "--package",
-        "rollup-starter-soak-test",
-        "--bin",
-        "rollup-starter-soak-test",
-        "--no-default-features",
-        "--features",
-        &feature_list,
-    ]);
-    configure_constants_manifest(&mut soak_build);
-    run_checked(&mut soak_build, "build local head soak binary")?;
-
-    if build_db_migration {
-        tracing::info!("Building rollup-db-migration at local HEAD...");
-        let migration_feature_list = db_migration_feature_list();
-        let mut migration_build = StdCommand::new("cargo");
-        migration_build.current_dir(rollup_root).args([
-            "build",
-            "--release",
-            "--package",
-            "rollup-starter",
-            "--bin",
-            "rollup-db-migration",
-            "--no-default-features",
-            "--features",
-            &migration_feature_list,
-        ]);
-        configure_constants_manifest(&mut migration_build);
-        run_checked(&mut migration_build, "build local head db migration binary")?;
-    }
-
-    let release_dir = target_dir.join("release");
-    let rollup_bin = release_dir.join("rollup");
-    if !rollup_bin.exists() {
+    let constants_path = directories
+        .acceptance_test_dir
+        .join(ACCEPTANCE_CONSTANTS_FILENAME);
+    if !constants_path.is_file() {
         return Err(anyhow!(
-            "local rollup binary not found at {}",
-            rollup_bin.display()
+            "acceptance-test constants manifest not found at {}",
+            constants_path.display()
         ));
     }
 
-    let soak_bin_default = release_dir.join("rollup-starter-soak-test");
-    let soak_bin = if soak_bin_default.exists() {
-        soak_bin_default
-    } else {
-        let subscriber_bin = release_dir.join("subscriber");
-        if subscriber_bin.exists() {
-            subscriber_bin
-        } else {
-            return Err(anyhow!(
-                "local soak binary not found at {} or {}",
-                soak_bin_default.display(),
-                subscriber_bin.display()
-            ));
-        }
-    };
-
+    let rollup_root = &directories.rollup_root;
+    let rollup_bin = build_local_target(rollup_root, &targets.rollup)?;
+    let soak_target = targets
+        .soak
+        .as_ref()
+        .ok_or_else(|| anyhow!("acceptance build targets must include a soak target"))?;
+    let soak_bin = build_local_target(rollup_root, soak_target)?;
     let migration_bin = if build_db_migration {
-        let migration_bin = release_dir.join("rollup-db-migration");
-        if !migration_bin.exists() {
-            return Err(anyhow!(
-                "local db migration binary not found at {}",
-                migration_bin.display()
-            ));
-        }
-        Some(migration_bin.canonicalize().with_context(|| {
-            format!(
-                "failed to canonicalize db migration binary {}",
-                migration_bin.display()
-            )
-        })?)
+        let migration_target = targets.db_migration.as_ref().ok_or_else(|| {
+            anyhow!("acceptance build targets must include a db migration target")
+        })?;
+        Some(build_local_target(rollup_root, migration_target)?)
     } else {
         None
     };
 
-    Ok((
-        rollup_bin.canonicalize().with_context(|| {
-            format!(
-                "failed to canonicalize rollup binary {}",
-                rollup_bin.display()
-            )
-        })?,
-        soak_bin.canonicalize().with_context(|| {
-            format!("failed to canonicalize soak binary {}", soak_bin.display())
-        })?,
-        migration_bin,
-    ))
+    Ok((rollup_bin, soak_bin, migration_bin))
 }
 
 fn render_config_template(
@@ -440,83 +388,16 @@ fn render_config_template(
         )
 }
 
-fn build_rollup_manager_binary(manager_build_root: &Path) -> Result<PathBuf, anyhow::Error> {
-    if manager_build_root.exists() {
-        fs::remove_dir_all(manager_build_root).with_context(|| {
-            format!(
-                "failed to remove existing rollup manager build directory {}",
-                manager_build_root.display()
-            )
-        })?;
-    }
-    fs::create_dir_all(manager_build_root).with_context(|| {
-        format!(
-            "failed to create rollup manager build directory {}",
-            manager_build_root.display()
-        )
-    })?;
-    let manager_repo = manager_build_root.join("repo");
-    let manager_repo_arg = manager_repo.to_string_lossy().to_string();
-
-    run_checked(
-        StdCommand::new("git").args([
-            "clone",
-            "--depth",
-            "1",
-            "--branch",
-            ROLLUP_MANAGER_BRANCH,
-            ROLLUP_MANAGER_REPO_URL,
-            &manager_repo_arg,
-        ]),
-        "clone sov-rollup-manager",
-    )?;
-
-    run_checked(
-        StdCommand::new("cargo").current_dir(&manager_repo).args([
-            "build",
-            "--release",
-            "--bin",
-            "sov-rollup-manager",
-        ]),
-        "build sov-rollup-manager",
-    )?;
-
-    let manager_bin = manager_repo.join("target/release/sov-rollup-manager");
-    if !manager_bin.exists() {
-        return Err(anyhow!(
-            "built manager binary not found at {}",
-            manager_bin.display()
-        ));
-    }
-    manager_bin.canonicalize().with_context(|| {
-        format!(
-            "failed to canonicalize built manager binary {}",
-            manager_bin.display()
-        )
-    })
-}
-
-/// Prepares a run plan for generating acceptance data from scratch: version heights are
-/// derived purely from `blocks_per_version`, ignoring any pre-existing snapshots.
+/// Prepares the versioned run plan: per-version binaries (built against the acceptance-test
+/// constants manifest, locally for the last version and from pinned commits for the rest),
+/// rendered configs, version heights, and the soak configuration.
+///
+/// `recorded_data` carries the bounds of pre-existing recorded data when the run will replay
+/// it (pass `None` when generating from scratch, so stale snapshots can't influence the plan).
 pub fn prepare_acceptance_run_plan(
     directories: &Directories,
     password: &str,
     blocks_per_version: u64,
-) -> Result<AcceptanceRunPlan, anyhow::Error> {
-    prepare_acceptance_run_plan_with_constants(
-        directories,
-        password,
-        blocks_per_version,
-        LocalConstantsManifest::Default,
-        None,
-    )
-}
-
-pub fn prepare_acceptance_run_plan_with_constants(
-    directories: &Directories,
-    password: &str,
-    blocks_per_version: u64,
-    local_constants_manifest: LocalConstantsManifest,
     recorded_data: Option<RecordedDataBounds>,
 ) -> Result<AcceptanceRunPlan, anyhow::Error> {
     let binary_cache_dir = &directories.rollup_build_cache_dir;
@@ -538,12 +419,16 @@ pub fn prepare_acceptance_run_plan_with_constants(
         })
         .collect();
 
+    // The same target set drives both the remote-commit and local-HEAD builds, so every
+    // version's binaries are built with identical features and constants manifest.
+    let build_targets = default_build_targets();
+
     let (mut remote_artifacts, template_reader) = if remote_commits.is_empty() {
         (None, None)
     } else {
         let build_spec = BuildSpec {
             repo_url: Some(ROLLUP_REPO_URL.to_string()),
-            targets: default_build_targets(),
+            targets: build_targets.clone(),
             versions: remote_commits
                 .iter()
                 .map(|(commit, build_db_migration)| VersionBuildSpec {
@@ -571,11 +456,8 @@ pub fn prepare_acceptance_run_plan_with_constants(
     let local_head_builds_db_migration = resolved_versions.iter().any(|version| {
         matches!(version.source, VersionSource::LocalHead) && version.build_db_migration
     });
-    let (local_rollup_bin, local_soak_bin, local_migration_bin) = build_local_head_binaries(
-        directories,
-        local_constants_manifest,
-        local_head_builds_db_migration,
-    )?;
+    let (local_rollup_bin, local_soak_bin, local_migration_bin) =
+        build_local_head_binaries(directories, &build_targets, local_head_builds_db_migration)?;
 
     let versioned_configs_dir = directories.output_dir.join("versioned-configs");
     fs::create_dir_all(&versioned_configs_dir).with_context(|| {
@@ -754,7 +636,8 @@ pub fn prepare_acceptance_run_plan_with_constants(
         soak_versions.push((soak_binary, stop_height));
     }
 
-    let manager_binary = build_rollup_manager_binary(&directories.manager_build_dir)?;
+    let manager_binary =
+        sov_rollup_versioned_setup::build_rollup_manager_binary(&directories.manager_build_dir)?;
 
     Ok(AcceptanceRunPlan {
         manager_binary,
@@ -768,6 +651,7 @@ pub fn prepare_acceptance_run_plan_with_constants(
             SOAK_SAFETY_STOP_BLOCKS,
         ),
         recorded_data,
+        blocks_per_version,
     })
 }
 

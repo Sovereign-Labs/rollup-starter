@@ -158,24 +158,35 @@ fn prepare_setup_run(args: Args) -> Result<PreparedSetupRun, anyhow::Error> {
     )?;
     ensure_evm_pinned_cache_config(&directories)?;
     let password = generate_postgres_password()?;
-    let plan = prepare_acceptance_run_plan(&directories, &password, settings.blocks_per_version)?;
+    // Pre-existing recorded data only matters when a durable MockDA from a previous run exists;
+    // without it, any lingering snapshots are stale leftovers a from-genesis run will overwrite.
+    let has_persistent_mock_da = directories
+        .output_dir
+        .join("persistent_mock_da.sqlite")
+        .exists();
+    let recorded_data = if has_persistent_mock_da {
+        recorded_data_bounds(&directories.snapshots_dir)?
+    } else {
+        None
+    };
+    let plan = prepare_acceptance_run_plan(
+        &directories,
+        &password,
+        settings.blocks_per_version,
+        recorded_data,
+    )?;
 
     // Auto-detect append mode: if there is durable MockDA from a previous run and the spec has
     // more than one version, resync the historical versions and only generate the new last
     // version. With no multi-version spec (a single implicit local version) we always regenerate
     // from genesis, preserving the original single-version behavior.
-    let has_persistent_mock_da = directories
-        .output_dir
-        .join("persistent_mock_da.sqlite")
-        .exists();
     let append_onto = if has_persistent_mock_da && plan.manager_versions.len() > 1 {
-        let bounds = recorded_data_bounds(&directories.snapshots_dir)?;
-        validate_append_boundary(bounds, &plan, settings.blocks_per_version)?;
+        validate_append_boundary(recorded_data, &plan)?;
         info!(
             "Detected persistent MockDA and {} versions: running setup in append mode",
             plan.manager_versions.len()
         );
-        Some(bounds.expect("validate_append_boundary rejects missing snapshots"))
+        Some(recorded_data.expect("validate_append_boundary rejects missing snapshots"))
     } else {
         info!("Running setup in from-genesis mode");
         None
@@ -237,16 +248,14 @@ async fn run_setup(
         Some(&directories.output_dir.join("rollup.log")),
     )?;
 
-    let res = if let Some(bounds) = append_onto {
+    let res = if append_onto.is_some() {
         run_append_generation(
             &directories,
             &plan,
             rollup,
-            bounds,
             stop_at_height,
             throughput_start_batch,
             settings.full_slot_save_interval,
-            settings.blocks_per_version,
             &mut shutdown_rx,
         )
         .await
@@ -333,40 +342,23 @@ async fn run_from_genesis_generation(
 /// version, saving its snapshots and re-persisting the extended MockDA. The genesis manual setup
 /// is skipped — its state (incl. the EVM consistency contracts) is already present in the
 /// resynced data.
-#[allow(clippy::too_many_arguments)]
 async fn run_append_generation(
     directories: &Directories,
     plan: &AcceptanceRunPlan,
     rollup: ManagedRollupProcess,
-    recorded: RecordedDataBounds,
     stop_at_height: u64,
     throughput_start_batch: u64,
     full_slot_save_interval: u64,
-    blocks_per_version: u64,
     shutdown_rx: &mut ShutdownReceiver,
 ) -> Result<ThroughputReport, anyhow::Error> {
-    // Batch numbers lag the rollup height by one (genesis has no batch).
-    let expected_setup_batches = recorded.end_rollup_height.saturating_sub(1);
     info!(
         "Append mode: resyncing {} historical version(s) up to batch {} before generating the \
          new version",
         plan.manager_versions.len() - 1,
-        expected_setup_batches
+        plan.expected_setup_batches()
     );
-    // Cumulative batch counts at which a version handover (and its db migration) occurs. The
-    // final one coincides with the end of the historical data, where the new version's
-    // migration runs.
-    let migration_boundaries: Vec<u64> = (1..plan.manager_versions.len() as u64)
-        .map(|k| k * blocks_per_version)
-        .collect();
-    let (_latest_batch_num, first_new_slot) = resync_and_verify_slots(
-        directories,
-        expected_setup_batches,
-        Some(recorded.last_slot_number),
-        &migration_boundaries,
-        shutdown_rx,
-    )
-    .await?;
+    let (_latest_batch_num, first_new_slot) =
+        resync_and_verify_slots(directories, plan, shutdown_rx).await?;
     info!(
         "Historical resync complete; the new version's data begins at slot {}",
         first_new_slot
@@ -435,7 +427,6 @@ fn classify_append_boundary(max_batch: Option<u64>, prev_stop_height: u64) -> Ap
 fn validate_append_boundary(
     recorded: Option<RecordedDataBounds>,
     plan: &AcceptanceRunPlan,
-    blocks_per_version: u64,
 ) -> Result<(), anyhow::Error> {
     let num_versions = plan.manager_versions.len();
     // Append is only selected when num_versions > 1, so [num_versions - 2] is valid.
@@ -444,7 +435,7 @@ fn validate_append_boundary(
         .expect("non-last acceptance-test versions must have a stop height");
     debug_assert_eq!(
         prev_stop_height,
-        (num_versions as u64 - 1) * blocks_per_version
+        (num_versions as u64 - 1) * plan.blocks_per_version
     );
     let max_batch = recorded.map(|bounds| bounds.end_rollup_height.saturating_sub(1));
 
