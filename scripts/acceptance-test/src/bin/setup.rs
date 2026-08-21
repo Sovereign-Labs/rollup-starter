@@ -246,6 +246,7 @@ async fn run_setup(
             stop_at_height,
             throughput_start_batch,
             settings.full_slot_save_interval,
+            settings.blocks_per_version,
             &mut shutdown_rx,
         )
         .await
@@ -341,6 +342,7 @@ async fn run_append_generation(
     stop_at_height: u64,
     throughput_start_batch: u64,
     full_slot_save_interval: u64,
+    blocks_per_version: u64,
     shutdown_rx: &mut ShutdownReceiver,
 ) -> Result<ThroughputReport, anyhow::Error> {
     // Batch numbers lag the rollup height by one (genesis has no batch).
@@ -351,10 +353,17 @@ async fn run_append_generation(
         plan.manager_versions.len() - 1,
         expected_setup_batches
     );
+    // Cumulative batch counts at which a version handover (and its db migration) occurs. The
+    // final one coincides with the end of the historical data, where the new version's
+    // migration runs.
+    let migration_boundaries: Vec<u64> = (1..plan.manager_versions.len() as u64)
+        .map(|k| k * blocks_per_version)
+        .collect();
     let (_latest_batch_num, first_new_slot) = resync_and_verify_slots(
         directories,
         expected_setup_batches,
         Some(recorded.last_slot_number),
+        &migration_boundaries,
         shutdown_rx,
     )
     .await?;

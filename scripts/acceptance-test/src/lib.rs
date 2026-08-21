@@ -580,12 +580,22 @@ pub const HANDOVER_FLAKINESS_SLOT_WINDOW: u64 = 15;
 /// `expected_setup_batches` is a *batch* number (rollup height minus one), not a slot number:
 /// slot numbers run ahead of batch numbers because of empty DA slots.
 ///
+/// `migration_boundary_batch_counts` lists the cumulative batch counts at which a version
+/// handover (and possibly a db migration) occurs, i.e. `k * blocks_per_version` for each
+/// non-last version `k`. The db migration rewrites the *state root* of the ledger's head slot
+/// (the outgoing version's final slot), so that slot legitimately reports either the recorded
+/// pre-migration root or the patched post-migration root depending on when it is read. For
+/// exactly those boundary slots the state root comparison is skipped; the migrated root is
+/// still fully verified because the next recorded slot's root chains from it and is compared
+/// strictly.
+///
 /// Returns `(latest_batch_num, first_new_slot)`, where `first_new_slot` is the first slot after
 /// the recorded data — the slot where a not-yet-generated next version would begin.
 pub async fn resync_and_verify_slots(
     directories: &Directories,
     expected_setup_batches: u64,
     last_recorded_slot: Option<u64>,
+    migration_boundary_batch_counts: &[u64],
     shutdown_rx: &mut ShutdownReceiver,
 ) -> Result<(u64, u64), anyhow::Error> {
     // Wait for the freshly spawned rollup's API to come up before subscribing.
@@ -704,8 +714,45 @@ pub async fn resync_and_verify_slots(
                     continue 'outer;
                 }
             };
+            let live_slot = slot.into_inner();
+
+            // At a version-handover boundary, the db migration patches this slot's state root
+            // in the ledger, so the live value races the migration: both the recorded
+            // (pre-migration) and patched (post-migration) roots are legitimate. Skip the
+            // state root comparison for exactly these slots; everything else stays strict,
+            // and the migrated root itself is verified via the next slot's chained root.
+            let mut snapshot = snapshot;
+            // The boundary slot is the one that *carries* the boundary batch, i.e. its batch
+            // range is non-empty and ends on the boundary count. Detect it via `batch_range`
+            // (not `batches`): most snapshots are saved slim, without children, so `batches`
+            // deserializes as empty even for batch-carrying slots. The trailing empty slots
+            // after a boundary share its cumulative `batch_range.end` but have
+            // `start == end`, so they stay strictly compared.
+            let is_migration_boundary = slot_snapshot.batch_range.start
+                != slot_snapshot.batch_range.end
+                && migration_boundary_batch_counts.contains(&slot_snapshot.batch_range.end);
+            if is_migration_boundary {
+                let live_root = serde_json::to_value(&live_slot)
+                    .map_err(|e| anyhow!("failed to serialize live slot {slot_number}: {e}"))?
+                    .get("state_root")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                if snapshot.get("state_root") != Some(&live_root) {
+                    tracing::info!(
+                        slot_number,
+                        snapshot_root = %snapshot.get("state_root").unwrap_or(&serde_json::Value::Null),
+                        live_root = %live_root,
+                        "Skipping state root comparison at a version-handover boundary slot: \
+                         the db migration rewrites this slot's state root in the ledger"
+                    );
+                    if let Some(entry) = snapshot.get_mut("state_root") {
+                        *entry = live_root;
+                    }
+                }
+            }
+
             compare_against_snapshot(
-                &slot.into_inner(),
+                &live_slot,
                 snapshot,
                 &format!("slot_{}", slot_number),
                 false,

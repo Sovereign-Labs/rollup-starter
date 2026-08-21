@@ -125,10 +125,15 @@ async fn run_test(
         None,
     )?;
 
+    // Cumulative batch counts at which a version handover (and its db migration) occurs.
+    let migration_boundaries: Vec<u64> = (1..plan.manager_versions.len() as u64)
+        .map(|k| k * settings.blocks_per_version)
+        .collect();
     let (latest_batch_num, _first_new_slot) = resync_and_verify_slots(
         &directories,
         expected_setup_batches,
         last_recorded_slot,
+        &migration_boundaries,
         &mut shutdown_rx,
     )
     .await?;
