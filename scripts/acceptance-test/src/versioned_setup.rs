@@ -214,7 +214,11 @@ fn run_checked(cmd: &mut StdCommand, context: &str) -> Result<(), anyhow::Error>
 }
 
 fn load_version_sources(directories: &Directories) -> anyhow::Result<Vec<ResolvedVersion>> {
-    let spec_path = directories.rollup_root.join(VERSION_SPEC_FILE);
+    // The spec lives in the acceptance-test directory: it describes the versions of the
+    // recorded acceptance data, which is a property of this test setup — not of the rollup
+    // repo itself (a root-level versions.yaml is the resync tooling's convention on customer
+    // branches, describing the deployed rollup's actual versions).
+    let spec_path = directories.acceptance_test_dir.join(VERSION_SPEC_FILE);
     if !spec_path.exists() {
         info!(
             path = %spec_path.display(),
@@ -545,10 +549,12 @@ pub fn prepare_acceptance_run_plan(
                             )
                         })?)
                     } else if let Some(path) = &resolved_version.migration_path {
+                        // Relative migration paths resolve against the spec's own directory,
+                        // like `vars_file` does.
                         let migration_path = if path.is_absolute() {
                             path.clone()
                         } else {
-                            directories.rollup_root.join(path)
+                            directories.acceptance_test_dir.join(path)
                         };
                         Some(migration_path.canonicalize().with_context(|| {
                             format!(
@@ -586,10 +592,12 @@ pub fn prepare_acceptance_run_plan(
                             anyhow!("local head db migration binary was requested but not built")
                         })?)
                     } else if let Some(path) = &resolved_version.migration_path {
+                        // Relative migration paths resolve against the spec's own directory,
+                        // like `vars_file` does.
                         let migration_path = if path.is_absolute() {
                             path.clone()
                         } else {
-                            directories.rollup_root.join(path)
+                            directories.acceptance_test_dir.join(path)
                         };
                         Some(migration_path.canonicalize().with_context(|| {
                             format!(

@@ -50,7 +50,7 @@ Useful examples:
 
 ### Rollup versioning (hard forks)
 
-If a multi-version spec (`versions.yaml` at the repo root) is present, the test builds a binary per
+If a multi-version spec (`versions.yaml` in this directory) is present, the test builds a binary per
 version (each compiled against its own commit's acceptance-test constants), replays the recorded
 data across the historical versions, and puts the latest version (local `HEAD`, with the SDK commit
 under test) through the post-resync soak. Versions with `build_db_migration: true` also get their
