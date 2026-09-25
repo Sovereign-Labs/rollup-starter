@@ -51,6 +51,26 @@ const paymasterUpdateCall: RuntimeCall = {
                     // ["0xbE595DaD4d75cf04314e6e217F379926aFD38244", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     // ["0x8636752e1458b6B07318B9Cd53f5CbDD0ef3FEc3", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     // ["0x57768C7c683Da89d01d0c6b5c79f7ef0aFF75569", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x5A37E4dd40C3A2aeF76c2EA6AC47262807A2ce05", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x97c45B344FFF0b834C8DE9A5F971b130da57d6FC", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x8Aae624283b258E349030355e03B8aEeA83B5EC8", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x24cF627B04F81581ef66A169431d047B2591F5c4", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x04E21D75b9a1fA7Cd389F8E741e1d79B6455e33a", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x9a75C4d05571ff8db7E686Cf1Cb7Ab22Ec7BC2b6", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x8ae05EDcE5aCddedd7Eb9b49f0f206e7CB6eBba3", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x53D29C87b43d54B3BF04b8153C2F6c44Ec031A13", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x2e48D56D8c2528D25B9222C9591ba2CB9756D261", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x097288f38d82C332EeE4B4EB553aa80b1b835c97", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x86b28A8D961e7da3BC3d51B3A1475829dFD81758", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0xFb2961F8C1a97443a84224620C4e609F265898C4", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x378211cA3DA2F55cD251015Eb64491934d110257", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0xcf5F61c644276803fb5d4205B5c58E77df55a261", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0xe07EAC3b0dF423eEdF5d4E84Ade04E9Bf18b9087", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x548699a999ef6D1364887c5817518251C99C10a1", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0xd76DFD4Ad3CCFc7ED89c59002209C0AF14f9EAff", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x1345280b40f47A2142a68E131d8308E60Cc2fD2f", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x7F35D8482946d64ea1108E428bD911e51f10788a", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    ["0x5df8660d298AcD51b05392E310eD2fE449aC6901", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}]
                     // Add more allowed payees here. Do not uncomment previous payees - it will just bloat the callmessage. 
                 ]
             }
@@ -102,10 +122,10 @@ try {
         console.log("[✗] Receipt result:", receipt.result);
         process.exit(1);
     }
-    
+
     console.log("[✓] Receipt result: successful");
-   
-   
+
+
 } catch (e) {
     console.error("failed to call rollup:", e);
 }
