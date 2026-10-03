@@ -22,7 +22,14 @@ CHAIN_NAME = "TestChain"
 # The optional `grace_period` field (defaults to 0) specifies how many blocks after end_height
 # the old hash will still be accepted alongside the new hash, allowing for smooth transitions.
 # Example: CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 1000, chain_hash = "0xabc...32_bytes_hex", grace_period = 100 }]
-CHAIN_HASH_OVERRIDES = []
+#
+# Acceptance-test override: the recorded acceptance data (rollup heights up to 2000 for the full
+# profile, 60 for short) was signed with the chain hash from before the UniversalWallet named-tuples
+# schema change (sovereign-sdk #3061). The tiny primary range plus grace period accepts that old
+# hash for all heights < 2001, while the current Runtime::CHAIN_HASH (used by the soak txs that
+# follow the replay, and by data regeneration) stays valid at every height >= 1.
+# Revisit when the acceptance data is regenerated.
+CHAIN_HASH_OVERRIDES = [{ start_height = 0, end_height = 1, chain_hash = "0xfce85f17a3937295742f68b15453220692e38b0d4a8c9c6df2de51bafe339e83", grace_period = 2000 }]
 # The global on-chain Sovereign state version expected by this binary.
 # This must match the `sov_chain_state::state_version` value in the current on-disk state. The compiled
 # rollup will refuse to run if there is a mismatch.
