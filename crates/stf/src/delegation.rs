@@ -4,7 +4,7 @@ use sov_address::{EthereumAddress, FromVmAddress};
 use sov_bank::Amount;
 use sov_capabilities::StandardProvenRollupCapabilities as StandardCapabilities;
 use sov_eip712_auth::{Eip712AuthenticatorTrait, Secp256k1CryptoSpec};
-use sov_evm::EthereumAuthenticator;
+use sov_evm::{EthereumAuthenticator, HasEvm};
 use sov_hyperlane_integration::HyperlaneAddress;
 use sov_kernels::soft_confirmations::SoftConfirmationsKernel;
 use sov_modules_api::capabilities::AuthorizationData;
@@ -294,6 +294,17 @@ where
 {
     fn add_ethereum_auth(tx: RawTx) -> <Self::Auth as TransactionAuthenticator<S>>::Input {
         EvmAndEip712AuthenticatorInput::Evm(tx)
+    }
+}
+
+impl<S: Spec> HasEvm<S> for Runtime<S>
+where
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    type EvmPrecompiles = stf_starter_declaration::RelayEvmPrecompiles<S>;
+
+    fn evm(&self) -> &sov_evm::Evm<S, Self::EvmPrecompiles> {
+        &self.0.evm
     }
 }
 
