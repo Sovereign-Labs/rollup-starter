@@ -8,7 +8,6 @@ use sov_mock_zkvm::MockZkvm;
 use sov_modules_api::capabilities::UniquenessData;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
 use sov_modules_api::execution_mode::Native;
-use sov_modules_api::macros::config_value;
 use sov_modules_api::transaction::{PriorityFeeBips, Transaction, UnsignedTransaction};
 use sov_modules_api::{Amount, Spec};
 use sov_modules_rollup_blueprint::logging::default_rust_log_value;
@@ -97,7 +96,6 @@ async fn send_test_create_token_tx(client: &NodeClient) -> Result<(), anyhow::Er
         admins: SafeVec::default(),
         supply_cap: None,
     });
-    let chain_id = config_value!("CHAIN_ID");
     let generation = 0;
     let max_priority_fee = PriorityFeeBips::ZERO;
     let gas_limit = None;
@@ -106,11 +104,12 @@ async fn send_test_create_token_tx(client: &NodeClient) -> Result<(), anyhow::Er
         &<Runtime<TestSpec> as sov_modules_stf_blueprint::Runtime<TestSpec>>::CHAIN_HASH,
         UnsignedTransaction::new(
             msg,
-            chain_id,
+            <Runtime<TestSpec> as sov_modules_stf_blueprint::Runtime<TestSpec>>::CHAIN_HASH,
             max_priority_fee,
             MAX_TX_FEE,
             UniquenessData::Generation(generation),
             gas_limit,
+            None,
         ),
     );
 

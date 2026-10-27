@@ -3,6 +3,7 @@
 use sov_address::{EthereumAddress, FromVmAddress};
 use sov_eip712_auth::{SchemaProvider, Secp256k1CryptoSpec};
 use sov_hyperlane_integration::HyperlaneAddress;
+use sov_modules_api::capabilities::HasSequencingData;
 use sov_modules_api::capabilities::TransactionAuthenticator;
 #[cfg(feature = "native")]
 use sov_modules_api::prelude::*;
@@ -30,11 +31,37 @@ pub struct Runtime<S: Spec>(pub(crate) RuntimeInner<S>)
 where
     <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>;
 
+impl<S: Spec> std::ops::Deref for Runtime<S>
+where
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    type Target = RuntimeInner<S>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<S: Spec> std::ops::DerefMut for Runtime<S>
+where
+    <S as Spec>::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl<S: Spec> SchemaProvider for Runtime<S>
 where
     S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
 {
     const SCHEMA_BORSH: &'static [u8] = __generated::SCHEMA_BORSH;
+}
+
+impl<S: Spec> HasSequencingData<S> for Runtime<S>
+where
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    type SequencingData = ();
 }
 
 impl<S: Spec> sov_modules_stf_blueprint::Runtime<S> for Runtime<S>
