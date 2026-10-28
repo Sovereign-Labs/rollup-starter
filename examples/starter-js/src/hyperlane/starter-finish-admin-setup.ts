@@ -71,6 +71,8 @@ const paymasterUpdateCall: RuntimeCall = {
                     // ["0x1345280b40f47A2142a68E131d8308E60Cc2fD2f", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     // ["0x7F35D8482946d64ea1108E428bD911e51f10788a", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
                     // ["0x5df8660d298AcD51b05392E310eD2fE449aC6901", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0x87641E21543BEdc70e4F34a254E6abAb8c16EC35", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}],
+                    // ["0xa984c4ca650b265E9db76f8713A9A626F704B83a", {allow: {max_fee: null, gas_limit: null, transaction_limit: null, max_gas_price: null}}]
                     // Add more allowed payees here. Do not uncomment previous payees - it will just bloat the callmessage. 
                 ]
             }
