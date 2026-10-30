@@ -4,8 +4,7 @@ use futures::FutureExt;
 use serde::de::DeserializeOwned;
 use sov_api_spec::types::Slot;
 use sov_api_spec::ClientInfo;
-use sov_modules_api::capabilities::config_chain_id;
-use sov_modules_api::transaction::{Transaction, TxDetails};
+use sov_modules_api::transaction::{chain_hash_fragment, Transaction, TxDetails};
 use sov_modules_api::{DispatchCall, PrivateKey, Runtime as RuntimeTrait};
 use sov_rollup_interface::node::ledger_api::IncludeChildren;
 use sov_test_utils::{TransactionType, TEST_DEFAULT_MAX_FEE, TEST_DEFAULT_MAX_PRIORITY_FEE};
@@ -215,7 +214,7 @@ fn create_assert_block_state_tx(
             max_priority_fee_bips: TEST_DEFAULT_MAX_PRIORITY_FEE,
             max_fee: TEST_DEFAULT_MAX_FEE,
             gas_limit: None,
-            chain_id: config_chain_id(),
+            chain_hash_fragment: chain_hash_fragment(&Runtime::CHAIN_HASH),
         },
         &mut HashMap::from([(key.pub_key(), 0)]),
     ))

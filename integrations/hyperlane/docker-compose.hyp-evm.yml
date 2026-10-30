@@ -51,7 +51,7 @@ services:
       --yes
 
   validator-ethtest:
-    image: ghcr.io/ross-weir/hyperlane-agent:integration-lander-2
+    image: ghcr.io/theodorebugnet/hyperlane-agent:multisig_upgrade-4
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
@@ -97,7 +97,7 @@ services:
   # TODO: validator-sovstarter
 
   relayer:
-    image: ghcr.io/ross-weir/hyperlane-agent:integration-lander-2
+    image: ghcr.io/theodorebugnet/hyperlane-agent:multisig_upgrade-4
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
