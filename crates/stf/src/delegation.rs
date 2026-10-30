@@ -2,7 +2,7 @@
 use sov_address::{EthereumAddress, FromVmAddress};
 use sov_capabilities::StandardProvenRollupCapabilities as StandardCapabilities;
 use sov_eip712_auth::{Eip712AuthenticatorTrait, Secp256k1CryptoSpec};
-use sov_evm::EthereumAuthenticator;
+use sov_evm::{EthereumAuthenticator, HasEvm};
 use sov_hyperlane_integration::HyperlaneAddress;
 use sov_kernels::soft_confirmations::SoftConfirmationsKernel;
 #[cfg(feature = "native")]
@@ -215,6 +215,17 @@ where
             attester_incentives: &mut self.0.attester_incentives,
             prover_incentives: &mut self.0.prover_incentives,
         })
+    }
+}
+
+impl<S: Spec> HasEvm<S> for Runtime<S>
+where
+    S::Address: HyperlaneAddress + FromVmAddress<EthereumAddress>,
+{
+    type EvmPrecompiles = sov_evm::precompiles::NoCustomPrecompiles<S>;
+
+    fn evm(&self) -> &sov_evm::Evm<S, Self::EvmPrecompiles> {
+        &self.0.evm
     }
 }
 
