@@ -14,30 +14,132 @@
  * Module call message.
  */
 export interface RuntimeCall {
-    accounts?:                 CallMessage;
+    accounts?:                 Accounts;
     uniqueness?:               null;
-    bank?:                     CallMessage2;
-    sequencer_registry?:       CallMessage3;
-    operator_incentives?:      CallMessage4;
-    attester_incentives?:      CallMessage5Class | CallMessage5Enum;
-    prover_incentives?:        CallMessage6Class | CallMessage6Enum;
-    value_setter?:           CallMessage7;
-    chain_state?:              null;
+    bank?:                     Bank;
+    sequencer_registry?:       SequencerRegistry;
+    operator_incentives?:      OperatorIncentives;
+    attester_incentives?:      AttesterIncentivesClass | AttesterIncentivesEnum;
+    prover_incentives?:        ProverIncentivesClass | ProverIncentivesEnum;
+    chain_state?:              ChainStateClass | ChainStateEnum;
     blob_storage?:             null;
-    paymaster?:                CallMessage8;
-    mailbox?:                  CallMessage9;
-    interchain_gas_paymaster?: CallMessage10;
+    paymaster?:                Paymaster;
+    revenue_share?:            RevenueShareClass | RevenueShareEnum;
+    mailbox?:                  Mailbox;
+    interchain_gas_paymaster?: InterchainGasPaymaster;
     merkle_tree_hook?:         null;
-    warp?:                     CallMessageForConfigurableSpec;
+    warp?:                     Warp;
+    value_setter?:             ValueSetter;
+    evm?:                      Evm;
 }
 
 /**
  * Represents the available call messages for interacting with the sov-accounts module.
  *
- * Inserts a new credential id for the corresponding Account.
+ * Authorizes `credential_id` as a signer for the caller's address.
+ * Fails if the credential is already authorized for the caller's address.
+ *
+ * Authorizes `credential` to sign transactions that execute as `address`.
+ * The caller must currently be signing as `address`. Fails if the tuple
+ * is already authorized.
+ *
+ * Revokes `credential` from `address`. The caller must currently be
+ * signing as `address`. No orphan guard: revoking the last credential
+ * succeeds and leaves `address` unspendable via this map.
+ *
+ * Atomically swaps `old_credential` for `new_credential` on `address`.
+ * Functionally equivalent to a `RemoveCredentialFromAddress` followed by
+ * an `AddCredentialToAddress`, collapsed into a single call so the
+ * caller does not have to authorize two transactions during a rotation.
+ * The caller must currently be signing as `address`.
+ *
+ * Creates a new *synthetic* address — an address whose authorization
+ * lives purely in `account_owners` and which has no
+ * naturally-corresponding private key — and auto-authorizes the
+ * caller's current credential for it.
+ *
+ * The address is derived deterministically by hashing
+ * `(domain || visible_slot_hash || sender_addr || sender_credential || salt)`
+ * with `S::CryptoSpec::Hasher`, then converting the resulting 32 bytes
+ * to `S::Address` via `CredentialId.into()`. Different callers, salts,
+ * and visible slots produce different addresses; replaying the same
+ * tuple in the same slot is an idempotent no-op.
+ *
+ * `visible_slot_hash` is part of the derivation by design: an
+ * attacker who later compromises the caller's private key cannot
+ * reconstruct the same synthetic address off-chain, because the slot
+ * hash only becomes known once chain progress commits to it and is
+ * unforgeable without participating in consensus. This makes the
+ * call *bind-then-use*, not *counterfactual*: unlike CREATE2 or
+ * ERC-4337, the address cannot be predicted and prefunded ahead of
+ * the `CreateSyntheticAddress` transaction. Callers must wait for
+ * finalization and read the derived address from the
+ * `SyntheticAddressCreated` event before routing assets or
+ * permissions to it.
  */
-export interface CallMessage {
-    insert_credential_id: string;
+export interface Accounts {
+    /**
+     * The credential id being authorized.
+     */
+    insert_credential_id?:           string;
+    add_credential_to_address?:      AddCredentialToAddress;
+    remove_credential_from_address?: RemoveCredentialFromAddress;
+    rotate_credential_on_address?:   RotateCredentialOnAddress;
+    create_synthetic_address?:       CreateSyntheticAddress;
+}
+
+export interface AddCredentialToAddress {
+    /**
+     * The address whose credential set is being extended. Must equal
+     * `context.sender()`.
+     */
+    address: string;
+    /**
+     * The credential being authorized for `address`.
+     */
+    credential: string;
+    [property: string]: any;
+}
+
+export interface CreateSyntheticAddress {
+    /**
+     * Caller-supplied salt that allows the same caller to derive
+     * multiple distinct synthetic addresses in the same slot.
+     */
+    salt: number[];
+    [property: string]: any;
+}
+
+export interface RemoveCredentialFromAddress {
+    /**
+     * The address whose credential set is being reduced. Must equal
+     * `context.sender()`.
+     */
+    address: string;
+    /**
+     * The credential being revoked from `address`.
+     */
+    credential: string;
+    [property: string]: any;
+}
+
+export interface RotateCredentialOnAddress {
+    /**
+     * The address whose credential set is being rotated. Must equal
+     * `context.sender()`.
+     */
+    address: string;
+    /**
+     * The credential being authorized for `address`. Must not already
+     * be authorized.
+     */
+    new_credential: string;
+    /**
+     * The credential being revoked from `address`. Must be currently
+     * authorized.
+     */
+    old_credential: string;
+    [property: string]: any;
 }
 
 /**
@@ -47,10 +149,10 @@ export interface CallMessage {
  *
  * Increases the balance of the attester.
  */
-export interface CallMessage5Class {
-    register_attester?:   number;
-    register_challenger?: number;
-    deposit_attester?:    number;
+export interface AttesterIncentivesClass {
+    register_attester?:   string;
+    register_challenger?: string;
+    deposit_attester?:    string;
 }
 
 /**
@@ -60,7 +162,7 @@ export interface CallMessage5Class {
  *
  * Exit a challenger
  */
-export enum CallMessage5Enum {
+export enum AttesterIncentivesEnum {
     BeginExitAttester = "begin_exit_attester",
     ExitAttester = "exit_attester",
     ExitChallenger = "exit_challenger",
@@ -79,13 +181,17 @@ export enum CallMessage5Enum {
  * Mints a specified amount of tokens.
  *
  * Freezes a token so that the supply is frozen
+ *
+ * Updates the list of admins for a specified token.
  */
-export interface CallMessage2 {
-    create_token?: CreateToken;
-    transfer?:     Transfer;
-    burn?:         Burn;
-    mint?:         Mint;
-    freeze?:       Freeze;
+export interface Bank {
+    create_token?:       CreateToken;
+    transfer?:           Transfer;
+    burn?:               Burn;
+    mint?:               Mint;
+    freeze?:             Freeze;
+    update_admin?:       UpdateAdmin;
+    transfer_with_memo?: TransferWithMemo;
 }
 
 export interface Burn {
@@ -99,8 +205,9 @@ export interface Burn {
 /**
  * The amount of tokens to transfer.
  *
- * Structure that stores information specifying a given `amount` (type [`Amount`]) of coins
- * stored at a `token_id` (type [`crate::TokenId`]).
+ * Structure that stores information specifying
+ * a given `amount` (type [`Amount`]) of coins stored at a `token_id`
+ * (type [`crate::TokenId`]).
  *
  * The amount of tokens to burn.
  *
@@ -110,7 +217,7 @@ export interface Coins {
     /**
      * The number of tokens
      */
-    amount: number;
+    amount: string;
     /**
      * The ID of the token
      */
@@ -126,7 +233,7 @@ export interface CreateToken {
     /**
      * The initial balance of the new token.
      */
-    initial_balance: number;
+    initial_balance: string;
     /**
      * The address of the account that the new tokens are minted to.
      */
@@ -134,7 +241,7 @@ export interface CreateToken {
     /**
      * The supply cap of the new token, if any.
      */
-    supply_cap?: number | null;
+    supply_cap?: null | string;
     /**
      * The number of decimal places this token's amounts will have.
      */
@@ -178,13 +285,175 @@ export interface Transfer {
     [property: string]: any;
 }
 
+export interface TransferWithMemo {
+    /**
+     * The amount of tokens to transfer.
+     */
+    coins: Coins;
+    /**
+     * The message included with the transfer
+     */
+    memo: string;
+    /**
+     * The address to which the tokens will be transferred.
+     */
+    to: string;
+    [property: string]: any;
+}
+
+export interface UpdateAdmin {
+    /**
+     * The new admin address.
+     * If `None`, the current admin entry for the transaction sender will be removed.
+     */
+    new_admin?: null | string;
+    /**
+     * The ID of the token whose admin list is being updated.
+     */
+    token_id: string;
+    [property: string]: any;
+}
+
 /**
- * This enumeration represents the available call messages for interacting with the
- * `ValueSetter` module. The `derive` for [`schemars::JsonSchema`] is a requirement of
- * [`sov_modules_api::ModuleCallJsonSchema`].
+ * Sets the current time.
  */
-export interface CallMessage7 {
-    set_value: number;
+export interface ChainStateClass {
+    SetOracleTime: SetOracleTime;
+}
+
+export interface SetOracleTime {
+    /**
+     * The new time in milliseconds since the epoch
+     */
+    milliseconds_since_epoch: number;
+    [property: string]: any;
+}
+
+/**
+ * Terminates setup mode as of the next rollup block.
+ */
+export enum ChainStateEnum {
+    TerminateSetupMode = "TerminateSetupMode",
+}
+
+/**
+ * EVM call message.
+ *
+ * RLP encoded transaction.
+ *
+ * Update the runtime configuration
+ *
+ * Enable or disable custom EVM precompiles.
+ *
+ * This is a dedicated message (rather than a field of [`EvmRuntimeConfigUpdate`]) so that
+ * the
+ * borsh layout of the pre-existing call messages is preserved: appending a variant keeps
+ * the
+ * existing variant discriminants, and `EvmRuntimeConfigUpdate` keeps its original fields,
+ * so
+ * transactions created before custom precompiles existed still decode identically.
+ */
+export interface Evm {
+    call?:                              Call;
+    update_runtime_config?:             UpdateRuntimeConfig;
+    update_enabled_custom_precompiles?: UpdateEnabledCustomPrecompiles;
+}
+
+/**
+ * RLP encoded evm transaction.
+ */
+export interface Call {
+    /**
+     * Rlp data.
+     */
+    rlp: number[];
+    [property: string]: any;
+}
+
+/**
+ * An update to the enabled custom EVM precompile set.
+ */
+export interface UpdateEnabledCustomPrecompiles {
+    /**
+     * Custom precompile addresses to enable.
+     */
+    add: string[];
+    /**
+     * Custom precompile addresses to disable.
+     */
+    remove: string[];
+    [property: string]: any;
+}
+
+/**
+ * An update to the runtime configuration.
+ */
+export interface UpdateRuntimeConfig {
+    /**
+     * A new chain spec to apply. None means "no change"
+     */
+    chain_spec_update?: null | ChainSpecUpdateObject;
+    /**
+     * A new admin address to set. None means "no change"
+     */
+    new_admin?: null | string;
+    /**
+     * A new contract creation policy to apply. None means "no change"
+     */
+    new_contract_creation_policy?: NewContractCreationPolicyClass | NewContractCreationPolicyEnum | null;
+    /**
+     * A new hardfork to activate and the block number at which it activates
+     */
+    new_hardfork?: any[] | null;
+    [property: string]: any;
+}
+
+/**
+ * An update to the chain spec.
+ */
+export interface ChainSpecUpdateObject {
+    /**
+     * The new block gas limit. Must be greater than 5M to avoid censorship. None means "no
+     * change"
+     * Check that the limit is greater than 5M to avoid accidental complete shutdown.
+     */
+    new_block_gas_limit?: number | null;
+    /**
+     * The new limit for contract code size. None means "no change"
+     */
+    new_limit_contract_code_size?: number | null;
+    /**
+     * The new tx gas limit. Must be less than or equal to the effective block gas limit after
+     * applying the update. None means "no change"
+     */
+    new_tx_gas_limit?: number | null;
+    [property: string]: any;
+}
+
+/**
+ * Only allowed addresses can create contracts
+ */
+export interface NewContractCreationPolicyClass {
+    allowlist: Allowlist;
+}
+
+export interface Allowlist {
+    /**
+     * Addresses to add to the allowlist
+     */
+    add: string[];
+    /**
+     * Addresses to remove from the allowlist
+     */
+    remove: string[];
+    [property: string]: any;
+}
+
+/**
+ * No restrictions on contract creation
+ */
+export enum NewContractCreationPolicyEnum {
+    Everyone = "everyone",
 }
 
 /**
@@ -198,7 +467,7 @@ export interface CallMessage7 {
  *
  * Beneficiary (sender) claim all relayer rewards.
  */
-export interface CallMessage10 {
+export interface InterchainGasPaymaster {
     set_relayer_config?: SetRelayerConfig;
     update_oracle_data?: UpdateOracleData;
     claim_rewards?:      ClaimRewards;
@@ -220,26 +489,28 @@ export interface SetRelayerConfig {
     /**
      * Default gas used if custom one is not set.
      */
-    default_gas: number;
+    default_gas: string;
     /**
      * Custom default gas per domain.
      */
-    domain_default_gas: DomainDefaultGas[];
+    domain_default_gas: DomainDefaultGasElement[];
     /**
-     * oracle data per domain.
+     * Oracle data per domain.
      */
-    domain_oracle_data: DomainOracleData[];
+    domain_oracle_data: DomainOracleDatumElement[];
     [property: string]: any;
 }
 
 /**
+ * Custom default gas per domain.
+ *
  * Domain Default Gas used in `CallMessage::SetRelayerConfig`.
  */
-export interface DomainDefaultGas {
+export interface DomainDefaultGasElement {
     /**
      * Default gas.
      */
-    default_gas: number;
+    default_gas: string;
     /**
      * Domain.
      */
@@ -248,13 +519,15 @@ export interface DomainDefaultGas {
 }
 
 /**
+ * Oracle data per domain.
+ *
  * Domain Oracle Data used in `CallMessage::SetRelayerConfig`.
  */
-export interface DomainOracleData {
+export interface DomainOracleDatumElement {
     /**
      * Oracle data value.
      */
-    data_value: ExchangeRateAndGasPrice;
+    data_value: DataValue;
     /**
      * Domain.
      */
@@ -271,11 +544,11 @@ export interface DomainOracleData {
  *
  * Relayer is responsible to multiple token_rate_exchange by `TOKEN_EXCHANGE_RATE_SCALE`.
  */
-export interface ExchangeRateAndGasPrice {
+export interface DataValue {
     /**
      * Gas price.
      */
-    gas_price: number;
+    gas_price: string;
     /**
      * Token exchange rate, calculated as local gas token price / remote gas token price.
      *
@@ -295,7 +568,7 @@ export interface UpdateOracleData {
      *
      * Relayer is responsible to multiple token_rate_exchange by `TOKEN_EXCHANGE_RATE_SCALE`.
      */
-    oracle_data: ExchangeRateAndGasPrice;
+    oracle_data: DataValue;
     [property: string]: any;
 }
 
@@ -306,14 +579,15 @@ export interface UpdateOracleData {
  * Sends an outbound message to the specified recipient.
  *
  * Receive an inbound message. This is called *on the desitination chain* by the relayer
- * after a `dispatch` call has been made on the source chain.
+ * after
+ * a `dispatch` call has been made on the source chain.
  *
- * Passes the message metadata and body to the security module (ISM) for verification, then
- * calls the recipient's `handle` function with the message body.
+ * Passes the message metadata and body to the security module (ISM) for verification,
+ * then calls the recipient's `handle` function with the message body.
  *
  * Announce a validator and its signatures' storage.
  */
-export interface CallMessage9 {
+export interface Mailbox {
     dispatch?: Dispatch;
     process?:  Process;
     announce?: Announce;
@@ -346,14 +620,15 @@ export interface Dispatch {
      */
     domain: number;
     /**
-     * A limit for the payment to relayer to cover gas needed for message delivery. If relayer
-     * demands more than this value of native gas token, dispatching message will fail. If it
-     * demands less than this, only needed amount will be paid.
+     * A limit for the payment to relayer to cover gas needed for message delivery.
+     * If relayer demands more than this value of native gas token, dispatching message
+     * will fail. If it demands less than this, only needed amount will be paid.
      */
-    gas_payment_limit: number;
+    gas_payment_limit: string;
     /**
-     * The "metadata" which is used to verify the message or control hooks. Can be used to set
-     * the destination gas limit for a message using [`IGPMetadata`](crate::igp::IGPMetadata)
+     * The "metadata" which is used to verify the message or control hooks.
+     * Can be used to set the destination gas limit for a message using
+     * [`IGPMetadata`](crate::igp::IGPMetadata)
      */
     metadata?: null | string;
     /**
@@ -383,64 +658,65 @@ export interface Process {
  * This enumeration represents the available call messages for interacting with the
  * sov-operator-incentives module.
  */
-export interface CallMessage4 {
+export interface OperatorIncentives {
     update_reward_address: UpdateRewardAddress;
 }
 
 export interface UpdateRewardAddress {
     /**
-     * The new address that will receive rewards for operating the rollup. Note: We do not
-     * verify possession of the corresponding private key, so it's possible to set an address
-     * for which the `sender` does not control the private key.
+     * The new address that will receive rewards for operating the rollup.
+     * Note: We do not verify possession of the corresponding private key,
+     * so it's possible to set an address for which the `sender` does not control the private
+     * key.
      */
     new_reward_address: string;
-    [property: string]: any;
-}
-
-export interface UpdatePolicy {
-    payer:  string;
-    update: CallMessage8;
     [property: string]: any;
 }
 
 /**
  * Call messages for interacting with the `Paymaster` module.
  *
- * ## Note: These call messages are highly unusual in that they have different effects based
- * on the address of the sequencer who places them on chain. See the docs on individual
- * variants for more information.
+ * ## Note:
+ * These call messages are highly unusual in that they have different effects
+ * based on the address of the sequencer who places them on chain. See the docs
+ * on individual variants for more information.
  *
  * Register a new payer with the given policy. If the sequencer who places this message on
- * chain is present in the list of `authorized_sequencers` to use the payer, the payer
- * address for that sequencer is set to the address of the newly registered payer.
+ * chain
+ * is present in the list of `authorized_sequencers` to use the payer, the payer address for
+ * that
+ * sequencer is set to the address of the newly registered payer.
  *
- * Set the payer address for the sequencer to the given address. This call message is highly
- * unusual in that it executes regardless of the sender address on the rollup. Sequencers
- * who do not wish to update their payer address should not sequence transactions containing
- * this callmessage.
+ * Set the payer address for the sequencer to the given address.
+ * This call message is highly unusual in that it executes regardless of the sender address
+ * on the rollup.
+ * Sequencers who do not wish to update their payer address should not sequence transactions
+ * containing this callmessage.
  *
- * Update the policy for a given payer. If the sequencer who places this message on chain is
- * present in the list of `authorized_sequencers` to use the payer after the update, the
- * payer address for that sequencer is set to the address of the newly registered paymaster.
+ * Update the policy for a given payer. If the sequencer who places this message on chain
+ * is present in the list of `authorized_sequencers` to use the payer after the update, the
+ * payer address for that
+ * sequencer is set to the address of the newly registered paymaster.
  */
-export interface CallMessage8 {
+export interface Paymaster {
     register_paymaster?:      RegisterPaymaster;
     set_payer_for_sequencer?: SetPayerForSequencer;
     update_policy?:           UpdatePolicy;
 }
 
 export interface RegisterPaymaster {
-    policy: PaymasterPolicyInitializer;
+    policy: Policy;
     [property: string]: any;
 }
 
 /**
- * An initial policy for a paymaster. This includes... - A set of sequencers that can use
- * the paymaster - A set of users authorized to update this policy - A default policy for
- * accepting/rejecting gas requests - Specific policies for accepting/rejecting gas requests
- * from particular users
+ * An initial policy for a paymaster. This includes...
+ * - A set of sequencers that can use the paymaster
+ * - A set of users authorized to update this policy
+ * - A default policy for accepting/rejecting gas requests
+ * - Specific policies for accepting/rejecting gas requests from particular users
  */
-export interface PaymasterPolicyInitializer {
+export interface Policy {
     /**
      * Sequencers who are authorized to use this payer.
      */
@@ -452,12 +728,11 @@ export interface PaymasterPolicyInitializer {
     /**
      * Default payee policy for users that are not in the balances map.
      */
-    default_payee_policy: PayeePolicyClass | PayeePolicyEnum;
+    default_payee_policy: DefaultPayeePolicyClass | DefaultPayeePolicyEnum;
     /**
      * A mapping from user address to the policy for that user.
      */
-    payees: Array<Array<PayeePolicyClass | string>>;
-    [property: string]: any;
+    payees: Array<any[]>;
 }
 
 /**
@@ -475,24 +750,26 @@ export enum AuthorizedSequencersEnum {
 }
 
 /**
- * The paymaster pays the fees for a particular sender when the policy allows it... - If the
- * policy specifies a `max_fee`, the transaction's max fee must be less than or equal to
- * that value - if the policy specifies a `max_gas_price`, the current gas price must be
- * less than or equal to that value - If the policy specifies a gas limit, the transaction
- * must also specify a limit *and* that limit must be less than or equal to `gas_limit`.
+ * The paymaster pays the fees for a particular sender when the policy allows it...
+ * - If the policy specifies a `max_fee`, the transaction's max fee must be less than or
+ * equal to that value
+ * - if the policy specifies a `max_gas_price`, the current gas price must be less than or
+ * equal to that value
+ * - If the policy specifies a gas limit, the transaction must also specify a limit *and*
+ * that limit must be less than or equal to `gas_limit`.
  *
  * - If the policy specifies a transaction_limit, the policy can only cover that many
  * transactions, after which it will expire and be replaced with a Deny policy
  *
  * In all other cases, the sender pays their own fees.
  */
-export interface PayeePolicyClass {
+export interface DefaultPayeePolicyClass {
     allow: Allow;
 }
 
 export interface Allow {
     gas_limit?:         number[] | null;
-    max_fee?:           number | null;
+    max_fee?:           null | string;
     max_gas_price?:     number[] | null;
     transaction_limit?: number | null;
     [property: string]: any;
@@ -501,7 +778,7 @@ export interface Allow {
 /**
  * The payer does not pay fees for any transaction using this policy.
  */
-export enum PayeePolicyEnum {
+export enum DefaultPayeePolicyEnum {
     Deny = "deny",
 }
 
@@ -510,27 +787,118 @@ export interface SetPayerForSequencer {
     [property: string]: any;
 }
 
+export interface UpdatePolicy {
+    payer:  string;
+    update: UpdatePolicyUpdate;
+    [property: string]: any;
+}
+
+/**
+ * An update to the policy of a single gas payer
+ */
+export interface UpdatePolicyUpdate {
+    default_policy?:           DefaultPayeePolicyClass | DefaultPayeePolicyEnum | null;
+    payee_policies_to_delete?: string[] | null;
+    payee_policies_to_set?:    Array<any[]> | null;
+    sequencer_update?:         SequencerUpdateClass | SequencerUpdateEnum | null;
+    updaters_to_add?:          string[] | null;
+    updaters_to_remove?:       string[] | null;
+    [property: string]: any;
+}
+
+/**
+ * Sets the list of authorized sequencers to an explicit whitelist if it was previously
+ * `AllowAll`.
+ * Adds and removes the requested addresses from the sequencer whitelist.
+ */
+export interface SequencerUpdateClass {
+    update: SequencerUpdateUpdate;
+}
+
+/**
+ * A list of updates to the `allowed_sequencers` list for a particular payer.
+ */
+export interface SequencerUpdateUpdate {
+    to_add?:    string[] | null;
+    to_remove?: string[] | null;
+    [property: string]: any;
+}
+
+/**
+ * Authorizes any sequencer to use this payer.
+ */
+export enum SequencerUpdateEnum {
+    AllowAll = "allow_all",
+}
+
 /**
  * Add a new prover as a bonded prover.
  *
- * Increases the balance of the prover, transferring the funds from the prover account to
- * the rollup.
+ * Increases the balance of the prover, transferring the funds from the prover account
+ * to the rollup.
  */
-export interface CallMessage6Class {
-    register?: number;
-    deposit?:  number;
+export interface ProverIncentivesClass {
+    register?: string;
+    deposit?:  string;
 }
 
 /**
  * Unbonds the prover.
  */
-export enum CallMessage6Enum {
+export enum ProverIncentivesEnum {
     Exit = "exit",
 }
 
 /**
- * This enumeration represents the available call messages for interacting with the
- * `sov-sequencer-registry` module.
+ * Lower the revenue share percentage (admin only)
+ *
+ * Update the sovereign admin address (current admin only)
+ *
+ * Withdraw accumulated rewards to the admin address (admin only)
+ */
+export interface RevenueShareClass {
+    lower_revenue_percentage?: LowerRevenuePercentage;
+    update_sovereign_admin?:   UpdateSovereignAdmin;
+    withdraw_rewards?:         WithdrawRewards;
+}
+
+export interface LowerRevenuePercentage {
+    /**
+     * New percentage in basis points (e.g., 1000 = 10%)
+     */
+    percentage_in_basis_points: number;
+    [property: string]: any;
+}
+
+export interface UpdateSovereignAdmin {
+    /**
+     * The new admin address
+     */
+    new_admin: string;
+    [property: string]: any;
+}
+
+export interface WithdrawRewards {
+    /**
+     * The token ID to withdraw
+     */
+    token_id: string;
+    [property: string]: any;
+}
+
+/**
+ * Activate revenue sharing (admin only)
+ *
+ * Deactivate revenue sharing (admin only)
+ */
+export enum RevenueShareEnum {
+    ActivateRevenueShare = "activate_revenue_share",
+    DeactivateRevenueShare = "deactivate_revenue_share",
+}
+
+/**
+ * This enumeration represents the available call messages for interacting with
+ * the `sov-sequencer-registry` module.
  *
  * Add a new sequencer to the sequencer registry.
  *
@@ -541,8 +909,8 @@ export enum CallMessage6Enum {
  *
  * Withdraw a sequencer's balance after waiting for the withdrawal period.
  */
-export interface CallMessage3 {
-    register?:            Register;
+export interface SequencerRegistry {
+    register?:            SequencerRegistryRegister;
     deposit?:             Deposit;
     initiate_withdrawal?: InitiateWithdrawal;
     withdraw?:            Withdraw;
@@ -552,7 +920,7 @@ export interface Deposit {
     /**
      * The amount to increase.
      */
-    amount: number;
+    amount: string;
     /**
      * The DA address of the sequencer.
      */
@@ -568,11 +936,11 @@ export interface InitiateWithdrawal {
     [property: string]: any;
 }
 
-export interface Register {
+export interface SequencerRegistryRegister {
     /**
      * The initial balance of the sequencer.
      */
-    amount: number;
+    amount: string;
     /**
      * The Da address of the sequencer you're registering.
      */
@@ -588,27 +956,39 @@ export interface Withdraw {
     [property: string]: any;
 }
 
+export interface ValueSetter {
+    set_value: number;
+}
+
 /**
  * Call messages for the test recipient module.
  *
  * Register a route with the given token source and ISM.
  *
+ * Warp routes should be rate-limited for security purposes. Its main purpose is to prevent
+ * draining a warp
+ * route in case an exploit is discovered or validators are malicious. Hyperlane uses "token
+ * bucket"
+ * algorithm for rate limitting. If rate limitting is not desired, the parameters that
+ * control
+ * it can be set to [`Amount::MAX`].
+ *
  * Update an existing route with new admin or ISM.
  *
  * Add a counterparty router on another chain. This router is trusted. A malicious remote
- * router can steal funds. Each warp route can have at most one remote router for a given
- * destination domain.
+ * router can steal funds.
+ * Each warp route can have at most one remote router for a given destination domain.
  *
  * Remove a counterparty router on another chain.
  *
  * Transfer a token from the local chain to the remote chain.
  */
-export interface CallMessageForConfigurableSpec {
-    Register?:             RegisterObject;
-    Update?:               Update;
-    EnrollRemoteRouter?:   EnrollRemoteRouter;
-    UnEnrollRemoteRouter?: UnEnrollRemoteRouter;
-    TransferRemote?:       TransferRemote;
+export interface Warp {
+    register?:                WarpRegister;
+    update?:                  WarpUpdate;
+    enroll_remote_router?:    EnrollRemoteRouter;
+    un_enroll_remote_router?: UnEnrollRemoteRouter;
+    transfer_remote?:         TransferRemote;
 }
 
 export interface EnrollRemoteRouter {
@@ -627,38 +1007,70 @@ export interface EnrollRemoteRouter {
     [property: string]: any;
 }
 
-export interface RegisterObject {
+export interface WarpRegister {
     /**
      * The authority that can modify the route, if any.
      */
-    admin: AdminForConfigurableSpecClass | AdminForConfigurableSpecEnum;
+    admin: AdminClass | AdminEnum;
+    /**
+     * Defines how many tokens are added to the inbound transferrable limit at each visible
+     * slot.
+     *
+     * Usually this should be set to a value which allows full limit recovery each day,
+     * so `transferrable_tokens_limit / DA_SLOTS_PER_DAY`.
+     */
+    inbound_limit_replenishment_per_slot: string;
+    /**
+     * Defines how many tokens can be transferred to the route without any refills.
+     *
+     * No more than this amount can be transferred in a single slot. Each transfer decreases
+     * current limit value until 0, at which point all new transfers are rejected.
+     * The limit recovers at each visible slot by a configured amount.
+     */
+    inbound_transferrable_tokens_limit: string;
     /**
      * The ISM for this route.
      */
-    ism: IsmClass | IsmEnum;
+    ism: PurpleJSONSchema | IsmEnum;
+    /**
+     * Defines how many tokens are added to the outbound transferrable limit at each visible
+     * slot.
+     *
+     * Usually this should be set to a value which allows full limit recovery each day,
+     * so `transferrable_tokens_limit / DA_SLOTS_PER_DAY`.
+     */
+    outbound_limit_replenishment_per_slot: string;
+    /**
+     * Defines how many tokens can be transferred from the route without any refills.
+     *
+     * No more than this amount can be transferred in a single slot. Each transfer decreases
+     * current limit value until 0, at which point all new transfers are rejected.
+     * The limit recovers at each visible slot by a configured amount.
+     */
+    outbound_transferrable_tokens_limit: string;
     /**
      * Remote routers to enroll on route registration.
      */
-    remote_routers: Array<Array<number | string>>;
+    remote_routers: Array<any[]>;
     /**
      * The token source for the route.
      */
-    token_source: TokenKindClass | TokenKindEnum;
+    token_source: TokenSourceClass | TokenSourceEnum;
     [property: string]: any;
 }
 
 /**
- * Allow the specified address to modify the route. This is extremely insecure, but it seems
- * to be common practice in Hyperlane.
+ * Allow the specified address to modify the route. This is extremely insecure,
+ * but it seems to be common practice in Hyperlane.
  */
-export interface AdminForConfigurableSpecClass {
+export interface AdminClass {
     InsecureOwner: string;
 }
 
 /**
  * No admin - the route is immutable.
  */
-export enum AdminForConfigurableSpecEnum {
+export enum AdminEnum {
     None = "None",
 }
 
@@ -667,7 +1079,7 @@ export enum AdminForConfigurableSpecEnum {
  *
  * Accepts messages if signed by `threshold` or more of the provided `validators`
  */
-export interface IsmClass {
+export interface PurpleJSONSchema {
     TrustedRelayer?:    TrustedRelayer;
     MessageIdMultisig?: MessageIDMultisig;
 }
@@ -705,7 +1117,7 @@ export enum IsmEnum {
  *
  * The token is natively issued on the local chain.
  */
-export interface TokenKindClass {
+export interface TokenSourceClass {
     Synthetic?:  Synthetic;
     Collateral?: Collateral;
 }
@@ -739,7 +1151,7 @@ export interface Synthetic {
 /**
  * The token is the native token of the local chain.
  */
-export enum TokenKindEnum {
+export enum TokenSourceEnum {
     Native = "Native",
 }
 
@@ -747,7 +1159,7 @@ export interface TransferRemote {
     /**
      * The amount to transfer.
      */
-    amount: number;
+    amount: string;
     /**
      * The domain of the destination chain.
      */
@@ -755,7 +1167,7 @@ export interface TransferRemote {
     /**
      * A limit for the payment to relayer to cover gas needed for message delivery.
      */
-    gas_payment_limit: number;
+    gas_payment_limit: string;
     /**
      * The recipient on the destination chain.
      */
@@ -783,15 +1195,32 @@ export interface UnEnrollRemoteRouter {
     [property: string]: any;
 }
 
-export interface Update {
+export interface WarpUpdate {
     /**
      * New authority that can modify the route.
      */
-    admin?: AdminForConfigurableSpecClass | AdminForConfigurableSpecEnum | null;
+    admin?: AdminClass | AdminEnum | null;
+    /**
+     * Defines how many tokens are added to the inbound transferrable limit at each visible slot.
+     */
+    inbound_limit_replenishment_per_slot?: null | string;
+    /**
+     * Defines how many tokens can be transferred to the route without any refills.
+     */
+    inbound_transferrable_tokens_limit?: null | string;
     /**
      * New ISM for this route.
      */
-    ism?: IsmIsmClass | IsmEnum | null;
+    ism?: FluffyJSONSchema | IsmEnum | null;
+    /**
+     * Defines how many tokens are added to the outbound transferrable limit at each visible
+     * slot.
+     */
+    outbound_limit_replenishment_per_slot?: null | string;
+    /**
+     * Defines how many tokens can be transferred from the route without any refills.
+     */
+    outbound_transferrable_tokens_limit?: null | string;
     /**
      * The ID of the warp route on the local chain to update.
      */
@@ -804,7 +1233,7 @@ export interface Update {
  *
  * Accepts messages if signed by `threshold` or more of the provided `validators`
  */
-export interface IsmIsmClass {
+export interface FluffyJSONSchema {
     TrustedRelayer?:    TrustedRelayer;
     MessageIdMultisig?: MessageIDMultisig;
 }
@@ -975,49 +1404,73 @@ function r(name: string) {
 
 const typeMap: any = {
     "RuntimeCall": o([
-        { json: "accounts", js: "accounts", typ: u(undefined, r("CallMessage")) },
+        { json: "accounts", js: "accounts", typ: u(undefined, r("Accounts")) },
         { json: "uniqueness", js: "uniqueness", typ: u(undefined, null) },
-        { json: "bank", js: "bank", typ: u(undefined, r("CallMessage2")) },
-        { json: "sequencer_registry", js: "sequencer_registry", typ: u(undefined, r("CallMessage3")) },
-        { json: "operator_incentives", js: "operator_incentives", typ: u(undefined, r("CallMessage4")) },
-        { json: "attester_incentives", js: "attester_incentives", typ: u(undefined, u(r("CallMessage5Class"), r("CallMessage5Enum"))) },
-        { json: "prover_incentives", js: "prover_incentives", typ: u(undefined, u(r("CallMessage6Class"), r("CallMessage6Enum"))) },
-        { json: "value_setter", js: "value_setter", typ: u(undefined, r("CallMessage7")) },
-        { json: "chain_state", js: "chain_state", typ: u(undefined, null) },
+        { json: "bank", js: "bank", typ: u(undefined, r("Bank")) },
+        { json: "sequencer_registry", js: "sequencer_registry", typ: u(undefined, r("SequencerRegistry")) },
+        { json: "operator_incentives", js: "operator_incentives", typ: u(undefined, r("OperatorIncentives")) },
+        { json: "attester_incentives", js: "attester_incentives", typ: u(undefined, u(r("AttesterIncentivesClass"), r("AttesterIncentivesEnum"))) },
+        { json: "prover_incentives", js: "prover_incentives", typ: u(undefined, u(r("ProverIncentivesClass"), r("ProverIncentivesEnum"))) },
+        { json: "chain_state", js: "chain_state", typ: u(undefined, u(r("ChainStateClass"), r("ChainStateEnum"))) },
         { json: "blob_storage", js: "blob_storage", typ: u(undefined, null) },
-        { json: "paymaster", js: "paymaster", typ: u(undefined, r("CallMessage8")) },
-        { json: "mailbox", js: "mailbox", typ: u(undefined, r("CallMessage9")) },
-        { json: "interchain_gas_paymaster", js: "interchain_gas_paymaster", typ: u(undefined, r("CallMessage10")) },
+        { json: "paymaster", js: "paymaster", typ: u(undefined, r("Paymaster")) },
+        { json: "revenue_share", js: "revenue_share", typ: u(undefined, u(r("RevenueShareClass"), r("RevenueShareEnum"))) },
+        { json: "mailbox", js: "mailbox", typ: u(undefined, r("Mailbox")) },
+        { json: "interchain_gas_paymaster", js: "interchain_gas_paymaster", typ: u(undefined, r("InterchainGasPaymaster")) },
         { json: "merkle_tree_hook", js: "merkle_tree_hook", typ: u(undefined, null) },
-        { json: "warp", js: "warp", typ: u(undefined, r("CallMessageForConfigurableSpec")) },
+        { json: "warp", js: "warp", typ: u(undefined, r("Warp")) },
+        { json: "value_setter", js: "value_setter", typ: u(undefined, r("ValueSetter")) },
+        { json: "evm", js: "evm", typ: u(undefined, r("Evm")) },
     ], false),
-    "CallMessage": o([
-        { json: "insert_credential_id", js: "insert_credential_id", typ: "" },
+    "Accounts": o([
+        { json: "insert_credential_id", js: "insert_credential_id", typ: u(undefined, "") },
+        { json: "add_credential_to_address", js: "add_credential_to_address", typ: u(undefined, r("AddCredentialToAddress")) },
+        { json: "remove_credential_from_address", js: "remove_credential_from_address", typ: u(undefined, r("RemoveCredentialFromAddress")) },
+        { json: "rotate_credential_on_address", js: "rotate_credential_on_address", typ: u(undefined, r("RotateCredentialOnAddress")) },
+        { json: "create_synthetic_address", js: "create_synthetic_address", typ: u(undefined, r("CreateSyntheticAddress")) },
     ], false),
-    "CallMessage5Class": o([
-        { json: "register_attester", js: "register_attester", typ: u(undefined, 0) },
-        { json: "register_challenger", js: "register_challenger", typ: u(undefined, 0) },
-        { json: "deposit_attester", js: "deposit_attester", typ: u(undefined, 0) },
+    "AddCredentialToAddress": o([
+        { json: "address", js: "address", typ: "" },
+        { json: "credential", js: "credential", typ: "" },
+    ], "any"),
+    "CreateSyntheticAddress": o([
+        { json: "salt", js: "salt", typ: a(0) },
+    ], "any"),
+    "RemoveCredentialFromAddress": o([
+        { json: "address", js: "address", typ: "" },
+        { json: "credential", js: "credential", typ: "" },
+    ], "any"),
+    "RotateCredentialOnAddress": o([
+        { json: "address", js: "address", typ: "" },
+        { json: "new_credential", js: "new_credential", typ: "" },
+        { json: "old_credential", js: "old_credential", typ: "" },
+    ], "any"),
+    "AttesterIncentivesClass": o([
+        { json: "register_attester", js: "register_attester", typ: u(undefined, "") },
+        { json: "register_challenger", js: "register_challenger", typ: u(undefined, "") },
+        { json: "deposit_attester", js: "deposit_attester", typ: u(undefined, "") },
     ], false),
-    "CallMessage2": o([
+    "Bank": o([
         { json: "create_token", js: "create_token", typ: u(undefined, r("CreateToken")) },
         { json: "transfer", js: "transfer", typ: u(undefined, r("Transfer")) },
         { json: "burn", js: "burn", typ: u(undefined, r("Burn")) },
         { json: "mint", js: "mint", typ: u(undefined, r("Mint")) },
         { json: "freeze", js: "freeze", typ: u(undefined, r("Freeze")) },
+        { json: "update_admin", js: "update_admin", typ: u(undefined, r("UpdateAdmin")) },
+        { json: "transfer_with_memo", js: "transfer_with_memo", typ: u(undefined, r("TransferWithMemo")) },
     ], false),
     "Burn": o([
         { json: "coins", js: "coins", typ: r("Coins") },
     ], "any"),
     "Coins": o([
-        { json: "amount", js: "amount", typ: 0 },
+        { json: "amount", js: "amount", typ: "" },
         { json: "token_id", js: "token_id", typ: "" },
     ], "any"),
     "CreateToken": o([
         { json: "admins", js: "admins", typ: a("") },
-        { json: "initial_balance", js: "initial_balance", typ: 0 },
+        { json: "initial_balance", js: "initial_balance", typ: "" },
         { json: "mint_to_address", js: "mint_to_address", typ: "" },
-        { json: "supply_cap", js: "supply_cap", typ: u(undefined, u(0, null)) },
+        { json: "supply_cap", js: "supply_cap", typ: u(undefined, u(null, "")) },
         { json: "token_decimals", js: "token_decimals", typ: u(undefined, u(0, null)) },
         { json: "token_name", js: "token_name", typ: "" },
     ], "any"),
@@ -1032,10 +1485,52 @@ const typeMap: any = {
         { json: "coins", js: "coins", typ: r("Coins") },
         { json: "to", js: "to", typ: "" },
     ], "any"),
-    "CallMessage7": o([
-        { json: "set_value", js: "set_value", typ: 0 },
+    "TransferWithMemo": o([
+        { json: "coins", js: "coins", typ: r("Coins") },
+        { json: "memo", js: "memo", typ: "" },
+        { json: "to", js: "to", typ: "" },
+    ], "any"),
+    "UpdateAdmin": o([
+        { json: "new_admin", js: "new_admin", typ: u(undefined, u(null, "")) },
+        { json: "token_id", js: "token_id", typ: "" },
+    ], "any"),
+    "ChainStateClass": o([
+        { json: "SetOracleTime", js: "SetOracleTime", typ: r("SetOracleTime") },
     ], false),
-    "CallMessage10": o([
+    "SetOracleTime": o([
+        { json: "milliseconds_since_epoch", js: "milliseconds_since_epoch", typ: 0 },
+    ], "any"),
+    "Evm": o([
+        { json: "call", js: "call", typ: u(undefined, r("Call")) },
+        { json: "update_runtime_config", js: "update_runtime_config", typ: u(undefined, r("UpdateRuntimeConfig")) },
+        { json: "update_enabled_custom_precompiles", js: "update_enabled_custom_precompiles", typ: u(undefined, r("UpdateEnabledCustomPrecompiles")) },
+    ], false),
+    "Call": o([
+        { json: "rlp", js: "rlp", typ: a(0) },
+    ], "any"),
+    "UpdateEnabledCustomPrecompiles": o([
+        { json: "add", js: "add", typ: a("") },
+        { json: "remove", js: "remove", typ: a("") },
+    ], "any"),
+    "UpdateRuntimeConfig": o([
+        { json: "chain_spec_update", js: "chain_spec_update", typ: u(undefined, u(null, r("ChainSpecUpdateObject"))) },
+        { json: "new_admin", js: "new_admin", typ: u(undefined, u(null, "")) },
+        { json: "new_contract_creation_policy", js: "new_contract_creation_policy", typ: u(undefined, u(r("NewContractCreationPolicyClass"), r("NewContractCreationPolicyEnum"), null)) },
+        { json: "new_hardfork", js: "new_hardfork", typ: u(undefined, u(a("any"), null)) },
+    ], "any"),
+    "ChainSpecUpdateObject": o([
+        { json: "new_block_gas_limit", js: "new_block_gas_limit", typ: u(undefined, u(0, null)) },
+        { json: "new_limit_contract_code_size", js: "new_limit_contract_code_size", typ: u(undefined, u(0, null)) },
+        { json: "new_tx_gas_limit", js: "new_tx_gas_limit", typ: u(undefined, u(0, null)) },
+    ], "any"),
+    "NewContractCreationPolicyClass": o([
+        { json: "allowlist", js: "allowlist", typ: r("Allowlist") },
+    ], false),
+    "Allowlist": o([
+        { json: "add", js: "add", typ: a("") },
+        { json: "remove", js: "remove", typ: a("") },
+    ], "any"),
+    "InterchainGasPaymaster": o([
         { json: "set_relayer_config", js: "set_relayer_config", typ: u(undefined, r("SetRelayerConfig")) },
         { json: "update_oracle_data", js: "update_oracle_data", typ: u(undefined, r("UpdateOracleData")) },
         { json: "claim_rewards", js: "claim_rewards", typ: u(undefined, r("ClaimRewards")) },
@@ -1045,27 +1540,27 @@ const typeMap: any = {
     ], "any"),
     "SetRelayerConfig": o([
         { json: "beneficiary", js: "beneficiary", typ: u(undefined, u(null, "")) },
-        { json: "default_gas", js: "default_gas", typ: 0 },
-        { json: "domain_default_gas", js: "domain_default_gas", typ: a(r("DomainDefaultGas")) },
-        { json: "domain_oracle_data", js: "domain_oracle_data", typ: a(r("DomainOracleData")) },
+        { json: "default_gas", js: "default_gas", typ: "" },
+        { json: "domain_default_gas", js: "domain_default_gas", typ: a(r("DomainDefaultGasElement")) },
+        { json: "domain_oracle_data", js: "domain_oracle_data", typ: a(r("DomainOracleDatumElement")) },
     ], "any"),
-    "DomainDefaultGas": o([
-        { json: "default_gas", js: "default_gas", typ: 0 },
+    "DomainDefaultGasElement": o([
+        { json: "default_gas", js: "default_gas", typ: "" },
         { json: "domain", js: "domain", typ: 0 },
     ], "any"),
-    "DomainOracleData": o([
-        { json: "data_value", js: "data_value", typ: r("ExchangeRateAndGasPrice") },
+    "DomainOracleDatumElement": o([
+        { json: "data_value", js: "data_value", typ: r("DataValue") },
         { json: "domain", js: "domain", typ: 0 },
     ], "any"),
-    "ExchangeRateAndGasPrice": o([
-        { json: "gas_price", js: "gas_price", typ: 0 },
+    "DataValue": o([
+        { json: "gas_price", js: "gas_price", typ: "" },
         { json: "token_exchange_rate", js: "token_exchange_rate", typ: 0 },
     ], "any"),
     "UpdateOracleData": o([
         { json: "domain", js: "domain", typ: 0 },
-        { json: "oracle_data", js: "oracle_data", typ: r("ExchangeRateAndGasPrice") },
+        { json: "oracle_data", js: "oracle_data", typ: r("DataValue") },
     ], "any"),
-    "CallMessage9": o([
+    "Mailbox": o([
         { json: "dispatch", js: "dispatch", typ: u(undefined, r("Dispatch")) },
         { json: "process", js: "process", typ: u(undefined, r("Process")) },
         { json: "announce", js: "announce", typ: u(undefined, r("Announce")) },
@@ -1078,7 +1573,7 @@ const typeMap: any = {
     "Dispatch": o([
         { json: "body", js: "body", typ: "" },
         { json: "domain", js: "domain", typ: 0 },
-        { json: "gas_payment_limit", js: "gas_payment_limit", typ: 0 },
+        { json: "gas_payment_limit", js: "gas_payment_limit", typ: "" },
         { json: "metadata", js: "metadata", typ: u(undefined, u(null, "")) },
         { json: "recipient", js: "recipient", typ: "" },
         { json: "relayer", js: "relayer", typ: u(undefined, u(null, "")) },
@@ -1087,91 +1582,127 @@ const typeMap: any = {
         { json: "message", js: "message", typ: "" },
         { json: "metadata", js: "metadata", typ: "" },
     ], "any"),
-    "CallMessage4": o([
+    "OperatorIncentives": o([
         { json: "update_reward_address", js: "update_reward_address", typ: r("UpdateRewardAddress") },
     ], false),
     "UpdateRewardAddress": o([
         { json: "new_reward_address", js: "new_reward_address", typ: "" },
     ], "any"),
-    "UpdatePolicy": o([
-        { json: "payer", js: "payer", typ: "" },
-        { json: "update", js: "update", typ: r("CallMessage8") },
-    ], "any"),
-    "CallMessage8": o([
+    "Paymaster": o([
         { json: "register_paymaster", js: "register_paymaster", typ: u(undefined, r("RegisterPaymaster")) },
         { json: "set_payer_for_sequencer", js: "set_payer_for_sequencer", typ: u(undefined, r("SetPayerForSequencer")) },
         { json: "update_policy", js: "update_policy", typ: u(undefined, r("UpdatePolicy")) },
     ], false),
     "RegisterPaymaster": o([
-        { json: "policy", js: "policy", typ: r("PaymasterPolicyInitializer") },
+        { json: "policy", js: "policy", typ: r("Policy") },
     ], "any"),
-    "PaymasterPolicyInitializer": o([
+    "Policy": o([
         { json: "authorized_sequencers", js: "authorized_sequencers", typ: u(r("AuthorizedSequencersClass"), r("AuthorizedSequencersEnum")) },
         { json: "authorized_updaters", js: "authorized_updaters", typ: a("") },
-        { json: "default_payee_policy", js: "default_payee_policy", typ: u(r("PayeePolicyClass"), r("PayeePolicyEnum")) },
-        { json: "payees", js: "payees", typ: a(a(u(r("PayeePolicyClass"), ""))) },
-    ], "any"),
+        { json: "default_payee_policy", js: "default_payee_policy", typ: u(r("DefaultPayeePolicyClass"), r("DefaultPayeePolicyEnum")) },
+        { json: "payees", js: "payees", typ: a(a("any")) },
+    ], false),
     "AuthorizedSequencersClass": o([
         { json: "some", js: "some", typ: a("") },
     ], false),
-    "PayeePolicyClass": o([
+    "DefaultPayeePolicyClass": o([
         { json: "allow", js: "allow", typ: r("Allow") },
     ], false),
     "Allow": o([
         { json: "gas_limit", js: "gas_limit", typ: u(undefined, u(a(3.14), null)) },
-        { json: "max_fee", js: "max_fee", typ: u(undefined, u(0, null)) },
+        { json: "max_fee", js: "max_fee", typ: u(undefined, u(null, "")) },
         { json: "max_gas_price", js: "max_gas_price", typ: u(undefined, u(a(3.14), null)) },
         { json: "transaction_limit", js: "transaction_limit", typ: u(undefined, u(0, null)) },
     ], "any"),
     "SetPayerForSequencer": o([
         { json: "payer", js: "payer", typ: "" },
     ], "any"),
-    "CallMessage6Class": o([
-        { json: "register", js: "register", typ: u(undefined, 0) },
-        { json: "deposit", js: "deposit", typ: u(undefined, 0) },
+    "UpdatePolicy": o([
+        { json: "payer", js: "payer", typ: "" },
+        { json: "update", js: "update", typ: r("UpdatePolicyUpdate") },
+    ], "any"),
+    "UpdatePolicyUpdate": o([
+        { json: "default_policy", js: "default_policy", typ: u(undefined, u(r("DefaultPayeePolicyClass"), r("DefaultPayeePolicyEnum"), null)) },
+        { json: "payee_policies_to_delete", js: "payee_policies_to_delete", typ: u(undefined, u(a(""), null)) },
+        { json: "payee_policies_to_set", js: "payee_policies_to_set", typ: u(undefined, u(a(a("any")), null)) },
+        { json: "sequencer_update", js: "sequencer_update", typ: u(undefined, u(r("SequencerUpdateClass"), r("SequencerUpdateEnum"), null)) },
+        { json: "updaters_to_add", js: "updaters_to_add", typ: u(undefined, u(a(""), null)) },
+        { json: "updaters_to_remove", js: "updaters_to_remove", typ: u(undefined, u(a(""), null)) },
+    ], "any"),
+    "SequencerUpdateClass": o([
+        { json: "update", js: "update", typ: r("SequencerUpdateUpdate") },
     ], false),
-    "CallMessage3": o([
-        { json: "register", js: "register", typ: u(undefined, r("Register")) },
+    "SequencerUpdateUpdate": o([
+        { json: "to_add", js: "to_add", typ: u(undefined, u(a(""), null)) },
+        { json: "to_remove", js: "to_remove", typ: u(undefined, u(a(""), null)) },
+    ], "any"),
+    "ProverIncentivesClass": o([
+        { json: "register", js: "register", typ: u(undefined, "") },
+        { json: "deposit", js: "deposit", typ: u(undefined, "") },
+    ], false),
+    "RevenueShareClass": o([
+        { json: "lower_revenue_percentage", js: "lower_revenue_percentage", typ: u(undefined, r("LowerRevenuePercentage")) },
+        { json: "update_sovereign_admin", js: "update_sovereign_admin", typ: u(undefined, r("UpdateSovereignAdmin")) },
+        { json: "withdraw_rewards", js: "withdraw_rewards", typ: u(undefined, r("WithdrawRewards")) },
+    ], false),
+    "LowerRevenuePercentage": o([
+        { json: "percentage_in_basis_points", js: "percentage_in_basis_points", typ: 0 },
+    ], "any"),
+    "UpdateSovereignAdmin": o([
+        { json: "new_admin", js: "new_admin", typ: "" },
+    ], "any"),
+    "WithdrawRewards": o([
+        { json: "token_id", js: "token_id", typ: "" },
+    ], "any"),
+    "SequencerRegistry": o([
+        { json: "register", js: "register", typ: u(undefined, r("SequencerRegistryRegister")) },
         { json: "deposit", js: "deposit", typ: u(undefined, r("Deposit")) },
         { json: "initiate_withdrawal", js: "initiate_withdrawal", typ: u(undefined, r("InitiateWithdrawal")) },
         { json: "withdraw", js: "withdraw", typ: u(undefined, r("Withdraw")) },
     ], false),
     "Deposit": o([
-        { json: "amount", js: "amount", typ: 0 },
+        { json: "amount", js: "amount", typ: "" },
         { json: "da_address", js: "da_address", typ: "" },
     ], "any"),
     "InitiateWithdrawal": o([
         { json: "da_address", js: "da_address", typ: "" },
     ], "any"),
-    "Register": o([
-        { json: "amount", js: "amount", typ: 0 },
+    "SequencerRegistryRegister": o([
+        { json: "amount", js: "amount", typ: "" },
         { json: "da_address", js: "da_address", typ: "" },
     ], "any"),
     "Withdraw": o([
         { json: "da_address", js: "da_address", typ: "" },
     ], "any"),
-    "CallMessageForConfigurableSpec": o([
-        { json: "Register", js: "Register", typ: u(undefined, r("RegisterObject")) },
-        { json: "Update", js: "Update", typ: u(undefined, r("Update")) },
-        { json: "EnrollRemoteRouter", js: "EnrollRemoteRouter", typ: u(undefined, r("EnrollRemoteRouter")) },
-        { json: "UnEnrollRemoteRouter", js: "UnEnrollRemoteRouter", typ: u(undefined, r("UnEnrollRemoteRouter")) },
-        { json: "TransferRemote", js: "TransferRemote", typ: u(undefined, r("TransferRemote")) },
+    "ValueSetter": o([
+        { json: "set_value", js: "set_value", typ: 0 },
+    ], false),
+    "Warp": o([
+        { json: "register", js: "register", typ: u(undefined, r("WarpRegister")) },
+        { json: "update", js: "update", typ: u(undefined, r("WarpUpdate")) },
+        { json: "enroll_remote_router", js: "enroll_remote_router", typ: u(undefined, r("EnrollRemoteRouter")) },
+        { json: "un_enroll_remote_router", js: "un_enroll_remote_router", typ: u(undefined, r("UnEnrollRemoteRouter")) },
+        { json: "transfer_remote", js: "transfer_remote", typ: u(undefined, r("TransferRemote")) },
     ], false),
     "EnrollRemoteRouter": o([
         { json: "remote_domain", js: "remote_domain", typ: 0 },
         { json: "remote_router_address", js: "remote_router_address", typ: "" },
         { json: "warp_route", js: "warp_route", typ: "" },
     ], "any"),
-    "RegisterObject": o([
-        { json: "admin", js: "admin", typ: u(r("AdminForConfigurableSpecClass"), r("AdminForConfigurableSpecEnum")) },
-        { json: "ism", js: "ism", typ: u(r("IsmClass"), r("IsmEnum")) },
-        { json: "remote_routers", js: "remote_routers", typ: a(a(u(0, ""))) },
-        { json: "token_source", js: "token_source", typ: u(r("TokenKindClass"), r("TokenKindEnum")) },
+    "WarpRegister": o([
+        { json: "admin", js: "admin", typ: u(r("AdminClass"), r("AdminEnum")) },
+        { json: "inbound_limit_replenishment_per_slot", js: "inbound_limit_replenishment_per_slot", typ: "" },
+        { json: "inbound_transferrable_tokens_limit", js: "inbound_transferrable_tokens_limit", typ: "" },
+        { json: "ism", js: "ism", typ: u(r("PurpleJSONSchema"), r("IsmEnum")) },
+        { json: "outbound_limit_replenishment_per_slot", js: "outbound_limit_replenishment_per_slot", typ: "" },
+        { json: "outbound_transferrable_tokens_limit", js: "outbound_transferrable_tokens_limit", typ: "" },
+        { json: "remote_routers", js: "remote_routers", typ: a(a("any")) },
+        { json: "token_source", js: "token_source", typ: u(r("TokenSourceClass"), r("TokenSourceEnum")) },
     ], "any"),
-    "AdminForConfigurableSpecClass": o([
+    "AdminClass": o([
         { json: "InsecureOwner", js: "InsecureOwner", typ: "" },
     ], false),
-    "IsmClass": o([
+    "PurpleJSONSchema": o([
         { json: "TrustedRelayer", js: "TrustedRelayer", typ: u(undefined, r("TrustedRelayer")) },
         { json: "MessageIdMultisig", js: "MessageIdMultisig", typ: u(undefined, r("MessageIDMultisig")) },
     ], false),
@@ -1182,7 +1713,7 @@ const typeMap: any = {
     "TrustedRelayer": o([
         { json: "relayer", js: "relayer", typ: "" },
     ], "any"),
-    "TokenKindClass": o([
+    "TokenSourceClass": o([
         { json: "Synthetic", js: "Synthetic", typ: u(undefined, r("Synthetic")) },
         { json: "Collateral", js: "Collateral", typ: u(undefined, r("Collateral")) },
     ], false),
@@ -1195,9 +1726,9 @@ const typeMap: any = {
         { json: "remote_token_id", js: "remote_token_id", typ: "" },
     ], "any"),
     "TransferRemote": o([
-        { json: "amount", js: "amount", typ: 0 },
+        { json: "amount", js: "amount", typ: "" },
         { json: "destination_domain", js: "destination_domain", typ: 0 },
-        { json: "gas_payment_limit", js: "gas_payment_limit", typ: 0 },
+        { json: "gas_payment_limit", js: "gas_payment_limit", typ: "" },
         { json: "recipient", js: "recipient", typ: "" },
         { json: "relayer", js: "relayer", typ: u(undefined, u(null, "")) },
         { json: "warp_route", js: "warp_route", typ: "" },
@@ -1206,36 +1737,53 @@ const typeMap: any = {
         { json: "remote_domain", js: "remote_domain", typ: 0 },
         { json: "warp_route", js: "warp_route", typ: "" },
     ], "any"),
-    "Update": o([
-        { json: "admin", js: "admin", typ: u(undefined, u(r("AdminForConfigurableSpecClass"), r("AdminForConfigurableSpecEnum"), null)) },
-        { json: "ism", js: "ism", typ: u(undefined, u(r("IsmIsmClass"), r("IsmEnum"), null)) },
+    "WarpUpdate": o([
+        { json: "admin", js: "admin", typ: u(undefined, u(r("AdminClass"), r("AdminEnum"), null)) },
+        { json: "inbound_limit_replenishment_per_slot", js: "inbound_limit_replenishment_per_slot", typ: u(undefined, u(null, "")) },
+        { json: "inbound_transferrable_tokens_limit", js: "inbound_transferrable_tokens_limit", typ: u(undefined, u(null, "")) },
+        { json: "ism", js: "ism", typ: u(undefined, u(r("FluffyJSONSchema"), r("IsmEnum"), null)) },
+        { json: "outbound_limit_replenishment_per_slot", js: "outbound_limit_replenishment_per_slot", typ: u(undefined, u(null, "")) },
+        { json: "outbound_transferrable_tokens_limit", js: "outbound_transferrable_tokens_limit", typ: u(undefined, u(null, "")) },
         { json: "warp_route", js: "warp_route", typ: "" },
     ], "any"),
-    "IsmIsmClass": o([
+    "FluffyJSONSchema": o([
         { json: "TrustedRelayer", js: "TrustedRelayer", typ: u(undefined, r("TrustedRelayer")) },
         { json: "MessageIdMultisig", js: "MessageIdMultisig", typ: u(undefined, r("MessageIDMultisig")) },
     ], false),
-    "CallMessage5Enum": [
+    "AttesterIncentivesEnum": [
         "begin_exit_attester",
         "exit_attester",
         "exit_challenger",
     ],
+    "ChainStateEnum": [
+        "TerminateSetupMode",
+    ],
+    "NewContractCreationPolicyEnum": [
+        "everyone",
+    ],
     "AuthorizedSequencersEnum": [
         "all",
     ],
-    "PayeePolicyEnum": [
+    "DefaultPayeePolicyEnum": [
         "deny",
     ],
-    "CallMessage6Enum": [
+    "SequencerUpdateEnum": [
+        "allow_all",
+    ],
+    "ProverIncentivesEnum": [
         "exit",
     ],
-    "AdminForConfigurableSpecEnum": [
+    "RevenueShareEnum": [
+        "activate_revenue_share",
+        "deactivate_revenue_share",
+    ],
+    "AdminEnum": [
         "None",
     ],
     "IsmEnum": [
         "AlwaysTrust",
     ],
-    "TokenKindEnum": [
+    "TokenSourceEnum": [
         "Native",
     ],
 };
