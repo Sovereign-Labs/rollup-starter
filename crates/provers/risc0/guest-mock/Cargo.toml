@@ -15,16 +15,16 @@ risc0-zkvm-platform = { version = "2.2" }
 serde = { version = "1.0.188", features = ["derive", "rc"] }
 
 
-sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9", features = ["evm"] }
-sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9" }
-sov-mock-da = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9" }
-sov-modules-stf-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9" }
-sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9" }
-sov-risc0-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9" }
-sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9" }
-sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9" }
-sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9" }
-sov-metrics = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "c7046e2ffd71b5ba1877a5fb15a40805924e9ac9", optional = true }
+sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696", features = ["evm"] }
+sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696" }
+sov-mock-da = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696" }
+sov-modules-stf-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696" }
+sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696" }
+sov-risc0-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696" }
+sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696" }
+sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696" }
+sov-kernels = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696" }
+sov-metrics = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "d0bbeff2294b3ee3fdb054887a9a05d36d8ec696", optional = true }
 
 
 stf-starter = { path = "../../../stf", default-features = false, features = ["mock_da"] }
