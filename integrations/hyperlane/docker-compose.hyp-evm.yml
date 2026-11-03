@@ -51,7 +51,7 @@ services:
       --yes
 
   validator-ethtest:
-    image: ghcr.io/theodorebugnet/hyperlane-agent:multisig_upgrade-4
+    image: ghcr.io/sovereign-labs/hyperlane-agent:multisig-wallet-pin-1
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
@@ -97,7 +97,7 @@ services:
   # TODO: validator-sovstarter
 
   relayer:
-    image: ghcr.io/theodorebugnet/hyperlane-agent:multisig_upgrade-4
+    image: ghcr.io/sovereign-labs/hyperlane-agent:multisig-wallet-pin-1
     depends_on:
       hyperlane-warp-deploy:
         condition: service_completed_successfully
