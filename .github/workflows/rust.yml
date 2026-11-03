@@ -116,5 +116,5 @@ jobs:
       command: |
         bashtestmd --input GETTING_STARTED_WITH_HYPERLANE.md --output scripts/rollup-starter-hyperlane.sh --tag=test-ci
         chmod +x scripts/rollup-starter-hyperlane.sh
-        ./scripts/rollup-starter-hyperlane.sh
+        ./scripts/rollup-starter-hyperlane.sh || { docker logs hyperlane-relayer-1 2>&1 | tail -n 500; docker logs hyperlane-validator-ethtest-1 2>&1 | tail -n 100; exit 1; }
     secrets: inherit
