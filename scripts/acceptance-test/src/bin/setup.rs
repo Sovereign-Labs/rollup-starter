@@ -3,24 +3,27 @@ use acceptance_test::evm_soak::{
 };
 use acceptance_test::fetch_and_compare::{GetItemBehavior, SlotFetcher};
 use acceptance_test::{
-    cleanup_rollup_state_dir, generate_postgres_password, get_rollup_client,
-    prepare_acceptance_run_plan, prepare_rollup_state_dir, run_soak, run_until_shutdown_signal,
-    spawn_rollup_manager, wait_for_sequencer_ready, write_manager_config, AcceptanceRunPlan,
-    CommonArgs, Directories, PostgresContainerGuard, ResolvedRunSettings, Runtime,
-    ShutdownReceiver, SoakRunOptions, Spec, ThroughputReport, API_URL, SETUP_THROUGHPUT_FILE,
+    cleanup_rollup_state_dir, copy_persistent_mock_data, generate_postgres_password,
+    get_rollup_client, last_version_soak_config, prepare_acceptance_run_plan,
+    prepare_rollup_state_dir, recorded_data_bounds, resync_and_verify_slots, run_soak,
+    run_until_shutdown_signal, spawn_rollup_manager, wait_for_sequencer_ready,
+    write_manager_config, AcceptanceRunPlan, CommonArgs, Directories, ManagedRollupProcess,
+    PostgresContainerGuard, RecordedDataBounds, ResolvedRunSettings, Runtime, ShutdownReceiver,
+    SoakRunOptions, Spec, ThroughputReport, API_URL, SEQUENCER_READY_HANDOVER_TIMEOUT,
+    SEQUENCER_READY_STARTUP_TIMEOUT, SETUP_THROUGHPUT_FILE,
 };
 use anyhow::Context;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use clap::Parser;
 use sov_api_spec::types::{self, AcceptTxBody};
+use std::cmp::Ordering;
 
 use acceptance_test::fetch_and_compare::SlotMonitor;
 use sov_api_spec::ResponseValue;
 use sov_bank::{get_token_id, Amount, CallMessage as BankCallMessage, Coins, TokenId};
 use sov_modules_api::Spec as SpecT;
 use stf_starter::sov_modules_api::capabilities::UniquenessData;
-use stf_starter::sov_modules_api::macros::config_value;
 use stf_starter::sov_modules_api::transaction::{
     PriorityFeeBips, Transaction, UnsignedTransaction,
 };
@@ -41,6 +44,10 @@ struct PreparedSetupRun {
     password: String,
     plan: AcceptanceRunPlan,
     settings: ResolvedRunSettings,
+    /// The bounds of the pre-existing recorded data, when appending onto it (auto-detected).
+    /// `Some` means append mode: resync the historical versions from the persistent MockDA and
+    /// generate only the new last version. `None` regenerates everything from genesis.
+    append_onto: Option<RecordedDataBounds>,
 }
 
 /// Returns true if the new throughput report should overwrite the existing one.
@@ -151,12 +158,46 @@ fn prepare_setup_run(args: Args) -> Result<PreparedSetupRun, anyhow::Error> {
     )?;
     ensure_evm_pinned_cache_config(&directories)?;
     let password = generate_postgres_password()?;
-    let plan = prepare_acceptance_run_plan(&directories, &password, settings.blocks_per_version)?;
+    // Pre-existing recorded data only matters when a durable MockDA from a previous run exists;
+    // without it, any lingering snapshots are stale leftovers a from-genesis run will overwrite.
+    let has_persistent_mock_da = directories
+        .output_dir
+        .join("persistent_mock_da.sqlite")
+        .exists();
+    let recorded_data = if has_persistent_mock_da {
+        recorded_data_bounds(&directories.snapshots_dir)?
+    } else {
+        None
+    };
+    let plan = prepare_acceptance_run_plan(
+        &directories,
+        &password,
+        settings.blocks_per_version,
+        recorded_data,
+    )?;
+
+    // Auto-detect append mode: if there is durable MockDA from a previous run and the spec has
+    // more than one version, resync the historical versions and only generate the new last
+    // version. With no multi-version spec (a single implicit local version) we always regenerate
+    // from genesis, preserving the original single-version behavior.
+    let append_onto = if has_persistent_mock_da && plan.manager_versions.len() > 1 {
+        validate_append_boundary(recorded_data, &plan)?;
+        info!(
+            "Detected persistent MockDA and {} versions: running setup in append mode",
+            plan.manager_versions.len()
+        );
+        Some(recorded_data.expect("validate_append_boundary rejects missing snapshots"))
+    } else {
+        info!("Running setup in from-genesis mode");
+        None
+    };
+
     Ok(PreparedSetupRun {
         directories,
         password,
         plan,
         settings,
+        append_onto,
     })
 }
 
@@ -169,7 +210,15 @@ async fn run_setup(
         password,
         plan,
         settings,
+        append_onto,
     } = prepared;
+
+    // In append mode, restore the durable MockDA so the historical versions can be resynced.
+    // Must happen before the rollup manager is spawned.
+    if append_onto.is_some() {
+        copy_persistent_mock_data(&directories)?;
+    }
+
     let _postgres_guard =
         PostgresContainerGuard::start(&settings.postgres_docker_container_name, &password)?;
     let manager_config_path = directories.output_dir.join("setup_manager_config.json");
@@ -199,28 +248,28 @@ async fn run_setup(
         Some(&directories.output_dir.join("rollup.log")),
     )?;
 
-    // First, run some manual setup. This creates and checks some very simple state with expensive consistency checks.
-    // If manual setup fails, skip soak run and let Drop clean up the manager process.
-    let res = match do_manual_setup(directories.clone(), &mut shutdown_rx).await {
-        Ok(()) => {
-            run_soak(
-                directories.clone(),
-                rollup,
-                plan.soak_config.clone(),
-                SoakRunOptions {
-                    throughput_start_batch,
-                    rollup_stop_height: stop_at_height,
-                    full_slot_save_interval: settings.full_slot_save_interval,
-                    save_slot_snapshots: true,
-                },
-                shutdown_rx.clone(),
-            )
-            .await
-        }
-        Err(err) => {
-            warn!("Manual setup failed, skipping soak run: {err}");
-            Err(err)
-        }
+    let res = if append_onto.is_some() {
+        run_append_generation(
+            &directories,
+            &plan,
+            rollup,
+            stop_at_height,
+            throughput_start_batch,
+            settings.full_slot_save_interval,
+            &mut shutdown_rx,
+        )
+        .await
+    } else {
+        run_from_genesis_generation(
+            &directories,
+            &plan,
+            rollup,
+            stop_at_height,
+            throughput_start_batch,
+            settings.full_slot_save_interval,
+            &mut shutdown_rx,
+        )
+        .await
     };
     match res {
         Ok(throughput_report) => {
@@ -234,6 +283,7 @@ async fn run_setup(
                         )
                     })?;
             }
+            // Re-persist the (now-extended, in append mode) MockDA as the durable baseline.
             save_mock_data(directories.clone())?;
             if settings.cleanup_rollup_state_on_success() {
                 cleanup_rollup_state_dir(&directories.rollup_data_path)?;
@@ -248,6 +298,176 @@ async fn run_setup(
     }
 }
 
+/// From-genesis generation (the default): run the manual setup to seed and assert known state,
+/// then run the soak across all versions, saving snapshots for every slot.
+#[allow(clippy::too_many_arguments)]
+async fn run_from_genesis_generation(
+    directories: &Directories,
+    plan: &AcceptanceRunPlan,
+    rollup: ManagedRollupProcess,
+    stop_at_height: u64,
+    throughput_start_batch: u64,
+    full_slot_save_interval: u64,
+    shutdown_rx: &mut ShutdownReceiver,
+) -> Result<ThroughputReport, anyhow::Error> {
+    // First, run some manual setup. This creates and checks some very simple state with expensive
+    // consistency checks. If manual setup fails, skip the soak run and let Drop clean up the
+    // manager process.
+    match do_manual_setup(directories.clone(), shutdown_rx).await {
+        Ok(()) => {
+            run_soak(
+                directories.clone(),
+                rollup,
+                plan.soak_config.clone(),
+                SoakRunOptions {
+                    throughput_start_batch,
+                    rollup_stop_height: stop_at_height,
+                    full_slot_save_interval,
+                    save_slot_snapshots: true,
+                    snapshot_backfill_start: None,
+                },
+                shutdown_rx.clone(),
+            )
+            .await
+        }
+        Err(err) => {
+            warn!("Manual setup failed, skipping soak run: {err}");
+            Err(err)
+        }
+    }
+}
+
+/// Append generation (post hard-fork): the restored MockDA already contains the historical
+/// versions. Resync and verify them against the existing snapshots, then generate the new last
+/// version, saving its snapshots and re-persisting the extended MockDA. The genesis manual setup
+/// is skipped — its state (incl. the EVM consistency contracts) is already present in the
+/// resynced data.
+async fn run_append_generation(
+    directories: &Directories,
+    plan: &AcceptanceRunPlan,
+    rollup: ManagedRollupProcess,
+    stop_at_height: u64,
+    throughput_start_batch: u64,
+    full_slot_save_interval: u64,
+    shutdown_rx: &mut ShutdownReceiver,
+) -> Result<ThroughputReport, anyhow::Error> {
+    info!(
+        "Append mode: resyncing {} historical version(s) up to batch {} before generating the \
+         new version",
+        plan.manager_versions.len() - 1,
+        plan.expected_setup_batches()
+    );
+    let (_latest_batch_num, first_new_slot) =
+        resync_and_verify_slots(directories, plan, shutdown_rx).await?;
+    info!(
+        "Historical resync complete; the new version's data begins at slot {}",
+        first_new_slot
+    );
+
+    // Wait for the new version's sequencer before driving soak load. This wait spans the version
+    // handover, which includes running the new version's db migration.
+    wait_for_sequencer_ready(shutdown_rx, SEQUENCER_READY_HANDOVER_TIMEOUT).await?;
+
+    let append_soak_config = last_version_soak_config(&plan.soak_config)
+        .ok_or_else(|| anyhow::anyhow!("append requires at least one soak version"))?;
+
+    run_soak(
+        directories.clone(),
+        rollup,
+        append_soak_config,
+        SoakRunOptions {
+            throughput_start_batch,
+            rollup_stop_height: stop_at_height,
+            full_slot_save_interval,
+            save_slot_snapshots: true,
+            // Guarantee contiguous snapshots for the new version: backfill from its first slot.
+            snapshot_backfill_start: Some(first_new_slot),
+        },
+        shutdown_rx.clone(),
+    )
+    .await
+}
+
+/// Classification of the existing persistent data relative to the append fork boundary
+/// (`prev_stop_height` = the second-to-last version's stop height).
+#[derive(Debug, PartialEq, Eq)]
+enum AppendBoundaryCheck {
+    /// Data ends exactly at the boundary (max batch == `prev_stop_height - 1`); safe to append.
+    Ok,
+    /// No snapshots were found at all.
+    NoSnapshots,
+    /// Data already contains the last version's range (would need DA pruning to regenerate).
+    AlreadyContainsLastVersion,
+    /// Data ends before the boundary — covers fewer versions than the spec, or is incomplete.
+    Incomplete,
+}
+
+/// Classify the existing data against the fork boundary, all in batch-number space.
+///
+/// The historical data is itself a previous run's *last* version, which the manager stops at
+/// exactly its `stop_height`, so its max batch is exactly `prev_stop_height - 1`. The resync this
+/// run then performs also requires reaching that batch (it panics otherwise), so the boundary
+/// must match exactly — the data must end equal to it; below means incomplete, above means the
+/// last version is already present.
+fn classify_append_boundary(max_batch: Option<u64>, prev_stop_height: u64) -> AppendBoundaryCheck {
+    let Some(batch) = max_batch else {
+        return AppendBoundaryCheck::NoSnapshots;
+    };
+    let expected_max_batch = prev_stop_height.saturating_sub(1);
+    match batch.cmp(&expected_max_batch) {
+        Ordering::Less => AppendBoundaryCheck::Incomplete,
+        Ordering::Equal => AppendBoundaryCheck::Ok,
+        Ordering::Greater => AppendBoundaryCheck::AlreadyContainsLastVersion,
+    }
+}
+
+/// Validate that the existing persistent data ends exactly at the fork boundary so a single
+/// version can be appended without pruning the MockDA. Slot numbers run ahead of batch numbers
+/// (empty DA slots, genesis warmup slots), so the comparison is done in batch-number space.
+fn validate_append_boundary(
+    recorded: Option<RecordedDataBounds>,
+    plan: &AcceptanceRunPlan,
+) -> Result<(), anyhow::Error> {
+    let num_versions = plan.manager_versions.len();
+    // Append is only selected when num_versions > 1, so [num_versions - 2] is valid.
+    let prev_stop_height = plan.manager_versions[num_versions - 2]
+        .stop_height
+        .expect("non-last acceptance-test versions must have a stop height");
+    debug_assert_eq!(
+        prev_stop_height,
+        (num_versions as u64 - 1) * plan.blocks_per_version
+    );
+    let max_batch = recorded.map(|bounds| bounds.end_rollup_height.saturating_sub(1));
+
+    match classify_append_boundary(max_batch, prev_stop_height) {
+        AppendBoundaryCheck::Ok => {
+            info!(
+                "Append boundary validated: existing data ends at batch {} (previous version \
+                 stop height {prev_stop_height})",
+                max_batch.expect("Ok implies a snapshot batch number")
+            );
+            Ok(())
+        }
+        AppendBoundaryCheck::NoSnapshots => anyhow::bail!(
+            "append mode selected (persistent MockDA + {num_versions} versions) but no snapshots \
+             were found. Clear acceptance-test-data and run a from-genesis setup instead."
+        ),
+        AppendBoundaryCheck::AlreadyContainsLastVersion => anyhow::bail!(
+            "append mode: existing snapshots already contain data for the last version (max \
+             batch {max_batch:?} >= previous version stop height {prev_stop_height}). \
+             Regenerating an existing version requires pruning the MockDA, which is not \
+             supported. Clear acceptance-test-data to fully regenerate from genesis."
+        ),
+        AppendBoundaryCheck::Incomplete => anyhow::bail!(
+            "append mode: existing snapshots end at batch {max_batch:?}, short of the expected \
+             previous-version boundary {} (stop height {prev_stop_height}). The persistent data \
+             covers fewer versions than the spec or is incomplete. Clear acceptance-test-data to \
+             fully regenerate from genesis.",
+            prev_stop_height.saturating_sub(1)
+        ),
+    }
+}
+
 /// Runs a sequence of two batches, one with a create token, and one with a mint and transfer.
 /// Since we know exactly what state will be generated, we can make fine-grained assertions about the state using this manual setup.
 async fn do_manual_setup(
@@ -255,7 +475,7 @@ async fn do_manual_setup(
     shutdown_rx: &mut ShutdownReceiver,
 ) -> Result<(), anyhow::Error> {
     info!("Rollup started, waiting for sequencer to be ready");
-    wait_for_sequencer_ready(shutdown_rx).await?;
+    wait_for_sequencer_ready(shutdown_rx, SEQUENCER_READY_STARTUP_TIMEOUT).await?;
     info!("Sequencer is ready, sending txs");
 
     // Send the known good txs: Create token, mint token, transfer token
@@ -462,10 +682,11 @@ fn save_mock_data(directories: Directories) -> Result<(), anyhow::Error> {
 fn encode_and_sign_tx(msg: RuntimeCall<Spec>) -> Result<RawTx, anyhow::Error> {
     let utx = UnsignedTransaction::<Runtime, Spec>::new(
         msg,
-        config_value!("CHAIN_ID"),
+        <Runtime as sov_modules_stf_blueprint::Runtime<Spec>>::CHAIN_HASH,
         PriorityFeeBips(0),
         Amount::new(100_000_000),
         UniquenessData::Generation(0),
+        None,
         None,
     );
     let priv_key: <<Spec as SpecT>::CryptoSpec as CryptoSpec>::PrivateKey = serde_json::from_str(
@@ -588,5 +809,58 @@ async fn get(client: &reqwest::Client, url: &str) -> anyhow::Result<Option<serde
         Ok(None)
     } else {
         Err(anyhow::anyhow!("Failed to get {}", url))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // With blocks_per_version=1000 and 2 versions, the previous (second-to-last) version stops at
+    // height 1000, so the historical data must end at batch 999.
+    const PREV_STOP_HEIGHT: u64 = 1000;
+
+    #[test]
+    fn append_boundary_ok_at_exact_boundary() {
+        assert_eq!(
+            classify_append_boundary(Some(PREV_STOP_HEIGHT - 1), PREV_STOP_HEIGHT),
+            AppendBoundaryCheck::Ok
+        );
+    }
+
+    #[test]
+    fn append_boundary_incomplete_below_boundary() {
+        // Even one batch short is rejected (the resync would otherwise panic).
+        assert_eq!(
+            classify_append_boundary(Some(PREV_STOP_HEIGHT - 2), PREV_STOP_HEIGHT),
+            AppendBoundaryCheck::Incomplete
+        );
+        // A whole version short is also Incomplete.
+        assert_eq!(
+            classify_append_boundary(Some(0), PREV_STOP_HEIGHT),
+            AppendBoundaryCheck::Incomplete
+        );
+    }
+
+    #[test]
+    fn append_boundary_detects_existing_last_version() {
+        // max_batch == prev_stop_height means height prev_stop_height+1 already exists, i.e. the
+        // last version's first block — would need DA pruning.
+        assert_eq!(
+            classify_append_boundary(Some(PREV_STOP_HEIGHT), PREV_STOP_HEIGHT),
+            AppendBoundaryCheck::AlreadyContainsLastVersion
+        );
+        assert_eq!(
+            classify_append_boundary(Some(2 * PREV_STOP_HEIGHT - 1), PREV_STOP_HEIGHT),
+            AppendBoundaryCheck::AlreadyContainsLastVersion
+        );
+    }
+
+    #[test]
+    fn append_boundary_no_snapshots() {
+        assert_eq!(
+            classify_append_boundary(None, PREV_STOP_HEIGHT),
+            AppendBoundaryCheck::NoSnapshots
+        );
     }
 }

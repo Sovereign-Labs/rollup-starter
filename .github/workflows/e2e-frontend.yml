@@ -44,7 +44,7 @@ jobs:
 
   e2e-metamask:
     name: "MetaMask E2E Tests"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build-rollup
     steps:
       - uses: actions/checkout@v4
@@ -94,7 +94,7 @@ jobs:
 
   e2e-privy:
     name: "Privy E2E Tests"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build-rollup
     steps:
       - uses: actions/checkout@v4

@@ -1,19 +1,17 @@
-use acceptance_test::fetch_and_compare::SlotFetcher;
 use acceptance_test::{
-    cleanup_rollup_state_dir, extend_last_stop_height,
-    fetch_and_compare::{compare_against_snapshot, load_snapshot_json},
-    generate_postgres_password, get_rollup_client, prepare_acceptance_run_plan_with_constants,
-    prepare_rollup_state_dir, run_soak, run_until_shutdown_signal, shutdown_error,
-    sleep_or_shutdown, spawn_rollup_manager, wait_for_shutdown, write_manager_config,
-    AcceptanceRunPlan, CommonArgs, Directories, LocalConstantsManifest, PostgresContainerGuard,
-    ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions, API_URL,
+    cleanup_rollup_state_dir, copy_persistent_mock_data, extend_last_stop_height,
+    generate_postgres_password, prepare_acceptance_run_plan, prepare_rollup_state_dir,
+    recorded_data_bounds, resync_and_verify_slots, run_soak, run_until_shutdown_signal,
+    spawn_rollup_manager, write_manager_config, AcceptanceRunPlan, CommonArgs, Directories,
+    PostgresContainerGuard, ResolvedRunSettings, RunProfile, ShutdownReceiver, SoakRunOptions,
 };
-use acceptance_test::{wait_for_sequencer_ready, ThroughputReport, SETUP_THROUGHPUT_FILE};
+use acceptance_test::{
+    wait_for_sequencer_ready, ThroughputReport, SEQUENCER_READY_HANDOVER_TIMEOUT,
+    SETUP_THROUGHPUT_FILE,
+};
 use anyhow::Context;
 use chrono::Utc;
 use clap::Parser;
-use sov_api_spec::types::{self, GetSlotByIdChildren, Slot};
-use std::time::Duration;
 use tracing::info;
 
 struct PreparedTestRun {
@@ -31,7 +29,7 @@ async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,hyper=info,sov_sequencer::rest_api=off,tower_http::trace=off,alloy_transport_http=warn,alloy_rpc_client=warn")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("debug,hyper=info,sov_sequencer::rest_api=off,tower_http::trace=off,alloy_transport_http=warn,alloy_rpc_client=warn,rustls=info,reqwest=info")),
         )
         .init();
 
@@ -49,69 +47,6 @@ async fn main() -> Result<(), anyhow::Error> {
     result
 }
 
-fn ignore_file_not_found<OK: Default>(e: std::io::Error) -> std::io::Result<OK> {
-    if e.kind() == std::io::ErrorKind::NotFound {
-        Ok(OK::default())
-    } else {
-        Err(e)
-    }
-}
-
-fn copy_persistent_mock_data(directories: &Directories) -> Result<(), anyhow::Error> {
-    tracing::info!("Copying persistent mock data back to mock_da.sqlite");
-    // Clean up any files from any previous runs. This is needed particularly for the shm and wal
-    // files since they may not get overwritten by a copy, but we do all three for consistency.
-    for stale_file in [
-        directories.output_dir.join("mock_da.sqlite"),
-        directories.output_dir.join("mock_da.sqlite-shm"),
-        directories.output_dir.join("mock_da.sqlite-wal"),
-    ] {
-        std::fs::remove_file(&stale_file)
-            .or_else(ignore_file_not_found)
-            .with_context(|| {
-                format!(
-                    "failed to remove stale mock DA file {}",
-                    stale_file.display()
-                )
-            })?;
-    }
-
-    // Then copy the base file, always
-    let persistent_mock_da = directories.output_dir.join("persistent_mock_da.sqlite");
-    let mock_da = directories.output_dir.join("mock_da.sqlite");
-    std::fs::copy(&persistent_mock_da, &mock_da).with_context(|| {
-        format!(
-            "failed to copy persistent mock DA database from {} to {}",
-            persistent_mock_da.display(),
-            mock_da.display()
-        )
-    })?;
-    // And the dangling wal and shm only if they exist
-    for (persistent_sidecar, mock_da_sidecar) in [
-        (
-            directories.output_dir.join("persistent_mock_da.sqlite-shm"),
-            directories.output_dir.join("mock_da.sqlite-shm"),
-        ),
-        (
-            directories.output_dir.join("persistent_mock_da.sqlite-wal"),
-            directories.output_dir.join("mock_da.sqlite-wal"),
-        ),
-    ] {
-        std::fs::copy(&persistent_sidecar, &mock_da_sidecar)
-            .or_else(ignore_file_not_found)
-            .with_context(|| {
-                format!(
-                    "failed to copy persistent mock DA sidecar from {} to {}",
-                    persistent_sidecar.display(),
-                    mock_da_sidecar.display()
-                )
-            })?;
-    }
-
-    tracing::info!("Persistent mock data copied back to mock_da.sqlite");
-    Ok(())
-}
-
 fn prepare_test_run(args: Args) -> Result<PreparedTestRun, anyhow::Error> {
     let throughput_check = throughput_check_enabled(&args);
     let settings = ResolvedRunSettings::from_common_args(args.common);
@@ -121,11 +56,12 @@ fn prepare_test_run(args: Args) -> Result<PreparedTestRun, anyhow::Error> {
         &directories.rollup_data_path,
         settings.on_existing_rollup_state,
     )?;
-    let plan = prepare_acceptance_run_plan_with_constants(
+    let recorded_data = recorded_data_bounds(&directories.snapshots_dir)?;
+    let plan = prepare_acceptance_run_plan(
         &directories,
         &password,
         settings.blocks_per_version,
-        LocalConstantsManifest::AcceptanceTest,
+        recorded_data,
     )?;
     Ok(PreparedTestRun {
         directories,
@@ -154,15 +90,6 @@ async fn run_test(
     // Start postgres and keep it alive for the test duration. Drop cleanup runs last.
     let _postgres_guard =
         PostgresContainerGuard::start(&settings.postgres_docker_container_name, &password)?;
-    let expected_setup_batches = plan
-        .manager_versions
-        .last()
-        .expect("Acceptance testing must have at least one rollup version")
-        .stop_height
-        .expect("Acceptance testing last rollup version must have stop height")
-        // Genesis doesn't have a batch; this has the result that batch numbers lag 1 behind the
-        // rollup height.
-        .saturating_sub(1);
     let manager_versions =
         extend_last_stop_height(&plan.manager_versions, settings.blocks_per_version);
     let manager_config_path = directories
@@ -183,72 +110,13 @@ async fn run_test(
         None,
     )?;
 
-    // Wait up to 60s for the rollup to be ready
-    for _ in 0..120 {
-        if reqwest::get(&format!("{}/ledger/slots/0", API_URL))
-            .await
-            .is_ok_and(|response| response.status().is_success())
-        {
-            break;
-        }
-        sleep_or_shutdown(Duration::from_millis(500), &mut shutdown_rx).await?;
-    }
+    let (latest_batch_num, _first_new_slot) =
+        resync_and_verify_slots(&directories, &plan, &mut shutdown_rx).await?;
 
-    let mut slot_fetcher = SlotFetcher::new(get_rollup_client()?, &directories);
-    slot_fetcher.subscribe_slots(false).await?;
-
-    let mut checked = 0;
-    let client = get_rollup_client()?;
-    let mut latest_batch_num = 0;
-    'outer: loop {
-        let slot = tokio::select! {
-            slot = slot_fetcher.next_slot() => slot?.unwrap(),
-            reason = wait_for_shutdown(&mut shutdown_rx) => return Err(shutdown_error(reason)),
-        };
-        for slot_number in checked..=slot.number {
-            let Ok(snapshot) = load_snapshot_json(slot_number, &directories.snapshots_dir) else {
-                // We might be missing a few slots at the beginning.
-                // If the slot number is less than 10, just ignore the missing snapshot.
-                if slot_number < 10 {
-                    continue;
-                } else if latest_batch_num < expected_setup_batches {
-                    panic!("Missing snapshot for slot {}", slot_number);
-                } else {
-                    // Once we've passed the setup batch count and we find the first missing snapshot, we're done.
-                    tracing::info!(
-                        "Missing snapshot found at slot {}. Finished resyncing.",
-                        slot_number
-                    );
-                    break 'outer;
-                }
-            };
-            let slot_snapshot: Slot = serde_json::from_value(snapshot.clone()).unwrap();
-            latest_batch_num = slot_snapshot.batch_range.end.saturating_sub(1);
-            let include_children = if slot_snapshot.batches.is_empty() {
-                None
-            } else {
-                Some(GetSlotByIdChildren::X1)
-            };
-            let slot = client
-                .get_slot_by_id(&types::IntOrHash::Integer(slot_number), include_children)
-                .await?;
-            compare_against_snapshot(
-                &slot.into_inner(),
-                snapshot,
-                &format!("slot_{}", slot_number),
-                false,
-            )?;
-        }
-        checked = slot.number;
-    }
-
-    tracing::info!(
-        "Rollup resync complete. All slots match their snapshots. Found {} batches.",
-        latest_batch_num
-    );
-
-    // Wait for the sequencer to resync to the empty DA slots
-    wait_for_sequencer_ready(&mut shutdown_rx).await?;
+    // Wait for the sequencer to resync to the empty DA slots. This wait spans the version
+    // handover, which may include running the new version's db migration, so use the
+    // generous timeout.
+    wait_for_sequencer_ready(&mut shutdown_rx, SEQUENCER_READY_HANDOVER_TIMEOUT).await?;
 
     let resync_soak_config = plan
         .soak_config
@@ -264,6 +132,7 @@ async fn run_test(
             rollup_stop_height: stop_at_height,
             full_slot_save_interval: settings.full_slot_save_interval,
             save_slot_snapshots: false,
+            snapshot_backfill_start: None,
         },
         shutdown_rx.clone(),
     )

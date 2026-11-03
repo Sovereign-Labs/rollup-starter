@@ -60,7 +60,7 @@ where
         match input {
             EvmAndEip712AuthenticatorInput::Evm(tx) => {
                 let (tx_and_raw_hash, auth_data, runtime_call) =
-                    sov_evm::authenticate::<_, _>(&tx.data, state)?;
+                    sov_evm::authenticate::<_, _>(&tx.data, &Rt::CHAIN_HASH, state)?;
 
                 Ok((
                     tx_and_raw_hash,
